@@ -46,13 +46,15 @@ function patchFileInPlace(moduleRequest, originalSource, patchedSource, descript
   }
 }
 
-function ensurePatchedElectronBuilder() {
-  patchFileInPlace(
-    "app-builder-lib/out/targets/nsis/nsisUtil.js",
-    nsisUtilOriginal,
-    nsisUtilPatched,
-    "NSIS util",
-  );
+function ensurePatchedElectronBuilder(options) {
+  if (options.includeNsis) {
+    patchFileInPlace(
+      "app-builder-lib/out/targets/nsis/nsisUtil.js",
+      nsisUtilOriginal,
+      nsisUtilPatched,
+      "NSIS util",
+    );
+  }
   patchFileInPlace(
     "app-builder-lib/out/util/appFileCopier.js",
     appFileCopierOriginal,
@@ -87,7 +89,7 @@ function firstNonEmpty(...values) {
   return "";
 }
 
-function normalizeBuildEnvironment(sourceEnv, args) {
+function normalizeBuildEnvironment(sourceEnv, args, options) {
   const env = { ...sourceEnv };
   const releaseChannel = firstNonEmpty(env.AI_NOVEL_RELEASE_CHANNEL, "beta").toLowerCase();
   const isPublishRequested = args.includes("--publish");
@@ -122,7 +124,7 @@ function normalizeBuildEnvironment(sourceEnv, args) {
   }
 
   const hasSigning = Boolean(signingLink);
-  if (!releaseChannel.startsWith("beta") && !hasSigning && !allowUnsignedRelease) {
+  if (options.isWindowsBuild && !releaseChannel.startsWith("beta") && !hasSigning && !allowUnsignedRelease) {
     throw new Error(
       "Public Windows desktop releases require signing material. Provide CSC_LINK/WIN_CSC_LINK first, or explicitly allow an unsigned release.",
     );
@@ -133,30 +135,39 @@ function normalizeBuildEnvironment(sourceEnv, args) {
   }
 
   console.log(
-    `[dist:desktop] releaseChannel=${releaseChannel} publish=${isPublishRequested ? "yes" : "no"} signing=${hasSigning ? "configured" : allowUnsignedRelease ? "unsigned-opt-in" : "unsigned-beta"}`,
+    `[dist:desktop] platform=${options.isWindowsBuild ? "windows" : options.isMacBuild ? "mac" : "default"} releaseChannel=${releaseChannel} publish=${isPublishRequested ? "yes" : "no"} signing=${options.isWindowsBuild ? hasSigning ? "configured" : allowUnsignedRelease ? "unsigned-opt-in" : "unsigned-beta" : "platform-managed"}`,
   );
 
   return env;
 }
 
 function main() {
-  ensurePatchedElectronBuilder();
+  const requestedArgs = process.argv.slice(2);
+  const isWindowsBuild = requestedArgs.includes("--win");
+  const isMacBuild = requestedArgs.includes("--mac");
+  ensurePatchedElectronBuilder({ includeNsis: isWindowsBuild });
 
-  const shortNsisTemplatesDir = resolveShortNsisTemplateDir();
+  const shortNsisTemplatesDir = isWindowsBuild ? resolveShortNsisTemplateDir() : null;
   const electronBuilderCli = resolveModule("electron-builder/cli.js");
-  const args = ["--config", "electron-builder.config.cjs", ...process.argv.slice(2)];
-  const env = normalizeBuildEnvironment(process.env, args);
+  const args = ["--config", "electron-builder.config.cjs", ...requestedArgs];
+  const env = normalizeBuildEnvironment(process.env, args, { isWindowsBuild, isMacBuild });
 
-  console.log(`[dist:desktop] using NSIS templates from ${shortNsisTemplatesDir}`);
+  if (shortNsisTemplatesDir) {
+    console.log(`[dist:desktop] using NSIS templates from ${shortNsisTemplatesDir}`);
+  }
+
+  const buildEnv = {
+    ...env,
+    [traversalEnvOverrideName]: "true",
+  };
+  if (shortNsisTemplatesDir) {
+    buildEnv[nsisEnvOverrideName] = shortNsisTemplatesDir;
+  }
 
   execFileSync(process.execPath, [electronBuilderCli, ...args], {
     cwd: desktopDir,
     stdio: "inherit",
-    env: {
-      ...env,
-      [nsisEnvOverrideName]: shortNsisTemplatesDir,
-      [traversalEnvOverrideName]: "true",
-    },
+    env: buildEnv,
   });
 }
 
