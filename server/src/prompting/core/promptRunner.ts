@@ -8,6 +8,7 @@ import {
 } from "../../llm/structuredInvoke";
 import {
   buildStructuredResponseFormat,
+  classifyStructuredOutputFailure,
   resolveStructuredOutputProfile,
   selectStructuredOutputStrategy,
 } from "../../llm/structuredOutput";
@@ -213,6 +214,9 @@ function classifyPromptQualityFailure(error: unknown): PromptQualityFailureKind 
     )
   ) {
     return marked.promptQualityFailureKind;
+  }
+  if (classifyStructuredOutputFailure({ error }) === "request_too_large") {
+    return "request_too_large";
   }
   const message = stringifyPromptError(error).toLowerCase();
   if (message.includes("schema") || message.includes("json") || message.includes("zod") || message.includes("structured")) {

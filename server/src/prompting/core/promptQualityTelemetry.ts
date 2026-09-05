@@ -13,6 +13,7 @@ export type PromptQualityEventName =
 
 export type PromptQualityFailureKind =
   | "llm_error"
+  | "request_too_large"
   | "schema_repair_failed"
   | "post_validate_failed"
   | "empty_output"
@@ -77,6 +78,7 @@ export interface PromptQualitySnapshotEntry {
   budgetObservedCount: number;
   budgetNearLimitCount: number;
   budgetExceededCount: number;
+  requestTooLargeCount: number;
   totalEstimatedRenderedInputTokens: number;
   failuresByKind: Record<PromptQualityFailureKind, number>;
 }
@@ -136,9 +138,11 @@ function createAggregate(event: PromptQualityEvent, key: string): MutablePromptQ
     budgetObservedCount: 0,
     budgetNearLimitCount: 0,
     budgetExceededCount: 0,
+    requestTooLargeCount: 0,
     totalEstimatedRenderedInputTokens: 0,
     failuresByKind: {
       llm_error: 0,
+      request_too_large: 0,
       schema_repair_failed: 0,
       post_validate_failed: 0,
       empty_output: 0,
@@ -214,7 +218,11 @@ export function recordPromptQualityEvent(event: PromptQualityEvent): void {
       aggregate.completedCount += 1;
     } else if (event.event === "failed") {
       aggregate.failedCount += 1;
-      aggregate.failuresByKind[event.failureKind ?? "unknown"] += 1;
+      const failureKind = event.failureKind ?? "unknown";
+      aggregate.failuresByKind[failureKind] += 1;
+      if (failureKind === "request_too_large") {
+        aggregate.requestTooLargeCount += 1;
+      }
     } else if (event.event === "semantic_retry_start") {
       aggregate.semanticRetryStartCount += 1;
     } else if (event.event === "semantic_retry_done") {
