@@ -160,6 +160,8 @@ test("standard world skeleton uses staged generation and deterministic assembly"
       "profile", "rules", "factions", "locations", "relations",
     ]);
     assert.ok(calls.every((request) => request.options.reasoningEffort === "low"));
+    assert.ok(calls.every((request) => request.options.requestBudget?.mode === "observe"));
+    assert.ok(calls.every((request) => request.options.requestBudget?.inputTokenLimit === 12_000));
     assert.equal(result.structuredData.rules.axioms.length, 5);
     assert.equal(result.structuredData.factions.length, 3);
     assert.equal(result.structuredData.forces.length, 5);

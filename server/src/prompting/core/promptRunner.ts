@@ -29,6 +29,11 @@ import {
   type PromptQualityFailureKind,
 } from "./promptQualityTelemetry";
 import { appendStructuredOutputHintMessages } from "./structuredOutputHint";
+import {
+  evaluateLlmRequestBudget,
+  LlmRequestBudgetError,
+  type LlmRequestBudgetSnapshot,
+} from "../../llm/requestBudget";
 import type {
   PromptAsset,
   PromptExecutionOptions,
@@ -192,6 +197,9 @@ function markPromptQualityFailure(error: unknown, failureKind: PromptQualityFail
 }
 
 function classifyPromptQualityFailure(error: unknown): PromptQualityFailureKind {
+  if (error instanceof LlmRequestBudgetError) {
+    return "budget_exceeded";
+  }
   const marked = error as { promptQualityFailureKind?: unknown };
   if (
     marked
@@ -358,6 +366,29 @@ function logPromptEvent(input: {
   );
 }
 
+function logPromptBudget(input: {
+  asset: PromptAsset<unknown, unknown, unknown>;
+  budget: LlmRequestBudgetSnapshot;
+  stage?: string;
+  provider?: LLMProvider;
+  model?: string;
+}): void {
+  console.info(
+    [
+      "[prompt.budget]",
+      `promptId=${input.asset.id}`,
+      `promptVersion=${input.asset.version}`,
+      input.stage ? `stage=${input.stage}` : "",
+      input.provider ? `provider=${input.provider}` : "",
+      input.model ? `model=${input.model}` : "",
+      `estimatedInputTokens=${input.budget.estimatedInputTokens}`,
+      `inputTokenLimit=${input.budget.effectiveInputTokenLimit ?? "unknown"}`,
+      `requestedOutputTokens=${input.budget.requestedOutputTokens ?? "unknown"}`,
+      `status=${input.budget.status}`,
+    ].filter(Boolean).join(" "),
+  );
+}
+
 function recordPromptCompletion(input: {
   asset: PromptAsset<unknown, unknown, unknown>;
   output: unknown;
@@ -369,6 +400,7 @@ function recordPromptCompletion(input: {
   renderedPromptChars?: number;
   tokenUsage?: LlmTokenUsageSnapshot | null;
   postValidateFailureRecovered?: boolean;
+  requestBudget?: LlmRequestBudgetSnapshot;
 }): void {
   recordPromptQualityEvent({
     event: "completed",
@@ -391,6 +423,7 @@ function recordPromptCompletion(input: {
     postValidateFailureRecovered: input.postValidateFailureRecovered,
     emptyOutput: isPromptOutputEmpty(input.output),
     tokenUsage: input.tokenUsage,
+    requestBudget: input.requestBudget,
   });
 }
 
@@ -403,6 +436,7 @@ function recordPromptFailure(input: {
   latencyMs: number;
   renderedPromptChars?: number;
   error: unknown;
+  requestBudget?: LlmRequestBudgetSnapshot;
 }): void {
   recordPromptQualityEvent({
     event: "failed",
@@ -422,6 +456,7 @@ function recordPromptFailure(input: {
     semanticRetryUsed: input.invocation.semanticRetryUsed,
     semanticRetryAttempts: input.invocation.semanticRetryAttempts,
     failureKind: classifyPromptQualityFailure(input.error),
+    requestBudget: input.requestBudget,
   });
 }
 
@@ -486,6 +521,7 @@ function buildPromptRunResult<T>(input: {
   renderedPromptChars?: number;
   tokenUsage?: LlmTokenUsageSnapshot | null;
   postValidateFailureRecovered?: boolean;
+  requestBudget?: LlmRequestBudgetSnapshot;
 }): PromptRunResult<T> {
   const meta = {
     provider: input.provider,
@@ -493,6 +529,7 @@ function buildPromptRunResult<T>(input: {
     latencyMs: input.latencyMs,
     invocation: input.invocation,
     tokenUsage: input.tokenUsage ?? null,
+    requestBudget: input.requestBudget,
   };
   logPromptCompletion({
     meta: input.invocation,
@@ -511,6 +548,7 @@ function buildPromptRunResult<T>(input: {
     renderedPromptChars: input.renderedPromptChars,
     tokenUsage: input.tokenUsage,
     postValidateFailureRecovered: input.postValidateFailureRecovered,
+    requestBudget: input.requestBudget,
   });
   return {
     output: input.output,
@@ -754,7 +792,26 @@ export async function runStructuredPrompt<I, O, R = O>(input: {
   });
   const startedAt = Date.now();
   const renderedPromptChars = estimateRenderedPromptChars(messages);
+  const requestBudget = evaluateLlmRequestBudget({
+    renderedPromptChars,
+    inputTokenLimit: input.options?.requestBudget?.inputTokenLimit,
+    safetyMarginTokens: input.options?.requestBudget?.safetyMarginTokens,
+    maxTokens: input.options?.maxTokens,
+  });
+  logPromptBudget({
+    asset: input.asset as PromptAsset<unknown, unknown, unknown>,
+    budget: requestBudget,
+    stage: input.options?.stage,
+    provider: input.options?.provider,
+    model: input.options?.model,
+  });
   try {
+    if (
+      input.options?.requestBudget?.mode === "reject"
+      && requestBudget.status === "exceeds_limit"
+    ) {
+      throw new LlmRequestBudgetError(requestBudget);
+    }
     const result = await promptRunnerStructuredInvoker<R>({
       label: `${input.asset.id}@${input.asset.version}`,
       provider: input.options?.provider,
@@ -825,6 +882,7 @@ export async function runStructuredPrompt<I, O, R = O>(input: {
       renderedPromptChars,
       tokenUsage: result.tokenUsage,
       postValidateFailureRecovered: resolved.postValidateFailureRecovered,
+      requestBudget,
     });
   } catch (error) {
     recordPromptFailure({
@@ -836,6 +894,7 @@ export async function runStructuredPrompt<I, O, R = O>(input: {
       latencyMs: Date.now() - startedAt,
       renderedPromptChars,
       error,
+      requestBudget,
     });
     throw error;
   }
