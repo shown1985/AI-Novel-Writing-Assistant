@@ -197,4 +197,4 @@
 - 范围：在世界骨架生成和开局展示 Prompt 中明确 `completenessScore` 使用 0-100 的百分制整数，避免不同模型返回 0-1 或 1-10 量纲后在界面显示失真。
 - 非目标：不重算模型对世界质量的判断；不修改 `readyForNovelUse`、缺口列表或世界结构；不引入固定关键词评分。
 - 验收：Prompt 回归测试覆盖百分制整数要求；GLM-5.3-Flash 与 DeepSeek V4 Flash 的 OpenCode Go standard 回放均返回整数百分制，并完成全部结构和入口校验。
-- 当前证据：服务端构建与根类型检查通过，相关回归测试 52/52 通过；DeepSeek 回放返回 `85`，耗时约 43.2 秒；GLM 回放返回 `92`，耗时约 79.0 秒，均为整数且 `readyForNovelUse=true`。提交与 PR 待本阶段提交后登记。
+- 当前证据：服务端构建与根类型检查通过，相关回归测试 52/52 通过；DeepSeek 回放返回 `85`，耗时约 43.2 秒；GLM 回放返回 `92`，耗时约 79.0 秒，均为整数且 `readyForNovelUse=true`。提交：`7ba8fcf6`；个人仓库 PR：[shown1985/AI-Novel-Writing-Assistant#12](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/12)，当前未合并。
