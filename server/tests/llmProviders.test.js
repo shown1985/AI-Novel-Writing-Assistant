@@ -10,6 +10,7 @@ const {
 const { resolveLLMClientOptions, setProviderSecretCache } = require("../dist/llm/factory.js");
 const {
   classifyStructuredOutputFailure,
+  isOpenCodeGoEndpoint,
   resolveStructuredOutputProfile,
   selectStructuredOutputStrategy,
 } = require("../dist/llm/structuredOutput.js");
@@ -65,6 +66,12 @@ test("minimax clamps temperature into supported range", () => {
 
 test("structured output profiles distinguish official, ModelScope Qwen and unknown custom endpoints", () => {
   const schema = z.object({ value: z.string() });
+
+  assert.equal(isOpenCodeGoEndpoint("https://opencode.ai/zen/go/v1"), true);
+  assert.equal(isOpenCodeGoEndpoint("https://opencode.ai/zen/go"), true);
+  assert.equal(isOpenCodeGoEndpoint("https://opencode.ai/zen/v1"), false);
+  assert.equal(isOpenCodeGoEndpoint("https://evil.example/zen/go/v1"), false);
+  assert.equal(isOpenCodeGoEndpoint("not-a-url"), false);
 
   const openaiProfile = resolveStructuredOutputProfile({
     provider: "openai",
@@ -137,6 +144,36 @@ test("structured output profiles distinguish official, ModelScope Qwen and unkno
   });
   assert.equal(deepseekFlashProfile.requiresNonThinkingForStructured, true);
   assert.equal(deepseekFlashProfile.supportsReasoningToggle, true);
+
+  const openCodeDeepSeekProfile = resolveStructuredOutputProfile({
+    provider: "deepseek",
+    model: "deepseek-v4-flash",
+    baseURL: "https://opencode.ai/zen/go/v1",
+    executionMode: "structured",
+  });
+  assert.equal(openCodeDeepSeekProfile.family, "opencode_go");
+  assert.equal(openCodeDeepSeekProfile.preferredStructuredStrategy, "prompt_json");
+  assert.equal(openCodeDeepSeekProfile.requiresNonThinkingForStructured, true);
+  assert.equal(openCodeDeepSeekProfile.supportsReasoningToggle, true);
+
+  const openCodeGlmProfile = resolveStructuredOutputProfile({
+    provider: "glm",
+    model: "glm-5.3-flash",
+    baseURL: "https://opencode.ai/zen/go/v1",
+    executionMode: "structured",
+  });
+  assert.equal(openCodeGlmProfile.family, "opencode_go");
+  assert.equal(openCodeGlmProfile.requiresNonThinkingForStructured, true);
+  assert.equal(openCodeGlmProfile.supportsReasoningToggle, true);
+
+  const openCodeUnknownModelProfile = resolveStructuredOutputProfile({
+    provider: "deepseek",
+    model: "deepseek-chat",
+    baseURL: "https://opencode.ai/zen/go/v1",
+    executionMode: "structured",
+  });
+  assert.notEqual(openCodeUnknownModelProfile.family, "opencode_go");
+  assert.equal(openCodeUnknownModelProfile.requiresNonThinkingForStructured, false);
 
   const kimiProfile = resolveStructuredOutputProfile({
     provider: "kimi",
@@ -306,6 +343,49 @@ test("resolveLLMClientOptions applies structured reasoning and token guardrails"
     assert.equal(deepseekFlash.modelKwargs?.reasoning_effort, undefined);
     assert.equal(deepseekFlash.reasoningEffort, null);
     assert.equal(deepseekFlash.modelKwargs?.enable_thinking, undefined);
+
+    const openCodeDeepSeek = await resolveLLMClientOptions("deepseek", {
+      apiKey: "test-key",
+      model: "deepseek-v4-flash",
+      baseURL: "https://opencode.ai/zen/go/v1",
+      executionMode: "structured",
+      structuredStrategy: "prompt_json",
+      maxTokens: 5000,
+    });
+    assert.equal(openCodeDeepSeek.structuredProfile?.family, "opencode_go");
+    assert.equal(openCodeDeepSeek.reasoningEnabled, false);
+    assert.equal(openCodeDeepSeek.reasoningForcedOff, true);
+    assert.deepEqual(openCodeDeepSeek.modelKwargs?.thinking, { type: "disabled" });
+    assert.equal(openCodeDeepSeek.modelKwargs?.reasoning_effort, undefined);
+    assert.equal(openCodeDeepSeek.reasoningEffort, null);
+
+    const openCodeGlm = await resolveLLMClientOptions("glm", {
+      apiKey: "test-key",
+      model: "glm-5.3-flash",
+      baseURL: "https://opencode.ai/zen/go/v1",
+      executionMode: "structured",
+      structuredStrategy: "prompt_json",
+      maxTokens: 5000,
+    });
+    assert.equal(openCodeGlm.structuredProfile?.family, "opencode_go");
+    assert.equal(openCodeGlm.reasoningEnabled, false);
+    assert.equal(openCodeGlm.reasoningForcedOff, true);
+    assert.equal(openCodeGlm.modelKwargs, undefined);
+    assert.equal(openCodeGlm.reasoningEffort, null);
+
+    const openCodePlain = await resolveLLMClientOptions("deepseek", {
+      apiKey: "test-key",
+      model: "deepseek-v4-flash",
+      baseURL: "https://opencode.ai/zen/go/v1",
+      executionMode: "plain",
+      reasoningEffort: "low",
+    });
+    assert.equal(openCodePlain.structuredProfile, null);
+    assert.equal(openCodePlain.reasoningEnabled, true);
+    assert.equal(openCodePlain.reasoningForcedOff, false);
+    assert.deepEqual(openCodePlain.modelKwargs?.thinking, { type: "enabled" });
+    assert.equal(openCodePlain.modelKwargs?.reasoning_effort, "low");
+    assert.equal(openCodePlain.reasoningEffort, "low");
 
     const deepseekMax = await resolveLLMClientOptions("deepseek", {
       model: "deepseek-v4-pro",

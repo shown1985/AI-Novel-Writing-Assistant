@@ -2,7 +2,7 @@ import { toJSONSchema, type ZodType } from "zod";
 import type { LLMProvider } from "@ai-novel/shared/types/llm";
 import type { ModelRouteRequestProtocol } from "@ai-novel/shared/types/novel";
 import { isBuiltInProvider } from "./providers";
-import { isDeepSeekThinkingModeProvider } from "./reasoning";
+import { isDeepSeekThinkingModeProvider, isGlmReasoningModeProvider } from "./reasoning";
 import type { LlmTokenUsageSnapshot } from "./usageTracking";
 
 export type StructuredExecutionMode = "plain" | "structured";
@@ -49,6 +49,8 @@ const DEEPSEEK_HOST_PATTERN = /(?:^|\.)api\.deepseek\.com$/i;
 const GLM_HOST_PATTERN = /(?:^|\.)open\.bigmodel\.cn$/i;
 const GROK_HOST_PATTERN = /(?:^|\.)api\.x\.ai$/i;
 const MINIMAX_HOST_PATTERN = /(?:^|\.)api\.minimax(?:i)?\.(?:io|com)$/i;
+const OPENCODE_HOST_PATTERN = /(?:^|\.)opencode\.ai$/i;
+const OPENCODE_GO_PATH_PATTERN = /(?:^|\/)zen\/go(?:\/|$)/i;
 
 function normalizeText(value: string | undefined | null): string {
   return (value ?? "").trim().toLowerCase();
@@ -63,6 +65,23 @@ function extractHost(baseURL?: string): string {
     return new URL(trimmed).hostname.toLowerCase();
   } catch {
     return "";
+  }
+}
+
+/**
+ * OpenCode Go exposes an OpenAI-compatible endpoint under /zen/go.  It is a
+ * gateway capability, not a model/provider identity, so it belongs in the
+ * structured-output profile rather than in product services.
+ */
+export function isOpenCodeGoEndpoint(baseURL?: string): boolean {
+  const host = extractHost(baseURL);
+  if (!OPENCODE_HOST_PATTERN.test(host) || !baseURL) {
+    return false;
+  }
+  try {
+    return OPENCODE_GO_PATH_PATTERN.test(new URL(baseURL).pathname);
+  } catch {
+    return false;
   }
 }
 
@@ -164,6 +183,16 @@ export function resolveStructuredOutputProfile(input: {
   const qwenMixedThinkingModel = isQwenMixedThinkingModel(model);
   const qwenThinkingOnlyModel = isQwenThinkingOnlyModel(model);
   const qwenNativeStructuredModel = supportsDashScopeQwenNativeStructuredOutput(model);
+  const isOpenCodeGo = isOpenCodeGoEndpoint(input.baseURL);
+  const isOpenCodeReasoningModel = isDeepSeekThinkingModeProvider(
+    input.provider,
+    input.baseURL,
+    input.model,
+  ) || isGlmReasoningModeProvider(
+    input.provider,
+    input.baseURL,
+    input.model,
+  );
   const isDashScopeQwen = usesOfficialEndpoint("qwen", DASHSCOPE_HOST_PATTERN);
   const isModelScopeQwen = MODELSCOPE_HOST_PATTERN.test(host) || provider.includes("modelscope");
 
@@ -172,6 +201,18 @@ export function resolveStructuredOutputProfile(input: {
       family: "anthropic",
       preferredStructuredStrategy: "prompt_json",
       safeStructuredMaxTokens: 8192,
+    });
+  }
+  if (isOpenCodeGo && isOpenCodeReasoningModel) {
+    return buildProfile({
+      family: "opencode_go",
+      // OpenCode Go is OpenAI-compatible, but its gateway capability should
+      // not be inferred from the upstream vendor's response_format support.
+      // Keep prompt JSON as the portable strategy and protect the structured
+      // response budget by turning reasoning off at the adapter boundary.
+      preferredStructuredStrategy: "prompt_json",
+      requiresNonThinkingForStructured: true,
+      supportsReasoningToggle: true,
     });
   }
   if (usesOfficialEndpoint("gemini", GEMINI_HOST_PATTERN)) {

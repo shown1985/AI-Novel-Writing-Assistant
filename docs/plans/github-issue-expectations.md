@@ -143,3 +143,14 @@
 - 非目标：不把“Too big: expected array to have <=N items”的 Zod 数组校验误报为请求超限；不伪装 Trae/Claude Code 客户端；不调整数据库结构、不删除或覆盖用户数据；不把所有小说生成任务一次性迁移到新上下文投影。
 - 验收：请求超限能稳定归类为 `request_too_large` 并在结构化策略轮换前停止；世界生成与恢复接口返回明确的缩小上下文/拆分建议；思考关闭重试实际传到 provider adapter；阶段提示保留跨实体引用所需 ID 且不会携带完整历史长文本；已有世界骨架阶段、检查点和 fallback 定向测试保持通过；使用 GLM-5.3 Flash 与 DeepSeek V4 Flash 各完成一次 standard 规模世界生成后再进入用户验收。
 - 当前证据：结构化错误分类、非误报 Zod “Too big”、思考参数传递、世界阶段上下文投影、轻量长输入裁剪和既有世界骨架编排定向测试共 35 项全部通过；根 `typecheck`（shared/server/client/desktop）通过。使用全新临时 SQLite 完成 schema push 后，集成套件 136 项中 132 项通过、2 项跳过、2 项失败；失败仍是既有 legacy source 断言与 ComicFactService Prompt 白名单缺口，未涉及本切片。真实模型重现尚未在本阶段执行。
+
+### WGR-009：OpenCode Go 结构化请求能力识别与思考预算保护
+
+- 优先级：P0
+- 状态：待用户真实模型验收
+- 关联 Issue：个人仓库 Issues 当前关闭（GitHub API 返回 410），以下编号继续作为本地索引
+- 实施分支：`codex/world-generation-opencode-capability`
+- 范围：在统一 LLM 能力层识别 OpenCode Go 端点；对 DeepSeek V4 Flash、GLM-5.3 Flash 等结构化 JSON 请求采用非思考默认策略，并继续通过 provider adapter 发送标准关闭参数；普通文本/流式请求保留显式思考配置。新增端点、模型组合与未知自定义端点的回归测试。
+- 非目标：不伪装 Trae/Claude Code 等客户端；不改变 API Key 存储、数据库结构、世界持久化结构或所有任务的 Agent Runtime；不在业务服务中堆叠模型名称分支。
+- 验收：OpenCode Go 结构化请求的 resolved options 标记 `reasoningForcedOff=true` 并携带供应商认可的关闭思考参数；普通文本请求不被强制关闭；官方端点和未知自定义端点保持既有行为；LLM/世界生成定向测试与服务端类型检查通过。
+- 当前证据：OpenCode Go 端点识别、DeepSeek V4/GLM-5.3 Flash 结构化关闭思考、普通文本保留思考、官方与未知自定义端点回归测试均已覆盖；服务端构建、根 typecheck，以及 LLM/推理/会话/结构化调用/世界骨架定向测试共 49 项全部通过。GitHub Issues 当前关闭，远端 Issue 无法创建（API 410）；个人仓库 PR 待推送后建立。真实 OpenCode Go 模型和 UI 世界生成仍需用户验收。
