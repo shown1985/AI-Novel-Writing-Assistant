@@ -1,4 +1,4 @@
-import type { LLMProvider } from "@ai-novel/shared/types/llm";
+import type { LLMProvider, ReasoningEffort } from "@ai-novel/shared/types/llm";
 import type { ModelRouteRequestProtocol } from "@ai-novel/shared/types/novel";
 import { ChatOpenAI } from "@langchain/openai";
 import type { PromptInvocationMeta } from "../prompting/core/promptTypes";
@@ -35,6 +35,7 @@ interface LLMOptions {
   maxTokens?: number;
   timeoutMs?: number;
   reasoningEnabled?: boolean;
+  reasoningEffort?: ReasoningEffort;
   executionMode?: StructuredExecutionMode;
   structuredStrategy?: StructuredOutputStrategy;
   requestProtocol?: ModelRouteRequestProtocol;
@@ -53,6 +54,7 @@ export interface ProviderSecret {
   baseURL?: string;
   displayName?: string;
   reasoningEnabled?: boolean;
+  reasoningEffort?: ReasoningEffort;
   concurrencyLimit?: number | null;
   requestIntervalMs?: number | null;
 }
@@ -69,6 +71,7 @@ export interface ResolvedLLMClientOptions {
   concurrencyLimit: number;
   requestIntervalMs: number;
   reasoningEnabled: boolean;
+  reasoningEffort: ReasoningEffort | null;
   modelKwargs?: Record<string, unknown>;
   includeRawResponse: boolean;
   requestProtocol: ModelRouteRequestProtocol;
@@ -121,6 +124,7 @@ function normalizeProviderSecret(secret: ProviderSecret): ProviderSecret {
     baseURL: normalizeOptionalText(secret.baseURL),
     displayName: normalizeOptionalText(secret.displayName),
     reasoningEnabled: secret.reasoningEnabled ?? true,
+    reasoningEffort: secret.reasoningEffort,
     concurrencyLimit: normalizeLimitValue(secret.concurrencyLimit),
     requestIntervalMs: normalizeLimitValue(secret.requestIntervalMs),
   };
@@ -139,6 +143,7 @@ function toProviderSecret(item: {
   baseURL?: string | null;
   displayName?: string | null;
   reasoningEnabled?: boolean | null;
+  reasoningEffort?: string | null;
   concurrencyLimit?: number | null;
   requestIntervalMs?: number | null;
 }): ProviderSecret {
@@ -148,6 +153,9 @@ function toProviderSecret(item: {
     baseURL: item.baseURL ?? undefined,
     displayName: item.displayName ?? undefined,
     reasoningEnabled: item.reasoningEnabled ?? undefined,
+    reasoningEffort: item.reasoningEffort === "low" || item.reasoningEffort === "high" || item.reasoningEffort === "max"
+      ? item.reasoningEffort
+      : undefined,
     concurrencyLimit: normalizeLimitValue(item.concurrencyLimit),
     requestIntervalMs: normalizeLimitValue(item.requestIntervalMs),
   });
@@ -298,6 +306,7 @@ export async function resolveLLMClientOptions(
     : null;
   const usesNativeStructured = structuredStrategy != null && structuredStrategy !== "prompt_json";
   const requestedReasoningEnabled = options.reasoningEnabled ?? dbSecret?.reasoningEnabled ?? true;
+  const requestedReasoningEffort = options.reasoningEffort ?? dbSecret?.reasoningEffort ?? "high";
   const shouldForceDisableReasoning = Boolean(
     structuredProfile
       && structuredProfile.requiresNonThinkingForStructured
@@ -327,6 +336,7 @@ export async function resolveLLMClientOptions(
     baseURL,
     model,
     reasoningEnabled,
+    reasoningEffort: requestedReasoningEffort,
   });
   const modelKwargs = {
     ...(reasoningBehavior.modelKwargs ?? {}),
@@ -345,6 +355,7 @@ export async function resolveLLMClientOptions(
     concurrencyLimit,
     requestIntervalMs,
     reasoningEnabled: reasoningBehavior.reasoningEnabled,
+    reasoningEffort: reasoningBehavior.reasoningEffort,
     modelKwargs: Object.keys(modelKwargs).length > 0 ? modelKwargs : undefined,
     includeRawResponse: reasoningBehavior.includeRawResponse,
     requestProtocol,
