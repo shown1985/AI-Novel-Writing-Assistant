@@ -169,10 +169,10 @@
 ### WGR-011：地点阶段提示与地图字段契约对齐
 
 - 优先级：P0
-- 状态：本地实现与真实模型回放完成，待创建个人 fork PR
+- 状态：本地实现与真实模型回放完成，待合并与用户验收
 - 关联 Issue：个人仓库 Issues 当前关闭（GitHub API 返回 410），以下编号继续作为本地索引
 - 实施分支：`codex/world-location-prompt-contract`
 - 范围：让地点阶段的 JSON 示例与装配校验保持同一份字段契约，明确要求 `x`、`y`、`directionHint`、`terrain`、`narrativeFunction`、`risk`、`riskLevel`、`entryConstraint`、`exitCost`，不改变世界持久化结构或其他阶段策略。
 - 非目标：不放宽地图字段校验；不在前端补造地点坐标；不调整数据库、模型路由、OpenCode 会话身份或其他世界生成阶段。
 - 验收：地点提示契约回归测试通过；服务端构建通过；使用 OpenCode Go GLM-5.3-Flash 的 standard 科幻世界真实回放完成规则 5、阵营 3、势力 5、地点 6、势力关系 6、地点控制 6、故事入口 3，`readyForNovelUse=true`，完整度 0.92。
-- 当前证据：地点阶段此前因提示示例缺少地图字段而在装配校验失败；补齐示例后，真实回放耗时约 54.6 秒并完整通过，无 `too big`、无错误码 1210。服务端构建与地点/世界骨架定向测试通过，提交与 PR 待本阶段提交后登记。
+- 当前证据：地点阶段此前因提示示例缺少地图字段而在装配校验失败；补齐示例后，真实回放耗时约 54.6 秒并完整通过，无 `too big`、无错误码 1210。服务端构建与地点/世界骨架定向测试 8 项全部通过。提交：`85a48454`；个人仓库 PR：[shown1985/AI-Novel-Writing-Assistant#10](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/10)，当前未合并。
