@@ -247,6 +247,13 @@ export async function getWorldSkeletonGenerationSummary(runId: string) {
   return data;
 }
 
+export async function getLatestUnfinishedWorldSkeletonGeneration() {
+  const { data } = await apiClient.get<ApiResponse<WorldSkeletonGenerationCheckpointSummary | null>>(
+    "/worlds/skeleton/generate/latest",
+  );
+  return data;
+}
+
 export async function recoverWorldSkeleton(runId: string) {
   const { data } = await apiClient.post<ApiResponse<WorldSkeletonGenerationPayload>>(
     `/worlds/skeleton/generate/${encodeURIComponent(runId)}/recover`,

@@ -78,6 +78,31 @@ function requestHash(requestJson: string): string {
 }
 
 export class WorldGenerationCheckpointService implements WorldSkeletonCheckpointStore {
+  private toSummary(run: {
+    id: string;
+    status: string;
+    currentStage: string | null;
+    nextStageIndex: number;
+    lastError: string | null;
+    sourceRoute: string;
+    createdAt: Date;
+    updatedAt: Date;
+    checkpoints: Array<{ stage: string }>;
+  }): WorldSkeletonGenerationCheckpointSummary {
+    const status = run.status === "succeeded" || run.status === "failed" ? run.status : "running";
+    return {
+      runId: run.id,
+      status,
+      currentStage: run.currentStage,
+      nextStageIndex: Math.max(0, run.nextStageIndex),
+      latestStage: run.checkpoints[0]?.stage ?? null,
+      lastError: run.lastError,
+      sourceRoute: run.sourceRoute,
+      createdAt: run.createdAt.toISOString(),
+      updatedAt: run.updatedAt.toISOString(),
+    };
+  }
+
   async startOrResume(input: {
     runId?: string;
     request: WorldSkeletonGenerateInput;
@@ -195,18 +220,16 @@ export class WorldGenerationCheckpointService implements WorldSkeletonCheckpoint
     if (!run) {
       return null;
     }
-    const status = run.status === "succeeded" || run.status === "failed" ? run.status : "running";
-    return {
-      runId: run.id,
-      status,
-      currentStage: run.currentStage,
-      nextStageIndex: Math.max(0, run.nextStageIndex),
-      latestStage: run.checkpoints[0]?.stage ?? null,
-      lastError: run.lastError,
-      sourceRoute: run.sourceRoute,
-      createdAt: run.createdAt.toISOString(),
-      updatedAt: run.updatedAt.toISOString(),
-    };
+    return this.toSummary(run);
+  }
+
+  async getLatestUnfinishedSummary(): Promise<WorldSkeletonGenerationCheckpointSummary | null> {
+    const run = await prisma.worldGenerationRun.findFirst({
+      where: { status: { in: ["running", "failed"] } },
+      orderBy: { updatedAt: "desc" },
+      include: { checkpoints: { orderBy: { sequence: "desc" }, take: 1 } },
+    });
+    return run ? this.toSummary(run) : null;
   }
 }
 

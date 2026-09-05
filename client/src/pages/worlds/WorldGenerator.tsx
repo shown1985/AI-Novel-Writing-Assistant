@@ -26,6 +26,7 @@ import LLMSelector from "@/components/common/LLMSelector";
 import {
   createWorld,
   generateWorldSkeleton,
+  getLatestUnfinishedWorldSkeletonGeneration,
   getWorldSkeletonGenerationSummary,
   recoverWorldSkeleton,
   WORLD_INSPIRATION_ANALYZE_STREAM_PATH,
@@ -119,10 +120,10 @@ export default function WorldGenerator() {
 
   useEffect(() => {
     const storedRunId = window.localStorage.getItem(WORLD_GENERATION_RUN_STORAGE_KEY);
-    if (!storedRunId) {
-      return;
-    }
-    void getWorldSkeletonGenerationSummary(storedRunId)
+    const summaryRequest = storedRunId
+      ? getWorldSkeletonGenerationSummary(storedRunId).catch(() => getLatestUnfinishedWorldSkeletonGeneration())
+      : getLatestUnfinishedWorldSkeletonGeneration();
+    void summaryRequest
       .then((response) => {
         const summary = response.data;
         if (!summary || summary.status === "succeeded") {
@@ -135,8 +136,10 @@ export default function WorldGenerator() {
       })
       .catch(() => {
         // Keep the local run id so a temporary network failure can be retried from this page.
-        setGenerationRunId(storedRunId);
-        setStep(2);
+        if (storedRunId) {
+          setGenerationRunId(storedRunId);
+          setStep(2);
+        }
       });
   }, []);
 

@@ -200,6 +200,10 @@ export class WorldService {
     return worldGenerationCheckpointService.getSummary(runId);
   }
 
+  async getLatestUnfinishedSkeletonGenerationSummary() {
+    return worldGenerationCheckpointService.getLatestUnfinishedSummary();
+  }
+
   async createWorld(input: CreateWorldInput) {
     const knowledgeDocumentIds = uniqueKnowledgeDocumentIds(input.knowledgeDocumentIds);
     if (knowledgeDocumentIds.length > 0) {

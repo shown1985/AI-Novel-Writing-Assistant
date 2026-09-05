@@ -189,6 +189,23 @@ export function registerGenerationWorldRoutes(router: Router): void {
   );
 
   router.get(
+    "/skeleton/generate/latest",
+    requireWorldWizard,
+    async (_req, res, next) => {
+      try {
+        const data = await worldService.getLatestUnfinishedSkeletonGenerationSummary();
+        res.status(200).json({
+          success: true,
+          data,
+          message: data ? "已找到未完成的世界生成记录。" : "没有未完成的世界生成记录。",
+        } satisfies ApiResponse<typeof data>);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  router.get(
     "/skeleton/generate/:runId",
     requireWorldWizard,
     validate({ params: worldGenerationRunParamsSchema }),
