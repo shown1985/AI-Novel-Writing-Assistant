@@ -242,9 +242,11 @@
 ### WGR-017：Agent Runtime 控制平面 MVP
 
 - 优先级：P1
-- 状态：设计候选，待 WGR-014～016 完成
+- 状态：架构审查完成，现有 Runtime 已满足 MVP 控制面；待 WGR-016 人工验收后按需补适配器
 - 关联 Issue：创建失败，个人仓库 API 返回 410
-- 实施分支：后续单独创建，不与预算切片混合
-- 范围：建立任务状态机、阶段调度、预算、超时、重试、检查点、取消和投影的高层控制平面；LLM 仅作为结构化创作与决策能力，由 Provider Adapter 屏蔽端点差异。
-- 非目标：不重写现有 Director；不迁移 MySQL；不新增通用聊天分支；不改变现有 Prompt Registry 规则。
-- 验收：Runtime 可恢复阶段任务、区分可重试与需人工处理的失败、保留局部质量债务不阻断全局链，并通过世界生成与章节生产的兼容回归。
+- 关联 PR：[个人 fork #16](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/16)
+- 实施分支：`codex/agent-runtime-control-plane`
+- 范围：验证并固化现有 `DirectorRuntimeService`、`DirectorRuntimeStore`、`DirectorNodeRunner`、`WorkflowStepModule`、`DirectorPolicyEngine` 与任务投影的控制面边界；只有出现明确缺口时，才增加单一职责的步骤适配器。
+- 非目标：不重写现有 Director；不新增第二套队列、状态机、重试计数或万能 Agent 门面；不迁移 MySQL；不新增通用聊天分支；不改变现有 Prompt Registry 规则。
+- 验收：现有 Runtime 可恢复阶段任务、区分可重试与需人工处理的失败、保留局部质量债务不阻断全局链；世界 `world_setup` 已通过现有 StepModule 接入；新增能力可以通过统一 Runtime 和 Provider Adapter 承载；世界生成与章节生产兼容回归保持通过。
+- 当前证据：`DirectorRuntimeService` 提供 `runNode`、`runNextStep`、`continueRuntime`、`runUntilGate`；`DirectorRuntimeStore` 持久化运行、步骤、事件、产物和策略；`DirectorNodeRunner` 执行策略、幂等和步骤状态；`directorPlanningStepModules` 已将 `world_setup` 注册为工作流步骤；Runtime 定向测试 51 项中 45 项通过、0 项失败、6 项跳过。基于证据不新增重复 Runtime，下一步只保留人工验收和必要适配器。
