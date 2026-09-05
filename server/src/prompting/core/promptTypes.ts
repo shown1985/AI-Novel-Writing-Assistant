@@ -121,6 +121,7 @@ export interface PromptRunTrace {
 }
 
 export interface PromptExecutionOptions {
+  sessionId?: string;
   provider?: LLMProvider;
   model?: string;
   temperature?: number;

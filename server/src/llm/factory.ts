@@ -16,6 +16,7 @@ import {
   type StructuredOutputStrategy,
 } from "./structuredOutput";
 import { attachLLMUsageTracking } from "./usageTracking";
+import { OPEN_CODE_USER_AGENT, resolveOpenCodeSessionId } from "./opencode/session";
 import { resolveModel, toStructuredOutputStrategy, type TaskType } from "./modelRouter";
 import {
   getProviderEnvApiKey,
@@ -44,6 +45,7 @@ interface LLMOptions {
   promptMeta?: PromptInvocationMeta;
   modelRoute?: string;
   routeDegraded?: boolean;
+  sessionId?: string;
 }
 
 export interface ProviderSecret {
@@ -81,6 +83,7 @@ export interface ResolvedLLMClientOptions {
   promptMeta?: PromptInvocationMeta;
   modelRoute?: string;
   routeDegraded?: boolean;
+  openCodeSessionId?: string;
 }
 
 const providerSecrets = new Map<LLMProvider, ProviderSecret>();
@@ -278,6 +281,13 @@ export async function resolveLLMClientOptions(
     throw new Error(`未配置 ${providerName} 的 API URL。`);
   }
 
+  const openCodeSessionId = resolveOpenCodeSessionId({
+    provider: resolvedProvider,
+    baseURL,
+    sessionId: options.sessionId,
+    promptMeta: options.promptMeta,
+  });
+
   const temperature = resolveModelTemperature(resolvedProvider, model, resolvedTemperature);
   const timeoutMs = normalizeOptionalTimeoutMs(options.timeoutMs);
   const concurrencyLimit = normalizeLimitValue(dbSecret?.concurrencyLimit);
@@ -357,10 +367,15 @@ export async function resolveLLMClientOptions(
     promptMeta: options.promptMeta,
     modelRoute: resolvedModelRoute,
     routeDegraded: resolvedRouteDegraded,
+    openCodeSessionId,
   };
 }
 
 export function createLLMFromResolvedOptions(resolved: ResolvedLLMClientOptions): ChatOpenAI {
+  const openCodeDefaultHeaders = resolved.openCodeSessionId ? {
+    "user-agent": OPEN_CODE_USER_AGENT,
+    "x-opencode-session": resolved.openCodeSessionId,
+  } : undefined;
   const llm = resolved.requestProtocol === "anthropic"
     ? createAnthropicLLM({
       apiKey: resolved.apiKey,
@@ -369,6 +384,7 @@ export function createLLMFromResolvedOptions(resolved: ResolvedLLMClientOptions)
       temperature: resolved.temperature,
       maxTokens: resolved.maxTokens,
       timeoutMs: resolved.timeoutMs,
+      defaultHeaders: openCodeDefaultHeaders,
     }) as ChatOpenAI
     : new ChatOpenAI({
       apiKey: resolved.apiKey ?? "ollama",
@@ -381,6 +397,7 @@ export function createLLMFromResolvedOptions(resolved: ResolvedLLMClientOptions)
       __includeRawResponse: resolved.includeRawResponse,
       configuration: {
         baseURL: resolved.baseURL,
+        ...(openCodeDefaultHeaders ? { defaultHeaders: openCodeDefaultHeaders } : {}),
       },
     });
   const meta = {

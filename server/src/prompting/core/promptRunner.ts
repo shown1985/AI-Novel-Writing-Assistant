@@ -663,6 +663,7 @@ async function resolveStructuredOutput<I, O, R = O>(input: {
         maxTokens: input.options?.maxTokens,
         timeoutMs: input.options?.timeoutMs,
         signal: input.options?.signal,
+        sessionId: input.options?.sessionId,
         taskType: input.asset.taskType,
         messages: currentMessages,
         schema: input.outputSchema,
@@ -761,6 +762,7 @@ export async function runStructuredPrompt<I, O, R = O>(input: {
       maxTokens: input.options?.maxTokens,
       timeoutMs: input.options?.timeoutMs,
       signal: input.options?.signal,
+      sessionId: input.options?.sessionId,
       taskType: input.asset.taskType,
       messages,
       schema: outputSchema,
@@ -881,6 +883,7 @@ export async function runTextPrompt<I>(input: {
       reasoningEnabled: input.options?.reasoningEnabled,
       maxTokens: input.options?.maxTokens,
       timeoutMs: input.options?.timeoutMs,
+      sessionId: input.options?.sessionId,
       taskType: input.asset.taskType,
       promptMeta: prepared.invocation,
     });
@@ -982,6 +985,7 @@ export async function streamTextPrompt<I>(input: {
       reasoningEnabled: input.options?.reasoningEnabled,
       maxTokens: input.options?.maxTokens,
       timeoutMs: input.options?.timeoutMs,
+      sessionId: input.options?.sessionId,
       taskType: input.asset.taskType,
       promptMeta: prepared.invocation,
     });
