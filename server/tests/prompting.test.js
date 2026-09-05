@@ -1515,6 +1515,42 @@ test("runStructuredPrompt can reject a request that exceeds an explicit soft bud
   }
 });
 
+test("runStructuredPrompt keeps provider request-too-large failures distinct from local budget rejection", async () => {
+  resetPromptQualityTelemetryForTests();
+  setPromptRunnerStructuredInvokerForTests(async () => {
+    const error = new Error("gateway rejected payload");
+    error.status = 413;
+    throw error;
+  });
+
+  try {
+    await assert.rejects(() => runStructuredPrompt({
+      asset: genreTreePrompt,
+      promptInput: {
+        prompt: "供应商请求过大",
+        retry: false,
+        forceJson: true,
+      },
+      options: {
+        provider: "openai",
+        model: "test-model",
+        requestBudget: {
+          inputTokenLimit: 20_000,
+          safetyMarginTokens: 0,
+          mode: "observe",
+        },
+      },
+    }), /gateway rejected payload/);
+    const telemetry = getSinglePromptQualityEntry();
+    assert.equal(telemetry.failedCount, 1);
+    assert.equal(telemetry.failuresByKind.request_too_large, 1);
+    assert.equal(telemetry.requestTooLargeCount, 1);
+    assert.equal(telemetry.failuresByKind.budget_exceeded, 0);
+  } finally {
+    setPromptRunnerStructuredInvokerForTests();
+  }
+});
+
 test("runStructuredPrompt retries semantically after postValidate failure", async () => {
   resetPromptQualityTelemetryForTests();
   const originalSemanticRetryPolicy = plannerChapterPlanPrompt.semanticRetryPolicy;
