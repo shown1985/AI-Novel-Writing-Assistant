@@ -11,7 +11,8 @@ export type TaskKind =
   | "image_generation"
   | "agent_run"
   | "novel_workflow"
-  | "style_extraction";
+  | "style_extraction"
+  | "world_generation";
 
 export type TaskStatus = "queued" | "running" | "waiting_approval" | "succeeded" | "failed" | "cancelled";
 

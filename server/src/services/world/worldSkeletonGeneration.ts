@@ -7,6 +7,7 @@ import type {
 import type {
   WorldGenerationBlueprint,
   WorldReferenceContext,
+  WorldSkeletonGenerationCheckpointSummary,
   WorldSkeletonGenerationPayload,
   WorldSkeletonGenerationOptions,
 } from "@ai-novel/shared/types/worldWizard";
@@ -47,6 +48,40 @@ const WORLD_SKELETON_STAGE_ORDER: WorldStructureSectionKey[] = [
   "relations",
 ];
 
+export interface WorldSkeletonCheckpointResumeState {
+  runId: string;
+  request: WorldSkeletonGenerateInput;
+  structure: WorldStructuredData;
+  nextStageIndex: number;
+  status: "running" | "failed" | "succeeded";
+  finalPayload?: WorldSkeletonGenerationPayload;
+}
+
+export interface WorldSkeletonCheckpointStore {
+  startOrResume(input: {
+    runId?: string;
+    request: WorldSkeletonGenerateInput;
+    sourceRoute: string;
+  }): Promise<WorldSkeletonCheckpointResumeState>;
+  saveStage(input: {
+    runId: string;
+    sequence: number;
+    stage: WorldStructureSectionKey | "presentation";
+    structure: WorldStructuredData;
+  }): Promise<void>;
+  complete(input: {
+    runId: string;
+    sequence: number;
+    payload: WorldSkeletonGenerationPayload;
+  }): Promise<void>;
+  fail(input: {
+    runId: string;
+    stage: WorldStructureSectionKey | "presentation";
+    error: unknown;
+  }): Promise<void>;
+  getSummary(runId: string): Promise<WorldSkeletonGenerationCheckpointSummary | null>;
+}
+
 export interface WorldSkeletonGenerateInput {
   idea: string;
   worldType?: string;
@@ -56,6 +91,9 @@ export interface WorldSkeletonGenerateInput {
   options?: Partial<WorldSkeletonGenerationOptions>;
   provider?: LLMProvider;
   model?: string;
+  checkpointRunId?: string;
+  sourceRoute?: string;
+  checkpointStore?: WorldSkeletonCheckpointStore;
 }
 
 function compactJson(value: unknown, maxChars = 8_000): string {
@@ -127,6 +165,21 @@ function errorMessage(error: unknown): string {
     return error.message.trim();
   }
   return String(error);
+}
+
+function annotateCheckpointError(
+  error: unknown,
+  runId: string,
+  stage: WorldStructureSectionKey | "presentation",
+): unknown {
+  const target = error && typeof error === "object" ? error : new Error(errorMessage(error));
+  try {
+    Object.defineProperty(target, "worldGenerationRunId", { value: runId, configurable: true });
+    Object.defineProperty(target, "worldGenerationStage", { value: stage, configurable: true });
+  } catch {
+    // Preserve the original error when a provider returns a frozen object.
+  }
+  return target;
 }
 
 function uniqueIds(items: Array<{ id: string }>, label: string): void {
@@ -298,90 +351,181 @@ async function runWorldStructureStage(
   throw new Error(`世界骨架阶段 ${section} 未完成。`);
 }
 
+async function startCheckpoint(
+  input: WorldSkeletonGenerateInput,
+): Promise<WorldSkeletonCheckpointResumeState | null> {
+  if (!input.checkpointStore) {
+    return null;
+  }
+  return input.checkpointStore.startOrResume({
+    runId: input.checkpointRunId,
+    request: input,
+    sourceRoute: input.sourceRoute ?? "/worlds/new",
+  });
+}
+
 async function generateWorldSkeletonOneShot(
   input: WorldSkeletonGenerateInput,
   options: WorldSkeletonGenerationOptions,
 ): Promise<WorldSkeletonGenerationPayload> {
-  const result = await runStructuredPrompt({
-    asset: worldSkeletonGenerationPrompt,
-    promptInput: {
-      idea: input.idea,
-      worldType: input.worldType,
-      template: input.template,
-      referenceContext: input.referenceContext ?? null,
-      blueprint: input.blueprint ?? null,
-      options,
-    },
-    options: {
-      provider: input.provider ?? "deepseek",
-      model: input.model,
-      temperature: 0.7,
-      reasoningEffort: "low",
-      maxTokens: WORLD_SKELETON_GENERATION_MAX_TOKENS,
-      timeoutMs: WORLD_SKELETON_GENERATION_TIMEOUT_MS,
-    },
-  });
-  return assembleWorldSkeleton(result.output, "world-skeleton");
+  const checkpoint = await startCheckpoint(input);
+  if (checkpoint?.status === "succeeded" && checkpoint.finalPayload) {
+    return {
+      ...checkpoint.finalPayload,
+      generationRunId: checkpoint.runId,
+    };
+  }
+  const runId = checkpoint?.runId;
+  const effectiveInput = checkpoint
+    ? { ...checkpoint.request, checkpointStore: input.checkpointStore, checkpointRunId: checkpoint.runId }
+    : input;
+  const effectiveOptions = normalizeWorldSkeletonGenerationOptions(effectiveInput.options);
+  try {
+    const result = await runStructuredPrompt({
+      asset: worldSkeletonGenerationPrompt,
+      promptInput: {
+        idea: effectiveInput.idea,
+        worldType: effectiveInput.worldType,
+        template: effectiveInput.template,
+        referenceContext: effectiveInput.referenceContext ?? null,
+        blueprint: effectiveInput.blueprint ?? null,
+        options: effectiveOptions,
+      },
+      options: {
+        provider: effectiveInput.provider ?? "deepseek",
+        model: effectiveInput.model,
+        temperature: 0.7,
+        reasoningEffort: "low",
+        maxTokens: WORLD_SKELETON_GENERATION_MAX_TOKENS,
+        timeoutMs: WORLD_SKELETON_GENERATION_TIMEOUT_MS,
+      },
+    });
+    const payload = assembleWorldSkeleton(result.output, "world-skeleton", runId);
+    if (runId && input.checkpointStore) {
+      await input.checkpointStore.complete({ runId, sequence: 1, payload });
+    }
+    return payload;
+  } catch (error) {
+    if (runId && input.checkpointStore) {
+      await input.checkpointStore.fail({ runId, stage: "presentation", error }).catch(() => undefined);
+      throw annotateCheckpointError(error, runId, "presentation");
+    }
+    throw error;
+  }
 }
 
 async function generateWorldSkeletonStaged(
   input: WorldSkeletonGenerateInput,
   options: WorldSkeletonGenerationOptions,
 ): Promise<WorldSkeletonGenerationPayload> {
-  let structure = createEmptyWorldStructure();
-  for (const section of WORLD_SKELETON_STAGE_ORDER) {
-    structure = await runWorldStructureStage(input, options, section, structure);
+  const checkpoint = await startCheckpoint(input);
+  if (checkpoint?.status === "succeeded" && checkpoint.finalPayload) {
+    return {
+      ...checkpoint.finalPayload,
+      generationRunId: checkpoint.runId,
+    };
+  }
+  const runId = checkpoint?.runId;
+  const effectiveInput = checkpoint
+    ? { ...checkpoint.request, checkpointStore: input.checkpointStore, checkpointRunId: checkpoint.runId }
+    : input;
+  const effectiveOptions = normalizeWorldSkeletonGenerationOptions(effectiveInput.options);
+  let structure = checkpoint?.structure ?? createEmptyWorldStructure();
+  const startIndex = Math.min(Math.max(0, checkpoint?.nextStageIndex ?? 0), WORLD_SKELETON_STAGE_ORDER.length);
+  for (let index = startIndex; index < WORLD_SKELETON_STAGE_ORDER.length; index += 1) {
+    const section = WORLD_SKELETON_STAGE_ORDER[index];
+    try {
+      structure = await runWorldStructureStage(effectiveInput, effectiveOptions, section, structure);
+      if (runId && input.checkpointStore) {
+        await input.checkpointStore.saveStage({
+          runId,
+          sequence: index + 1,
+          stage: section,
+          structure,
+        });
+      }
+    } catch (error) {
+      if (runId && input.checkpointStore) {
+        await input.checkpointStore.fail({ runId, stage: section, error }).catch(() => undefined);
+        throw annotateCheckpointError(error, runId, section);
+      }
+      throw error;
+    }
   }
 
   const bindingSupport = buildWorldBindingSupport(structure);
-  const presentation = await runStructuredPrompt({
-    asset: worldSkeletonPresentationPrompt,
-    promptInput: {
-      idea: input.idea,
-      worldType: input.worldType,
-      template: input.template,
-      storyEntryCount: options.counts.storyEntrySuggestions,
-      currentStructure: structure,
-      currentBindingSupport: bindingSupport,
-    },
-    options: {
-      provider: input.provider ?? "deepseek",
-      model: input.model,
-      temperature: 0.3,
-      reasoningEffort: "low",
-      maxTokens: WORLD_SKELETON_STAGE_MAX_TOKENS.presentation,
-      timeoutMs: WORLD_SKELETON_GENERATION_TIMEOUT_MS,
-    },
-  });
-  const output = presentation.output;
-  const finalStructure = normalizeWorldStructuredData({
-    ...structure,
-    metadata: {
-      ...structure.metadata,
-      schemaVersion: WORLD_STRUCTURE_SCHEMA_VERSION,
-      seededFrom: "world-skeleton-staged",
-      lastGeneratedAt: new Date().toISOString(),
-      lastSectionGenerated: "relations",
-    },
-  });
-  const generatedBindingSupport = buildWorldBindingSupport(finalStructure);
-  return {
-    concept: output.concept,
-    structuredData: finalStructure,
-    bindingSupport: normalizeWorldBindingSupport(null, {
-      ...generatedBindingSupport,
-      recommendedEntryPoints: [
-        ...output.storyEntrySuggestions.map((item) => `${item.title}：${item.description}`),
-        ...generatedBindingSupport.recommendedEntryPoints,
-      ].slice(0, 6),
-    }),
-    storyEntrySuggestions: output.storyEntrySuggestions,
-    assessment: output.assessment,
-  };
+  try {
+    const presentation = await runStructuredPrompt({
+      asset: worldSkeletonPresentationPrompt,
+      promptInput: {
+        idea: effectiveInput.idea,
+        worldType: effectiveInput.worldType,
+        template: effectiveInput.template,
+        storyEntryCount: effectiveOptions.counts.storyEntrySuggestions,
+        currentStructure: structure,
+        currentBindingSupport: bindingSupport,
+      },
+      options: {
+        provider: effectiveInput.provider ?? "deepseek",
+        model: effectiveInput.model,
+        temperature: 0.3,
+        reasoningEffort: "low",
+        maxTokens: WORLD_SKELETON_STAGE_MAX_TOKENS.presentation,
+        timeoutMs: WORLD_SKELETON_GENERATION_TIMEOUT_MS,
+      },
+    });
+    const output = presentation.output;
+    const finalStructure = normalizeWorldStructuredData({
+      ...structure,
+      metadata: {
+        ...structure.metadata,
+        schemaVersion: WORLD_STRUCTURE_SCHEMA_VERSION,
+        seededFrom: "world-skeleton-staged",
+        lastGeneratedAt: new Date().toISOString(),
+        lastSectionGenerated: "relations",
+      },
+    });
+    const generatedBindingSupport = buildWorldBindingSupport(finalStructure);
+    const payload: WorldSkeletonGenerationPayload = {
+      generationRunId: runId,
+      concept: output.concept,
+      structuredData: finalStructure,
+      bindingSupport: normalizeWorldBindingSupport(null, {
+        ...generatedBindingSupport,
+        recommendedEntryPoints: [
+          ...output.storyEntrySuggestions.map((item) => `${item.title}：${item.description}`),
+          ...generatedBindingSupport.recommendedEntryPoints,
+        ].slice(0, 6),
+      }),
+      storyEntrySuggestions: output.storyEntrySuggestions,
+      assessment: output.assessment,
+    };
+    if (runId && input.checkpointStore) {
+      await input.checkpointStore.saveStage({
+        runId,
+        sequence: WORLD_SKELETON_STAGE_ORDER.length + 1,
+        stage: "presentation",
+        structure: finalStructure,
+      });
+      await input.checkpointStore.complete({
+        runId,
+        sequence: WORLD_SKELETON_STAGE_ORDER.length + 1,
+        payload,
+      });
+    }
+    return payload;
+  } catch (error) {
+    if (runId && input.checkpointStore) {
+      await input.checkpointStore.fail({ runId, stage: "presentation", error }).catch(() => undefined);
+      throw annotateCheckpointError(error, runId, "presentation");
+    }
+    throw error;
+  }
 }
 
 function assembleWorldSkeleton(
   output: {
+    generationRunId?: string;
     concept: WorldSkeletonGenerationPayload["concept"];
     structuredData: unknown;
     bindingSupport?: unknown;
@@ -389,6 +533,7 @@ function assembleWorldSkeleton(
     assessment: WorldSkeletonGenerationPayload["assessment"];
   },
   seededFrom: string,
+  generationRunId?: string,
 ): WorldSkeletonGenerationPayload {
   const source = output.structuredData && typeof output.structuredData === "object" && !Array.isArray(output.structuredData)
     ? output.structuredData as Record<string, unknown>
@@ -414,6 +559,7 @@ function assembleWorldSkeleton(
     ].slice(0, 6),
   });
   return {
+    generationRunId: generationRunId ?? output.generationRunId,
     concept: output.concept,
     structuredData,
     bindingSupport,

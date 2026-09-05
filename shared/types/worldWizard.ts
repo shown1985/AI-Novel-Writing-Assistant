@@ -46,6 +46,7 @@ export interface WorldSkeletonAssessment {
 }
 
 export interface WorldSkeletonGenerationPayload {
+  generationRunId?: string;
   concept: {
     name: string;
     oneSentence: string;
@@ -56,6 +57,18 @@ export interface WorldSkeletonGenerationPayload {
   bindingSupport: WorldBindingSupport;
   storyEntrySuggestions: WorldSkeletonStoryEntrySuggestion[];
   assessment: WorldSkeletonAssessment;
+}
+
+export interface WorldSkeletonGenerationCheckpointSummary {
+  runId: string;
+  status: "running" | "failed" | "succeeded";
+  currentStage: string | null;
+  nextStageIndex: number;
+  latestStage: string | null;
+  lastError: string | null;
+  sourceRoute: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export const WORLD_SKELETON_PRESET_COUNTS: Record<WorldSkeletonPreset, WorldSkeletonGenerationCounts> = {
