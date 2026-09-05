@@ -156,11 +156,14 @@ export function registerGenerationWorldRoutes(router: Router): void {
           "reasoning_budget_exhausted",
           "output_truncated",
           "empty_content",
+          "request_too_large",
         ].includes(failure.category)) {
           const userMessage = failure.category === "reasoning_budget_exhausted"
             ? "模型思考占用了本次输出额度，请降低思考深度后重试。"
             : failure.category === "output_truncated"
               ? "世界骨架输出达到额度上限，请降低世界规模后重试。"
+              : failure.category === "request_too_large"
+                ? "世界骨架携带的上下文超过模型限制，请减少参考内容或拆分生成。"
               : failure.category === "empty_content"
                 ? "模型没有返回世界骨架，请重试或切换模型。"
                 : "世界骨架未能完整生成，请降低世界规模后重试。";
@@ -261,11 +264,14 @@ export function registerGenerationWorldRoutes(router: Router): void {
           "reasoning_budget_exhausted",
           "output_truncated",
           "empty_content",
+          "request_too_large",
         ].includes(failure.category)) {
           const userMessage = failure.category === "reasoning_budget_exhausted"
             ? "模型思考占用了本次输出额度，请降低思考深度后重试。"
             : failure.category === "output_truncated"
               ? "世界骨架输出达到额度上限，请降低世界规模后重试。"
+              : failure.category === "request_too_large"
+                ? "世界骨架携带的上下文超过模型限制，请减少参考内容或拆分生成。"
               : failure.category === "empty_content"
                 ? "模型没有返回世界骨架，请重试或切换模型。"
                 : "世界骨架未能完整生成，请降低世界规模后重试。";

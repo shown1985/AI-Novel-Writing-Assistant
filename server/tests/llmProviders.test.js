@@ -356,6 +356,20 @@ test("structured failure classification separates native-json, thinking and sche
   );
   assert.equal(
     classifyStructuredOutputFailure({
+      error: Object.assign(new Error("context_length_exceeded: prompt is too long"), { status: 400, code: "context_length_exceeded" }),
+    }),
+    "request_too_large",
+  );
+  assert.equal(
+    classifyStructuredOutputFailure({ error: Object.assign(new Error("Payload Too Large"), { statusCode: 413 }) }),
+    "request_too_large",
+  );
+  assert.notEqual(
+    classifyStructuredOutputFailure({ error: new Error("Too big: expected array to have <=5 items") }),
+    "request_too_large",
+  );
+  assert.equal(
+    classifyStructuredOutputFailure({
       error: new Error("Unexpected token '<', \"<!doctype\" is not valid JSON"),
       rawContent: "<!DOCTYPE html><html><head><title>429 Too Many Requests</title></head><body>rate limit</body></html>",
     }),

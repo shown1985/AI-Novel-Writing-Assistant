@@ -132,3 +132,14 @@
 - 非目标：不改变生产数据库文件、不执行用户数据库迁移、不改变世界生成业务协议、不为测试注入真实 API Key。
 - 验收：临时 SQLite 数据库可以完成 `prisma db push`；兼容门面调用卷级服务时保留正确接收者；p0b 真实链路中导演恢复场景和 RAG 兼容场景不因工具链或未配置模型失败；剩余失败必须能归类为既有产品测试缺陷。
 - 当前证据：空 SQLite 文件预创建已使 Prisma schema push 成功；兼容门面回归测试通过；在独立且预创建、已完成 schema push 的 SQLite 数据库上，全量 integration 套件为 136 项，其中 132 项通过、2 项跳过、2 项失败；剩余失败分别是既有 legacy source 断言（`volume` 与测试期望的 `legacy` 不一致）和既有 Prompt governance 白名单缺口（`ComicFactService.ts` 的两个内联消息构造器），均未指向本阶段工具链修复回归；RAG 兼容测试 2 项通过；世界骨架与预算定向测试保持通过。
+
+### WGR-008：世界生成请求超限识别与阶段上下文投影
+
+- 优先级：P0
+- 状态：本地实现与定向测试完成，待用户真实模型验收
+- 关联 PR：无（待本阶段验证后创建个人 fork PR）
+- 实施分支：`fix/world-generation-budget-preflight`
+- 范围：在统一结构化 LLM Runtime 中识别供应商返回的 413、`context_length_exceeded`、`payload too large`、`too big` 等请求超限错误；世界生成向导给出“减少参考内容或拆分生成”的可执行提示；将思考关闭选项从 Prompt Runner 传递到实际结构化客户端；世界骨架各阶段只向模型发送当前阶段需要的短摘要和稳定 ID，不改变持久化结构、用户输入和跨阶段装配规则。
+- 非目标：不把“Too big: expected array to have <=N items”的 Zod 数组校验误报为请求超限；不伪装 Trae/Claude Code 客户端；不调整数据库结构、不删除或覆盖用户数据；不把所有小说生成任务一次性迁移到新上下文投影。
+- 验收：请求超限能稳定归类为 `request_too_large` 并在结构化策略轮换前停止；世界生成与恢复接口返回明确的缩小上下文/拆分建议；思考关闭重试实际传到 provider adapter；阶段提示保留跨实体引用所需 ID 且不会携带完整历史长文本；已有世界骨架阶段、检查点和 fallback 定向测试保持通过；使用 GLM-5.3 Flash 与 DeepSeek V4 Flash 各完成一次 standard 规模世界生成后再进入用户验收。
+- 当前证据：结构化错误分类、非误报 Zod “Too big”、思考参数传递、世界阶段上下文投影、轻量长输入裁剪和既有世界骨架编排定向测试共 35 项全部通过；服务端构建通过。真实模型重现尚未在本阶段执行。

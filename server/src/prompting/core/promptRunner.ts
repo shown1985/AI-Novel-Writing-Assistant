@@ -821,6 +821,7 @@ export async function runStructuredPrompt<I, O, R = O>(input: {
       timeoutMs: input.options?.timeoutMs,
       signal: input.options?.signal,
       sessionId: input.options?.sessionId,
+      reasoningEnabled: input.options?.reasoningEnabled,
       reasoningEffort: input.options?.reasoningEffort,
       taskType: input.asset.taskType,
       messages,

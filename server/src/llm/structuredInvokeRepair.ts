@@ -24,6 +24,7 @@ export interface StructuredRepairInput<T> {
   schema: ZodType<T>;
   promptMeta?: PromptInvocationMeta;
   onRepairOutputDelta?: (content: string) => void;
+  reasoningEnabled?: boolean;
   reasoningEffort?: ReasoningEffort;
 }
 
@@ -172,6 +173,7 @@ export async function repairWithLlm<T>(
     model: input.model,
     temperature: 0.15,
     maxTokens: input.maxTokens,
+    reasoningEnabled: input.reasoningEnabled,
     reasoningEffort: input.reasoningEffort,
     timeoutMs: input.timeoutMs,
     taskType: input.taskType ?? "planner",

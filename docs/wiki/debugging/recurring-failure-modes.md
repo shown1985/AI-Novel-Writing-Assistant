@@ -30,6 +30,8 @@
 - 生成没有使用知识库资料：检查 `knowledgeDocumentIds`、小说/世界绑定、启用状态和 prompt context requirement。
 - macOS 集成测试在 `prisma db push` 报空的 `Schema engine error`：先在临时目录创建空的 SQLite 文件，再执行 schema push；该处理只适用于隔离测试库，不得指向用户数据库。
 - 兼容门面调用应用服务时报内部字段为空：检查代理是否以应用服务实例作为 receiver 调用方法。类方法不能从 `applicationServices` 上取出后裸调用，否则卷服务、检查点和恢复方法会丢失 `this`。
+- 世界生成日志出现 `too big` 时，先检查结构化错误分类是否为 `request_too_large`：413、`context_length_exceeded`、payload/context 过大属于请求边界；`Too big: expected array to have <=N items` 属于 Zod 数组校验，不能靠缩短 Prompt 代替输出契约修复。确认分类后再查看阶段投影后的提示长度和 provider 的实际响应。
+- 世界骨架阶段若日志显示“关闭思考后重试”但供应商仍返回相同思考耗尽，检查 `reasoningEnabled` 是否贯穿 Prompt Runner、structuredInvoke 和 factory；只改阶段调用参数而未传入客户端不会改变模型行为。
 
 ## 失败模式
 

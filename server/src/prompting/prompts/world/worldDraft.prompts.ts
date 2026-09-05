@@ -7,7 +7,7 @@ import type {
   WorldReferenceContext,
   WorldSkeletonGenerationOptions,
 } from "@ai-novel/shared/types/worldWizard";
-import type { WorldBindingSupport, WorldStructuredData } from "@ai-novel/shared/types/world";
+import type { WorldBindingSupport } from "@ai-novel/shared/types/world";
 
 const worldDraftFieldSchema = z.string().trim().min(1).optional().nullable();
 
@@ -227,7 +227,11 @@ export interface WorldSkeletonPresentationPromptInput {
   worldType?: string;
   template?: string;
   storyEntryCount: number;
-  currentStructure: WorldStructuredData;
+  currentStructure: {
+    forces: Array<{ id: string }>;
+    locations: Array<{ id: string }>;
+    [key: string]: unknown;
+  };
   currentBindingSupport: WorldBindingSupport;
 }
 
@@ -266,21 +270,35 @@ function buildWorldDraftRequirements(input: WorldDraftGenerationPromptInput): st
   return requirements;
 }
 
+function compactPromptText(value: unknown, maxChars: number): string {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const normalized = value.trim();
+  if (normalized.length <= maxChars) {
+    return normalized;
+  }
+  const tailLength = Math.min(40, Math.floor(maxChars / 4));
+  return `${normalized.slice(0, maxChars - tailLength - 1)}…${normalized.slice(-tailLength)}`;
+}
+
 function formatBlueprint(input: WorldSkeletonGenerationPromptInput): string {
   const blueprint = input.blueprint;
   if (!blueprint) {
     return "无";
   }
-  const propertyLines = blueprint.propertySelections.map((item) =>
+  const propertyLines = blueprint.propertySelections.slice(0, 12).map((item) =>
     [
-      item.name,
-      item.choiceLabel && `选择：${item.choiceLabel}`,
-      item.description,
-      item.detail && `补充：${item.detail}`,
+      compactPromptText(item.name, 80),
+      item.choiceLabel && `选择：${compactPromptText(item.choiceLabel, 100)}`,
+      compactPromptText(item.description, 180),
+      item.detail && `补充：${compactPromptText(item.detail, 180)}`,
     ].filter(Boolean).join(" | "),
   );
   return [
-    blueprint.classicElements.length > 0 ? `经典元素：${blueprint.classicElements.join("、")}` : "",
+    blueprint.classicElements.length > 0
+      ? `经典元素：${blueprint.classicElements.slice(0, 12).map((item) => compactPromptText(item, 80)).join("、")}`
+      : "",
     propertyLines.length > 0 ? `用户选定属性：\n${propertyLines.map((item, index) => `${index + 1}. ${item}`).join("\n")}` : "",
   ].filter(Boolean).join("\n") || "无";
 }
@@ -292,11 +310,11 @@ function formatReferenceContext(input: WorldSkeletonGenerationPromptInput): stri
   }
   return [
     `参考方式：${context.mode}`,
-    context.preserveElements.length > 0 ? `必须保留：${context.preserveElements.join("、")}` : "",
-    context.allowedChanges.length > 0 ? `允许改造：${context.allowedChanges.join("、")}` : "",
-    context.forbiddenElements.length > 0 ? `禁止偏离：${context.forbiddenElements.join("、")}` : "",
+    context.preserveElements.length > 0 ? `必须保留：${context.preserveElements.slice(0, 12).map((item) => compactPromptText(item, 100)).join("、")}` : "",
+    context.allowedChanges.length > 0 ? `允许改造：${context.allowedChanges.slice(0, 12).map((item) => compactPromptText(item, 100)).join("、")}` : "",
+    context.forbiddenElements.length > 0 ? `禁止偏离：${context.forbiddenElements.slice(0, 12).map((item) => compactPromptText(item, 100)).join("、")}` : "",
     context.anchors.length > 0
-      ? `参考锚点：\n${context.anchors.map((item, index) => `${index + 1}. ${item.label}：${item.content}`).join("\n")}`
+      ? `参考锚点：\n${context.anchors.slice(0, 8).map((item, index) => `${index + 1}. ${compactPromptText(item.label, 100)}：${compactPromptText(item.content, 180)}`).join("\n")}`
       : "",
   ].filter(Boolean).join("\n") || "无";
 }
@@ -378,7 +396,7 @@ export const worldSkeletonGenerationPrompt: PromptAsset<
         "3. missingParts 只列真正缺口；如果无明显缺口，输出空数组。",
       ].join("\n")),
       new HumanMessage([
-        `世界意图：${input.idea}`,
+        `世界意图：${input.idea.length > 6_000 ? `${input.idea.slice(0, 5_900)}…${input.idea.slice(-100)}` : input.idea}`,
         `世界类型：${input.worldType || "自定义"}`,
         `模板：${input.template || "自定义"}`,
         `规模预设：${input.options.preset}`,

@@ -1,5 +1,6 @@
 import type { LLMProvider } from "@ai-novel/shared/types/llm";
 import type {
+  WorldBindingSupport,
   WorldForce,
   WorldStructureSectionKey,
   WorldStructuredData,
@@ -93,6 +94,12 @@ export interface WorldSkeletonCheckpointStore {
   getSummary(runId: string): Promise<WorldSkeletonGenerationCheckpointSummary | null>;
 }
 
+interface WorldSkeletonPromptStructureContext {
+  forces: Array<{ id: string; [key: string]: unknown }>;
+  locations: Array<{ id: string; [key: string]: unknown }>;
+  [key: string]: unknown;
+}
+
 export interface WorldSkeletonGenerateInput {
   idea: string;
   worldType?: string;
@@ -107,15 +114,170 @@ export interface WorldSkeletonGenerateInput {
   checkpointStore?: WorldSkeletonCheckpointStore;
 }
 
-function compactJson(value: unknown, maxChars = 8_000): string {
+function compactText(value: unknown, maxChars = 240): string {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const normalized = value.trim();
+  if (normalized.length <= maxChars) {
+    return normalized;
+  }
+  const suffixLength = Math.min(48, Math.floor(maxChars / 4));
+  return `${normalized.slice(0, maxChars - suffixLength - 1)}…${normalized.slice(-suffixLength)}`;
+}
+
+function compactList(value: unknown, maxItems = 6, itemMaxChars = 120): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    .slice(0, maxItems)
+    .map((item) => compactText(item, itemMaxChars));
+}
+
+function compactJson(value: unknown, maxChars = 3_200): string {
   try {
     const serialized = JSON.stringify(value, null, 2) ?? "";
     return serialized.length > maxChars
-      ? `${serialized.slice(0, maxChars)}\n[内容已压缩]`
+      ? `${compactText(serialized, maxChars)}\n[内容已压缩]`
       : serialized;
   } catch {
     return "无";
   }
+}
+
+/**
+ * Build the smallest useful continuity snapshot for a world-generation stage.
+ * The persisted structure remains unchanged; only the prompt representation is
+ * projected so descriptions cannot grow every subsequent request.
+ */
+export function buildWorldSkeletonPromptContext(
+  structure: WorldStructuredData,
+  section: WorldStructureSectionKey | "presentation",
+): WorldSkeletonPromptStructureContext {
+  const stageIndex = section === "presentation"
+    ? WORLD_SKELETON_STAGE_ORDER.length
+    : WORLD_SKELETON_STAGE_ORDER.indexOf(section);
+  const context: WorldSkeletonPromptStructureContext = {
+    forces: [],
+    locations: [],
+  };
+
+  if (stageIndex >= 1) {
+    context.profile = {
+      summary: compactText(structure.profile.summary, 360),
+      identity: compactText(structure.profile.identity, 220),
+      tone: compactText(structure.profile.tone, 160),
+      themes: compactList(structure.profile.themes, 5, 80),
+      coreConflict: compactText(structure.profile.coreConflict, 280),
+    };
+    context.rules = {
+      summary: compactText(structure.rules.summary, 240),
+      axioms: structure.rules.axioms.slice(0, 12).map((rule) => ({
+        id: rule.id,
+        name: compactText(rule.name, 80),
+        summary: compactText(rule.summary, 160),
+        cost: compactText(rule.cost, 120),
+        boundary: compactText(rule.boundary, 120),
+        enforcement: compactText(rule.enforcement, 120),
+      })),
+      taboo: compactList(structure.rules.taboo, 6, 100),
+      sharedConsequences: compactList(structure.rules.sharedConsequences, 6, 100),
+    };
+  }
+
+  if (stageIndex >= 2) {
+    context.factions = structure.factions.slice(0, 12).map((faction) => ({
+      id: faction.id,
+      name: compactText(faction.name, 80),
+      position: compactText(faction.position, 120),
+      doctrine: compactText(faction.doctrine, 120),
+      goals: compactList(faction.goals, 4, 100),
+      methods: compactList(faction.methods, 4, 100),
+      representativeForceIds: faction.representativeForceIds.slice(0, 8),
+    }));
+    context.forces = structure.forces.slice(0, 16).map((force) => ({
+      id: force.id,
+      name: compactText(force.name, 80),
+      type: compactText(force.type, 80),
+      factionId: force.factionId ?? null,
+      role: compactText(force.role, 100),
+      resources: compactList(force.resources, 5, 100),
+      controlledLocationIds: (force.controlledLocationIds ?? []).slice(0, 12),
+      summary: compactText(force.summary, 180),
+      baseOfPower: compactText(force.baseOfPower, 120),
+      currentObjective: compactText(force.currentObjective, 160),
+      pressure: compactText(force.pressure, 160),
+      narrativeRole: compactText(force.narrativeRole, 120),
+    }));
+  }
+
+  if (stageIndex >= 3) {
+    context.locations = structure.locations.slice(0, 20).map((location) => ({
+      id: location.id,
+      name: compactText(location.name, 80),
+      type: compactText(location.type, 80),
+      region: compactText(location.region, 80),
+      x: location.x,
+      y: location.y,
+      directionHint: location.directionHint,
+      terrain: compactText(location.terrain, 100),
+      summary: compactText(location.summary, 180),
+      narrativeFunction: compactText(location.narrativeFunction, 140),
+      risk: compactText(location.risk, 120),
+      entryConstraint: compactText(location.entryConstraint, 120),
+      exitCost: compactText(location.exitCost, 120),
+      controllingForceIds: location.controllingForceIds.slice(0, 8),
+    }));
+  }
+
+  if (stageIndex >= 4) {
+    context.relations = {
+      forceRelations: structure.relations.forceRelations.slice(0, 24).map((relation) => ({
+        id: relation.id,
+        sourceForceId: relation.sourceForceId,
+        targetForceId: relation.targetForceId,
+        relation: compactText(relation.relation, 80),
+        tension: compactText(relation.tension, 120),
+        detail: compactText(relation.detail, 140),
+      })),
+      locationControls: structure.relations.locationControls.slice(0, 32).map((relation) => ({
+        id: relation.id,
+        forceId: relation.forceId,
+        locationId: relation.locationId,
+        relation: compactText(relation.relation, 80),
+        detail: compactText(relation.detail, 120),
+      })),
+      locationConnections: (structure.relations.locationConnections ?? []).slice(0, 32).map((relation) => ({
+        id: relation.id,
+        sourceLocationId: relation.sourceLocationId,
+        targetLocationId: relation.targetLocationId,
+        connectionType: compactText(relation.connectionType, 80),
+        distanceHint: compactText(relation.distanceHint, 80),
+        narrativeUse: compactText(relation.narrativeUse, 120),
+      })),
+    };
+  }
+
+  return context;
+}
+
+function buildWorldSkeletonBindingPromptContext(
+  bindingSupport: ReturnType<typeof buildWorldBindingSupport>,
+): WorldBindingSupport {
+  return {
+    recommendedEntryPoints: compactList(bindingSupport.recommendedEntryPoints, 8, 160),
+    highPressureForces: compactList(bindingSupport.highPressureForces, 8, 120),
+    suggestedLocationClusters: bindingSupport.suggestedLocationClusters.slice(0, 8).map((cluster) => ({
+      id: cluster.id,
+      label: compactText(cluster.label, 100),
+      locationIds: cluster.locationIds.slice(0, 12),
+      reason: compactText(cluster.reason, 160),
+    })),
+    compatibleConflicts: compactList(bindingSupport.compatibleConflicts, 8, 140),
+    forbiddenCombinations: compactList(bindingSupport.forbiddenCombinations, 8, 140),
+  };
 }
 
 function stageConstraints(section: WorldStructureSectionKey, options: WorldSkeletonGenerationOptions): string {
@@ -158,7 +320,7 @@ function buildStagePromptSource(
   return [
     "这是世界骨架的分阶段生成任务。",
     `当前阶段：${section}`,
-    `世界意图：${input.idea}`,
+    `世界意图：${compactText(input.idea, 6_000)}`,
     `世界类型：${input.worldType || "自定义"}`,
     `模板：${input.template || "自定义"}`,
     `规模预设：${options.preset}`,
@@ -344,8 +506,8 @@ async function runWorldStructureStage(
         promptInput: {
           section,
           promptSource: buildStagePromptSource(input, options, section, retryReason),
-          currentStructure: current,
-          currentBindingSupport: buildWorldBindingSupport(current),
+          currentStructure: buildWorldSkeletonPromptContext(current, section),
+          currentBindingSupport: buildWorldSkeletonBindingPromptContext(buildWorldBindingSupport(current)),
           stageConstraints: stageConstraints(section, options),
         },
         options: {
@@ -488,8 +650,8 @@ async function generateWorldSkeletonStaged(
         worldType: effectiveInput.worldType,
         template: effectiveInput.template,
         storyEntryCount: effectiveOptions.counts.storyEntrySuggestions,
-        currentStructure: structure,
-        currentBindingSupport: bindingSupport,
+        currentStructure: buildWorldSkeletonPromptContext(structure, "presentation"),
+        currentBindingSupport: buildWorldSkeletonBindingPromptContext(bindingSupport),
       },
       options: {
         provider: effectiveInput.provider ?? "deepseek",

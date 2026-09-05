@@ -64,6 +64,7 @@ export interface StructuredInvokeInput<T> {
   maxRepairAttempts?: number;
   promptMeta?: PromptInvocationMeta;
   sessionId?: string;
+  reasoningEnabled?: boolean;
   reasoningEffort?: ReasoningEffort;
   disableFallbackModel?: boolean;
 }
@@ -133,6 +134,7 @@ async function resolveAttemptTarget(input: {
   requestProtocol?: ModelRouteRequestProtocol;
   structuredStrategy?: StructuredOutputStrategy;
   sessionId?: string;
+  reasoningEnabled?: boolean;
   reasoningEffort?: ReasoningEffort;
 }): Promise<StructuredAttemptTarget> {
   const shouldResolveRoutePreference = Boolean(
@@ -153,6 +155,7 @@ async function resolveAttemptTarget(input: {
     requestProtocol: input.requestProtocol,
     structuredStrategy: input.structuredStrategy,
     sessionId: input.sessionId,
+    reasoningEnabled: input.reasoningEnabled,
     reasoningEffort: input.reasoningEffort,
     executionMode: "plain",
   });
@@ -200,6 +203,7 @@ async function invokeStructuredAttempt<T>(input: {
     taskType: input.baseInput.taskType ?? "planner",
     promptMeta: input.baseInput.promptMeta,
     sessionId: input.baseInput.sessionId,
+    reasoningEnabled: input.baseInput.reasoningEnabled,
     reasoningEffort: input.baseInput.reasoningEffort,
     executionMode: "structured",
     structuredStrategy: input.strategy,
@@ -309,6 +313,7 @@ async function invokeStructuredAttempt<T>(input: {
       fallbackUsed: input.fallbackUsed,
       reasoningForcedOff: resolved.reasoningForcedOff,
       reasoningChars: collected.reasoningChars,
+      reasoningEnabled: resolved.reasoningEnabled,
       reasoningEffort: input.baseInput.reasoningEffort,
     });
     liveSession.complete();
@@ -378,6 +383,7 @@ async function tryStructuredStrategies<T>(input: {
       });
       if ([
         "transport_error",
+        "request_too_large",
         "reasoning_budget_exhausted",
         "output_truncated",
         "empty_content",
@@ -411,6 +417,7 @@ export async function invokeStructuredLlmDetailed<T>(input: StructuredInvokeInpu
     requestProtocol: input.requestProtocol,
     structuredStrategy: input.structuredStrategy,
     sessionId: input.sessionId,
+    reasoningEnabled: input.reasoningEnabled,
     reasoningEffort: input.reasoningEffort,
   });
   const fallbackSettings = input.disableFallbackModel ? null : await getStructuredFallbackSettings();
@@ -497,6 +504,7 @@ export function summarizeStructuredOutputFailure(input: {
     output_truncated: `模型输出达到额度上限，结构化结果不完整${suffix}`,
     empty_content: `模型没有返回结构化正文${suffix}`,
     transport_error: `结构化调用过程发生传输或服务端错误${suffix}`,
+    request_too_large: `本次请求携带的上下文或输出规模超过模型限制，请减少世界规模或拆分生成${suffix}`,
   };
   return {
     category,
