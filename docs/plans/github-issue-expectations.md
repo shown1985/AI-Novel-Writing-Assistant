@@ -244,6 +244,7 @@
 - 优先级：P1
 - 状态：架构审查完成，现有 Runtime 已满足 MVP 控制面；待 WGR-016 人工验收后按需补适配器
 - 关联 Issue：创建失败，个人仓库 API 返回 410
+- 关联 PR：[个人 fork #16](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/16)
 - 实施分支：`codex/agent-runtime-control-plane`
 - 范围：验证并固化现有 `DirectorRuntimeService`、`DirectorRuntimeStore`、`DirectorNodeRunner`、`WorkflowStepModule`、`DirectorPolicyEngine` 与任务投影的控制面边界；只有出现明确缺口时，才增加单一职责的步骤适配器。
 - 非目标：不重写现有 Director；不新增第二套队列、状态机、重试计数或万能 Agent 门面；不迁移 MySQL；不新增通用聊天分支；不改变现有 Prompt Registry 规则。
