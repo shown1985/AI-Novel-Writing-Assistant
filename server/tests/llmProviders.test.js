@@ -7,7 +7,11 @@ const {
   getModelParameterCompatibility,
   resolveModelTemperature,
 } = require("../dist/llm/capabilities.js");
-const { resolveLLMClientOptions, setProviderSecretCache } = require("../dist/llm/factory.js");
+const {
+  createLLMFromResolvedOptions,
+  resolveLLMClientOptions,
+  setProviderSecretCache,
+} = require("../dist/llm/factory.js");
 const {
   classifyStructuredOutputFailure,
   resolveStructuredOutputProfile,
@@ -426,6 +430,21 @@ test("resolveLLMClientOptions applies structured reasoning and token guardrails"
     setProviderSecretCache("openai", null);
     setProviderSecretCache("deepseek", null);
   }
+});
+
+test("OpenCode session identity is injected into the OpenAI transport", async () => {
+  const resolved = await resolveLLMClientOptions("deepseek", {
+    apiKey: "test-key",
+    model: "deepseek-v4-flash",
+    baseURL: "https://opencode.ai/zen/go/v1",
+    sessionId: "world-conversation-transport",
+  });
+  const llm = createLLMFromResolvedOptions(resolved);
+
+  assert.deepEqual(llm.clientConfig.defaultHeaders, {
+    "user-agent": "AI-Novel-Writing-Assistant/0.4.17",
+    "x-opencode-session": resolved.openCodeSessionId,
+  });
 });
 
 test("structured failure classification separates native-json, thinking and schema problems", () => {
