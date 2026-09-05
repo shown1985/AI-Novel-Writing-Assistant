@@ -304,6 +304,7 @@
 - 优先级：P0
 - 状态：本地实现与定向验证完成，待用户重新执行一次中等规模世界生成验收
 - 关联 Issue：创建失败，个人仓库 API 返回 410
+- 关联 PR：[个人 fork PR #21](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/21)
 - 实施分支：`codex/llm-selection-hydration`
 - 范围：快速配置成功后先刷新厂商配置与当前选择事实源，再更新前端运行时模型；启动水合和通用模型选择器在配置请求刷新期间暂停失效厂商回退写入，避免新配置被旧缓存中的 Ollama 覆盖。
 - 非目标：不修改 API Key、数据库结构或已有任务数据；不改变 OpenCode 会话头；不把供应商身份伪装成 Trae/Claude Code；不处理仍引用旧厂商的历史任务重试。
