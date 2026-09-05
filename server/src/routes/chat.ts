@@ -161,6 +161,7 @@ router.post("/", validate({ body: chatSchema }), async (req, res, next) => {
       model: body.model,
       temperature: body.temperature ?? 0.7,
       maxTokens: body.maxTokens,
+      sessionId: body.sessionId,
     });
     const llm = createLLMFromResolvedOptions(resolvedLLM);
 

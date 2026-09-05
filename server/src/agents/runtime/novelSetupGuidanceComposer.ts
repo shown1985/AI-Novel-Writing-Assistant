@@ -107,6 +107,7 @@ async function composeWarmGuidance(input: {
           knownFacts: input.facts,
         },
         options: {
+          sessionId: input.context.sessionId,
           provider: input.context.provider ?? "deepseek",
           model: input.context.model,
           temperature: Math.max(input.context.temperature ?? 0.7, 0.7),
@@ -126,6 +127,7 @@ async function composeWarmGuidance(input: {
       },
     });
     const llm = await guidanceLLMFactory(input.context.provider ?? "deepseek", {
+      sessionId: input.context.sessionId,
       model: input.context.model,
       temperature: Math.max(input.context.temperature ?? 0.7, 0.7),
       maxTokens: resolvedMaxTokens,

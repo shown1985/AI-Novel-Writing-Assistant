@@ -62,6 +62,7 @@ export interface StructuredInvokeInput<T> {
   label: string;
   maxRepairAttempts?: number;
   promptMeta?: PromptInvocationMeta;
+  sessionId?: string;
   disableFallbackModel?: boolean;
 }
 
@@ -129,6 +130,7 @@ async function resolveAttemptTarget(input: {
   taskType?: TaskType;
   requestProtocol?: ModelRouteRequestProtocol;
   structuredStrategy?: StructuredOutputStrategy;
+  sessionId?: string;
 }): Promise<StructuredAttemptTarget> {
   const shouldResolveRoutePreference = Boolean(
     input.taskType
@@ -147,6 +149,7 @@ async function resolveAttemptTarget(input: {
     taskType: input.taskType ?? "planner",
     requestProtocol: input.requestProtocol,
     structuredStrategy: input.structuredStrategy,
+    sessionId: input.sessionId,
     executionMode: "plain",
   });
   const preferredStrategy = input.structuredStrategy ?? (route
@@ -192,6 +195,7 @@ async function invokeStructuredAttempt<T>(input: {
     timeoutMs: input.baseInput.timeoutMs,
     taskType: input.baseInput.taskType ?? "planner",
     promptMeta: input.baseInput.promptMeta,
+    sessionId: input.baseInput.sessionId,
     executionMode: "structured",
     structuredStrategy: input.strategy,
     requestProtocol: input.target.requestProtocol,
@@ -420,6 +424,7 @@ export async function invokeStructuredLlmDetailed<T>(input: StructuredInvokeInpu
       temperature: fallbackSettings.temperature,
       maxTokens: fallbackSettings.maxTokens ?? undefined,
       taskType: input.taskType ?? "planner",
+      sessionId: input.sessionId,
     });
     try {
       return await tryStructuredStrategies({

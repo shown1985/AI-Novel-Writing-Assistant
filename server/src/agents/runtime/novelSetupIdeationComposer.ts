@@ -160,6 +160,7 @@ export async function composeNovelSetupIdeationAnswer(
           facts,
         },
         options: {
+          sessionId: context.sessionId,
           provider: context.provider ?? "deepseek",
           model: context.model,
           temperature: Math.max(context.temperature ?? 0.75, 0.75),
@@ -178,6 +179,7 @@ export async function composeNovelSetupIdeationAnswer(
       },
     });
     const llm = await ideationLLMFactory(context.provider ?? "deepseek", {
+      sessionId: context.sessionId,
       model: context.model,
       temperature: Math.max(context.temperature ?? 0.75, 0.75),
       maxTokens: resolvedMaxTokens,
