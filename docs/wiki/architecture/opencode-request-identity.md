@@ -18,7 +18,7 @@ OpenCode Go 需要客户端在每个请求中提供 `x-opencode-session`，并�
 
 所有新建的 LLM 调用应沿用 `resolveLLMClientOptions`、`runStructuredPrompt` 或 `runTextPrompt`，并在存在用户会话标识时传递 `sessionId`。业务模块不应自行拼接 `x-opencode-session` 或直接修改底层请求头。
 
-世界观生成等历史入口暂时没有独立会话字段，会使用任务/小说元数据或进程回退值；后续若要实现严格的一次向导一次会话，应先扩展共享请求契约，再由客户端贯穿传递。
+世界观向导将一次生成运行视为一个会话：结构阶段、开局展示阶段以及同阶段重试都会复用同一个 `sessionId`，并同时记录当前 `stage` 与 `entrypoint`。新建运行优先使用调用方传入的会话值；没有传入时生成不透明的运行级值；检查点恢复则优先沿用已保存的会话值，旧检查点缺少该字段时由 `runId` 派生稳定值。这个标识只用于第三方会话识别，不替代检查点或 Runtime 状态。
 
 ## Failure Modes
 

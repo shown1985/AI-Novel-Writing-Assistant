@@ -276,6 +276,7 @@ test("standard world skeleton uses staged generation and deterministic assembly"
       worldType: "科幻",
       options: { preset: "standard" },
       provider: "deepseek",
+      sessionId: "world-conversation-1",
     });
     assert.deepEqual(calls.map((request) => request.asset.id), [
       "world.structure.generate",
@@ -291,6 +292,12 @@ test("standard world skeleton uses staged generation and deterministic assembly"
     assert.ok(calls.every((request) => request.options.reasoningEffort === "low"));
     assert.ok(calls.every((request) => request.options.requestBudget?.mode === "observe"));
     assert.ok(calls.every((request) => request.options.requestBudget?.inputTokenLimit === 12_000));
+    assert.equal(new Set(calls.map((request) => request.options.sessionId)).size, 1);
+    assert.ok(calls.every((request) => request.options.sessionId === "world-conversation-1"));
+    assert.deepEqual(calls.map((request) => request.options.stage), [
+      "profile", "rules", "factions", "locations", "relations", "presentation",
+    ]);
+    assert.ok(calls.every((request) => request.options.entrypoint === "/worlds/new"));
     assert.equal(result.structuredData.rules.axioms.length, 5);
     assert.equal(result.structuredData.factions.length, 3);
     assert.equal(result.structuredData.forces.length, 5);
@@ -332,6 +339,8 @@ test("a failed stage is retried in place without regenerating prior stages", asy
     assert.deepEqual(calls.map((request) => request.promptInput?.section ?? request.asset.id), [
       "profile", "profile", "rules", "factions", "locations", "relations", "world.skeleton.present",
     ]);
+    assert.equal(new Set(calls.map((request) => request.options.sessionId)).size, 1);
+    assert.match(calls[0].options.sessionId, /^world-generation:/);
     assert.match(calls[1].promptInput.promptSource, /缺少必要字段/);
   } finally {
     promptRunner.runStructuredPrompt = original;
@@ -562,6 +571,7 @@ test("checkpointed generation resumes from the failed stage", async () => {
     const resumedSections = calls.slice(callsBeforeResume)
       .map((request) => request.promptInput?.section ?? request.asset.id);
     assert.deepEqual(resumedSections, ["locations", "relations", "world.skeleton.present"]);
+    assert.ok(calls.every((request) => request.options.sessionId === "world-generation:run-checkpoint-1"));
     assert.equal(result.generationRunId, state.runId);
     assert.equal(state.status, "succeeded");
   } finally {
