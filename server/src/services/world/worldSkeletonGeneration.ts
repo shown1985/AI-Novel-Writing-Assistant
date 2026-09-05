@@ -100,6 +100,26 @@ interface WorldSkeletonPromptStructureContext {
   [key: string]: unknown;
 }
 
+interface WorldSkeletonPresentationPromptStructureContext {
+  profile: {
+    summary: string;
+    identity: string;
+    coreConflict: string;
+  };
+  forces: Array<{
+    id: string;
+    name: string;
+    currentObjective: string;
+    narrativeRole: string;
+  }>;
+  locations: Array<{
+    id: string;
+    name: string;
+    narrativeFunction: string;
+  }>;
+  [key: string]: unknown;
+}
+
 export interface WorldSkeletonGenerateInput {
   idea: string;
   worldType?: string;
@@ -261,6 +281,35 @@ export function buildWorldSkeletonPromptContext(
   }
 
   return context;
+}
+
+/**
+ * Build the minimal context needed to write opening-entry suggestions.
+ * Presentation does not need factions, relations, or full field prose; keeping
+ * only concrete force/location IDs prevents invalid faction references and
+ * avoids making the final call slower than the generation stages themselves.
+ */
+export function buildWorldSkeletonPresentationPromptContext(
+  structure: WorldStructuredData,
+): WorldSkeletonPresentationPromptStructureContext {
+  return {
+    profile: {
+      summary: compactText(structure.profile.summary, 360),
+      identity: compactText(structure.profile.identity, 220),
+      coreConflict: compactText(structure.profile.coreConflict, 280),
+    },
+    forces: structure.forces.slice(0, 16).map((force) => ({
+      id: force.id,
+      name: compactText(force.name, 80),
+      currentObjective: compactText(force.currentObjective, 160),
+      narrativeRole: compactText(force.narrativeRole, 120),
+    })),
+    locations: structure.locations.slice(0, 20).map((location) => ({
+      id: location.id,
+      name: compactText(location.name, 80),
+      narrativeFunction: compactText(location.narrativeFunction, 140),
+    })),
+  };
 }
 
 function buildWorldSkeletonBindingPromptContext(
@@ -650,7 +699,7 @@ async function generateWorldSkeletonStaged(
         worldType: effectiveInput.worldType,
         template: effectiveInput.template,
         storyEntryCount: effectiveOptions.counts.storyEntrySuggestions,
-        currentStructure: buildWorldSkeletonPromptContext(structure, "presentation"),
+        currentStructure: buildWorldSkeletonPresentationPromptContext(structure),
         currentBindingSupport: buildWorldSkeletonBindingPromptContext(bindingSupport),
       },
       options: {

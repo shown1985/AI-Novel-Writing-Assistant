@@ -176,3 +176,14 @@
 - 非目标：不放宽地图字段校验；不在前端补造地点坐标；不调整数据库、模型路由、OpenCode 会话身份或其他世界生成阶段。
 - 验收：地点提示契约回归测试通过；服务端构建通过；使用 OpenCode Go GLM-5.3-Flash 的 standard 科幻世界真实回放完成规则 5、阵营 3、势力 5、地点 6、势力关系 6、地点控制 6、故事入口 3，`readyForNovelUse=true`，完整度 0.92。
 - 当前证据：地点阶段此前因提示示例缺少地图字段而在装配校验失败；补齐示例后，真实回放耗时约 54.6 秒并完整通过，无 `too big`、无错误码 1210。服务端构建与地点/世界骨架定向测试 8 项全部通过。提交：`85a48454`；个人仓库 PR：[shown1985/AI-Novel-Writing-Assistant#10](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/10)，当前未合并。
+
+### WGR-012：开局展示上下文与具体势力 ID 约束
+
+- 优先级：P0
+- 状态：本地实现与双模型真实回放完成，待合并与用户验收
+- 关联 Issue：个人仓库 Issues 当前关闭（GitHub API 返回 410），以下编号继续作为本地索引
+- 实施分支：`codex/world-presentation-context-contract`
+- 范围：为开局展示阶段建立独立的最小上下文投影，只传递世界摘要、具体势力和地点的必要字段；在提示中明确 `recommendedLocationIds` 与 `involvedForceIds` 的可选 ID 清单，避免将 faction ID 当作 force ID。
+- 非目标：不改变前五个世界生成阶段的上下文；不放宽入口引用校验；不在前端把阵营名称转换为势力 ID；不调整数据库或模型协议。
+- 验收：展示阶段上下文不包含完整 relations/factions；提示明确列出具体势力 ID；GLM-5.3-Flash 与 DeepSeek V4 Flash 的 OpenCode Go standard 科幻世界回放均完成全部数量约束并通过入口引用校验。
+- 当前证据：小型展示探针从约 1,600 字符输入在 4.9 秒内完成；压缩上下文后 DeepSeek 入口 ID 仍暴露 faction 引用，补充具体 ID 清单并移除 factions 后，完整回放成功。DeepSeek standard 回放耗时约 64.5 秒，规则 5、阵营 3、势力 5、地点 6、势力关系 6、地点控制 6、故事入口 3，`readyForNovelUse=true`；GLM standard 回放耗时约 54.6 秒同样通过。提交：`55dfd7e8`；个人仓库 PR：[shown1985/AI-Novel-Writing-Assistant#11](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/11)，当前未合并。

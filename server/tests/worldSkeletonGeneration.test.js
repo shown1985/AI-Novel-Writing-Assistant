@@ -2,9 +2,13 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const promptRunner = require("../dist/prompting/core/promptRunner.js");
-const { worldSkeletonGenerationPrompt } = require("../dist/prompting/prompts/world/worldDraft.prompts.js");
+const {
+  worldSkeletonGenerationPrompt,
+  worldSkeletonPresentationPrompt,
+} = require("../dist/prompting/prompts/world/worldDraft.prompts.js");
 const {
   buildWorldSkeletonPromptContext,
+  buildWorldSkeletonPresentationPromptContext,
   generateWorldSkeleton,
 } = require("../dist/services/world/worldSkeletonGeneration.js");
 const { buildStructureSectionInstructions } = require("../dist/services/world/worldServiceShared.js");
@@ -15,6 +19,32 @@ test("location stage instructions include every field required by map validation
   for (const field of ["x", "y", "directionHint", "terrain", "narrativeFunction", "risk", "riskLevel", "entryConstraint", "exitCost"]) {
     assert.match(instructions, new RegExp(`\\\"${field}\\\"`));
   }
+});
+
+test("presentation context and prompt expose only concrete force and location ids", () => {
+  const structure = buildStageFixture();
+  const context = buildWorldSkeletonPresentationPromptContext(structure);
+  assert.deepEqual(context.factions, undefined);
+  assert.deepEqual(context.relations, undefined);
+  assert.deepEqual(context.forces.map((item) => item.id), ["force-1", "force-2", "force-3", "force-4", "force-5"]);
+  assert.deepEqual(context.locations.map((item) => item.id), ["location-1", "location-2", "location-3", "location-4", "location-5", "location-6"]);
+  const messages = worldSkeletonPresentationPrompt.render({
+    idea: "超光速粒子构成知识垄断社会。",
+    worldType: "科幻",
+    template: "知识垄断与神话复现",
+    storyEntryCount: 3,
+    currentStructure: context,
+    currentBindingSupport: {
+      recommendedEntryPoints: [],
+      highPressureForces: [],
+      suggestedLocationClusters: [],
+      compatibleConflicts: [],
+      forbiddenCombinations: [],
+    },
+  });
+  const humanPrompt = String(messages[1].content);
+  assert.match(humanPrompt, /可用势力 id（involvedForceIds 只能从这里选择）：force-1, force-2, force-3, force-4, force-5/);
+  assert.doesNotMatch(humanPrompt, /faction-1/);
 });
 
 function buildStageFixture() {
