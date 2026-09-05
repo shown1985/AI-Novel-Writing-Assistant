@@ -38,6 +38,9 @@ export default function LLMSelectionBootstrap() {
     if (store.hasHydratedSelection) {
       return null;
     }
+    if (selectionQuery.isFetching || apiKeySettingsQuery.isFetching) {
+      return null;
+    }
     if (!selectionQuery.isSuccess && !selectionQuery.isError) {
       return null;
     }
@@ -59,9 +62,11 @@ export default function LLMSelectionBootstrap() {
   }, [
     apiKeySettingsQuery.data?.data,
     apiKeySettingsQuery.isError,
+    apiKeySettingsQuery.isFetching,
     apiKeySettingsQuery.isSuccess,
     selectionQuery.data?.data,
     selectionQuery.isError,
+    selectionQuery.isFetching,
     selectionQuery.isSuccess,
     store.hasHydratedSelection,
     store.maxTokens,
