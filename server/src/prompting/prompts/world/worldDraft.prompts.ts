@@ -394,6 +394,7 @@ export const worldSkeletonGenerationPrompt: PromptAsset<
         "1. completenessScore 反映当前世界是否可直接开始写小说。",
         "2. readyForNovelUse 只有在规则、势力、地点、关系、故事入口都足够清楚时才为 true。",
         "3. missingParts 只列真正缺口；如果无明显缺口，输出空数组。",
+        "4. completenessScore 必须使用 0-100 的百分制整数；不要返回 0-1 或 1-10 的比例。",
       ].join("\n")),
       new HumanMessage([
         `世界意图：${input.idea.length > 6_000 ? `${input.idea.slice(0, 5_900)}…${input.idea.slice(-100)}` : input.idea}`,
@@ -500,6 +501,7 @@ export const worldSkeletonPresentationPrompt: PromptAsset<
       "involvedForceIds 只能填写下方可用势力 id，不能填写 faction id、势力名称或其他标签。",
       "名称和说明保持短小具体；不要把完整世界设定或剧情大纲重复到入口中。",
       "assessment 只评价当前结构是否足以开始写作；如果结构已满足要求，missingParts 输出空数组。",
+      "completenessScore 必须使用 0-100 的百分制整数；不要返回 0-1 或 1-10 的比例。",
     ].join("\n")),
     new HumanMessage([
       `世界意图：${input.idea}`,

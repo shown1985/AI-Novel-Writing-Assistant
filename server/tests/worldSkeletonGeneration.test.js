@@ -45,6 +45,29 @@ test("presentation context and prompt expose only concrete force and location id
   const humanPrompt = String(messages[1].content);
   assert.match(humanPrompt, /可用势力 id（involvedForceIds 只能从这里选择）：force-1, force-2, force-3, force-4, force-5/);
   assert.doesNotMatch(humanPrompt, /faction-1/);
+  assert.match(String(messages[0].content), /completenessScore 必须使用 0-100 的百分制整数/);
+});
+
+test("world skeleton generation prompt defines assessment as a percentage integer", () => {
+  const messages = worldSkeletonGenerationPrompt.render({
+    idea: "一个受知识垄断影响的科幻世界。",
+    worldType: "科幻",
+    template: "知识垄断",
+    referenceContext: null,
+    blueprint: null,
+    options: {
+      preset: "standard",
+      counts: {
+        rules: 5,
+        factionGroups: 3,
+        forces: 5,
+        locations: 6,
+        conflicts: 4,
+        storyEntrySuggestions: 3,
+      },
+    },
+  });
+  assert.match(String(messages[0].content), /completenessScore 必须使用 0-100 的百分制整数/);
 });
 
 function buildStageFixture() {
