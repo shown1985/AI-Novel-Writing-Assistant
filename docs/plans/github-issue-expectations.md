@@ -153,4 +153,4 @@
 - 范围：在统一 LLM 能力层识别 OpenCode Go 端点；对 DeepSeek V4 Flash、GLM-5.3 Flash 等结构化 JSON 请求采用非思考默认策略，并继续通过 provider adapter 发送标准关闭参数；普通文本/流式请求保留显式思考配置。新增端点、模型组合与未知自定义端点的回归测试。
 - 非目标：不伪装 Trae/Claude Code 等客户端；不改变 API Key 存储、数据库结构、世界持久化结构或所有任务的 Agent Runtime；不在业务服务中堆叠模型名称分支。
 - 验收：OpenCode Go 结构化请求的 resolved options 标记 `reasoningForcedOff=true` 并携带供应商认可的关闭思考参数；普通文本请求不被强制关闭；官方端点和未知自定义端点保持既有行为；LLM/世界生成定向测试与服务端类型检查通过。
-- 当前证据：OpenCode Go 端点识别、DeepSeek V4/GLM-5.3 Flash 结构化关闭思考、普通文本保留思考、官方与未知自定义端点回归测试均已覆盖；服务端构建、根 typecheck，以及 LLM/推理/会话/结构化调用/世界骨架定向测试共 49 项全部通过。GitHub Issues 当前关闭，远端 Issue 无法创建（API 410）；个人仓库 PR 待推送后建立。真实 OpenCode Go 模型和 UI 世界生成仍需用户验收。
+- 当前证据：OpenCode Go 端点识别、DeepSeek V4/GLM-5.3 Flash 结构化关闭思考、普通文本保留思考、官方与未知自定义端点回归测试均已覆盖；服务端构建、根 typecheck，以及 LLM/推理/会话/结构化调用/世界骨架定向测试共 49 项全部通过。GitHub Issues 当前关闭，远端 Issue 无法创建（API 410）；个人仓库 PR：[shown1985/AI-Novel-Writing-Assistant#8](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/8)，当前未合并。真实 OpenCode Go 模型和 UI 世界生成仍需用户验收。
