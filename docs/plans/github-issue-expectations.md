@@ -198,3 +198,49 @@
 - 非目标：不重算模型对世界质量的判断；不修改 `readyForNovelUse`、缺口列表或世界结构；不引入固定关键词评分。
 - 验收：Prompt 回归测试覆盖百分制整数要求；GLM-5.3-Flash 与 DeepSeek V4 Flash 的 OpenCode Go standard 回放均返回整数百分制，并完成全部结构和入口校验。
 - 当前证据：服务端构建与根类型检查通过，相关回归测试 52/52 通过；DeepSeek 回放返回 `85`，耗时约 43.2 秒；GLM 回放返回 `92`，耗时约 79.0 秒，均为整数且 `readyForNovelUse=true`。提交：`7ba8fcf6`；个人仓库 PR：[shown1985/AI-Novel-Writing-Assistant#12](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/12)，当前未合并。
+
+## Next Runtime Stabilization Stories（个人仓库 Issues 暂不可用）
+
+个人仓库的 Issue 列表可以读取 Pull Request，但创建 Issue 仍返回 GitHub API 410（`Issues has been disabled in this repository`）。以下编号先作为本地索引；仓库启用 Issues 后按原编号补录，不能用 PR 号冒充 Issue。
+
+### WGR-014：Provider 能力矩阵与请求预算契约
+
+- 优先级：P0
+- 状态：本地实现与定向测试完成，待提交个人 fork PR
+- 关联 Issue：创建失败，个人仓库 API 返回 410
+- 实施分支：`codex/world-generation-budget-runtime`
+- 范围：为 Provider/Model/Endpoint 建立统一能力描述，覆盖输入上下文上限、最大输出上限、JSON 能力、reasoning 契约和未知能力状态；让统一 Prompt Runner 在调用前读取能力并生成预算快照；保留 observe/reject 两种策略；区分本地预算错误、供应商 413 和 schema 数组 Too big。
+- 非目标：不修改数据库结构、世界骨架持久化结构或用户数据；不在世界服务中增加 provider/model 分支；不把供应商文档上限当作精确 tokenizer 结果。
+- 验收：OpenCode Go、内置 Provider、自定义端点使用同一能力契约；未知上限不误阻断；reject 才抛出本地预算错误；日志不含 API Key、完整提示词或正文；既有 WGR-001～013 回归保持通过。
+- 当前证据：新增统一能力快照与请求预算来源字段，覆盖显式上限、Provider 默认输出上限、未知自定义端点、OpenCode Go reasoning 能力和端点查询参数脱敏；预算与能力定向测试通过，根类型检查通过。
+
+### WGR-015：世界阶段上下文预算器与降级策略
+
+- 优先级：P0
+- 状态：本地实现与定向测试完成，待提交个人 fork PR
+- 关联 Issue：创建失败，个人仓库 API 返回 410
+- 实施分支：`codex/world-generation-budget-runtime`
+- 范围：将世界骨架各阶段的上下文选择、摘要、可选块丢弃和请求重试收敛为独立预算器；超预算时按必选约束、稳定 ID、关系引用、用户约束的优先级降级；保留成功阶段和检查点，不重复生成前置阶段。
+- 非目标：不扩展到所有小说生成链路；不在前端猜测缺失实体或坐标；不通过关键词匹配替代 AI 结构化决策；不修改数据库结构。
+- 验收：小、中、大规模和长参考输入均有可追踪预算快照；必选上下文不会静默丢失；可选上下文按策略摘要或丢弃；请求过大时能给出缩小规模/拆分阶段提示；增加预算边界、降级、重试和脱敏日志测试。
+- 当前证据：请求过大时同一阶段只重试一次，第二次使用最小上下文、截短用户意图/参考约束并降低输出预算；开局整理阶段和轻量单次流程同样受保护；新增阶段与展示重试回归测试，世界骨架测试通过 13/13，组合 LLM/预算/会话/结构化测试通过 60/60。
+
+### WGR-016：Mac 世界生成端到端验收门
+
+- 优先级：P1
+- 状态：待用户验收
+- 关联 Issue：创建失败，个人仓库 API 返回 410
+- 实施分支：后续从 `codex/world-generation-budget-runtime` 创建
+- 范围：验证 DMG 安装、首次配置、GLM/DeepSeek 中等规模世界生成、保存、重启恢复、Dock 再激活和故障提示。
+- 非目标：不在未签名开发包上执行公开发布；不上传上游；不修改用户数据库。
+- 验收：Mac 用户流程完成并记录可复核日志，失败时能返回世界生成源页面继续，而不是停留在任务中心操作。
+
+### WGR-017：Agent Runtime 控制平面 MVP
+
+- 优先级：P1
+- 状态：设计候选，待 WGR-014～016 完成
+- 关联 Issue：创建失败，个人仓库 API 返回 410
+- 实施分支：后续单独创建，不与预算切片混合
+- 范围：建立任务状态机、阶段调度、预算、超时、重试、检查点、取消和投影的高层控制平面；LLM 仅作为结构化创作与决策能力，由 Provider Adapter 屏蔽端点差异。
+- 非目标：不重写现有 Director；不迁移 MySQL；不新增通用聊天分支；不改变现有 Prompt Registry 规则。
+- 验收：Runtime 可恢复阶段任务、区分可重试与需人工处理的失败、保留局部质量债务不阻断全局链，并通过世界生成与章节生产的兼容回归。

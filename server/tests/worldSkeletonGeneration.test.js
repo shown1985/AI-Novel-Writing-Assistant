@@ -375,6 +375,97 @@ test("reasoning budget exhaustion retries the same stage with reasoning disabled
   }
 });
 
+test("request-too-large retries one stage with minimal context and output budget", async () => {
+  const original = promptRunner.runStructuredPrompt;
+  const calls = [];
+  const fixture = buildStageFixture();
+  fixture.forces[0].summary = "超长势力摘要".repeat(600);
+  fixture.locations[0].summary = "超长地点摘要".repeat(600);
+  let locationAttempts = 0;
+  promptRunner.runStructuredPrompt = async (request) => {
+    calls.push(request);
+    if (request.asset.id === "world.structure.generate") {
+      const section = request.promptInput.section;
+      if (section === "locations" && locationAttempts++ === 0) {
+        const error = new Error("[STRUCTURED_OUTPUT:request_too_large] payload too large");
+        error.category = "request_too_large";
+        throw error;
+      }
+      const output = section === "factions"
+        ? { factions: fixture.factions, forces: fixture.forces }
+        : fixture[section] ?? fixture.relations;
+      return { output };
+    }
+    return { output: buildPresentationFixture(fixture) };
+  };
+
+  try {
+    await generateWorldSkeleton({
+      idea: `${"超长用户意图".repeat(2_500)}尾部关键线索`,
+      options: { preset: "standard" },
+      provider: "deepseek",
+    });
+    const locationCalls = calls.filter((request) => request.promptInput?.section === "locations");
+    assert.equal(locationCalls.length, 2);
+    assert.ok(locationCalls[1].promptInput.promptSource.length < locationCalls[0].promptInput.promptSource.length);
+    assert.ok(
+      JSON.stringify(locationCalls[1].promptInput.currentStructure).length
+      < JSON.stringify(locationCalls[0].promptInput.currentStructure).length,
+    );
+    assert.ok(locationCalls[1].options.maxTokens < locationCalls[0].options.maxTokens);
+    assert.deepEqual(
+      calls.map((request) => request.promptInput?.section ?? request.asset.id),
+      ["profile", "rules", "factions", "locations", "locations", "relations", "world.skeleton.present"],
+    );
+  } finally {
+    promptRunner.runStructuredPrompt = original;
+  }
+});
+
+test("presentation request-too-large retry keeps only the minimal entry context", async () => {
+  const original = promptRunner.runStructuredPrompt;
+  const calls = [];
+  const fixture = buildStageFixture();
+  fixture.profile.summary = "超长世界摘要".repeat(120);
+  fixture.forces[0].currentObjective = "超长势力目标".repeat(120);
+  fixture.locations[0].narrativeFunction = "超长地点功能".repeat(120);
+  let presentationAttempts = 0;
+  promptRunner.runStructuredPrompt = async (request) => {
+    calls.push(request);
+    if (request.asset.id === "world.structure.generate") {
+      const section = request.promptInput.section;
+      const output = section === "factions"
+        ? { factions: fixture.factions, forces: fixture.forces }
+        : fixture[section] ?? fixture.relations;
+      return { output };
+    }
+    if (presentationAttempts++ === 0) {
+      const error = new Error("[STRUCTURED_OUTPUT:request_too_large] request entity too large");
+      error.category = "request_too_large";
+      throw error;
+    }
+    return { output: buildPresentationFixture(fixture) };
+  };
+
+  try {
+    await generateWorldSkeleton({
+      idea: `${"展示阶段超长意图".repeat(2_000)}尾部线索`,
+      options: { preset: "standard" },
+      provider: "deepseek",
+    });
+    const presentationCalls = calls.filter((request) => request.asset.id === "world.skeleton.present");
+    assert.equal(presentationCalls.length, 2);
+    assert.ok(presentationCalls[1].promptInput.idea.length < presentationCalls[0].promptInput.idea.length);
+    assert.ok(
+      JSON.stringify(presentationCalls[1].promptInput.currentStructure).length
+      < JSON.stringify(presentationCalls[0].promptInput.currentStructure).length,
+    );
+    assert.ok(presentationCalls[1].options.maxTokens < presentationCalls[0].options.maxTokens);
+  } finally {
+    promptRunner.runStructuredPrompt = original;
+  }
+});
+
 test("checkpointed generation resumes from the failed stage", async () => {
   const original = promptRunner.runStructuredPrompt;
   const calls = [];

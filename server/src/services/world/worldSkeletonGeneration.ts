@@ -29,6 +29,12 @@ import {
 } from "./worldStructure";
 import { buildStructureSectionInstructions, mergeWorldStructureSection } from "./worldServiceShared";
 import { worldStructuredDataSchema } from "./worldSchemas";
+import {
+  compressWorldPromptContext,
+  resolveWorldPromptInputLimits,
+  resolveWorldStageOutputTokens,
+  type WorldPromptCompressionLevel,
+} from "./worldPromptCompression";
 
 const WORLD_SKELETON_GENERATION_TIMEOUT_MS = 120_000;
 const WORLD_SKELETON_GENERATION_MAX_TOKENS = 6_000;
@@ -175,6 +181,7 @@ function compactJson(value: unknown, maxChars = 3_200): string {
 export function buildWorldSkeletonPromptContext(
   structure: WorldStructuredData,
   section: WorldStructureSectionKey | "presentation",
+  compressionLevel: WorldPromptCompressionLevel = "normal",
 ): WorldSkeletonPromptStructureContext {
   const stageIndex = section === "presentation"
     ? WORLD_SKELETON_STAGE_ORDER.length
@@ -280,7 +287,7 @@ export function buildWorldSkeletonPromptContext(
     };
   }
 
-  return context;
+  return compressWorldPromptContext(context, compressionLevel);
 }
 
 /**
@@ -291,8 +298,9 @@ export function buildWorldSkeletonPromptContext(
  */
 export function buildWorldSkeletonPresentationPromptContext(
   structure: WorldStructuredData,
+  compressionLevel: WorldPromptCompressionLevel = "normal",
 ): WorldSkeletonPresentationPromptStructureContext {
-  return {
+  return compressWorldPromptContext({
     profile: {
       summary: compactText(structure.profile.summary, 360),
       identity: compactText(structure.profile.identity, 220),
@@ -309,7 +317,7 @@ export function buildWorldSkeletonPresentationPromptContext(
       name: compactText(location.name, 80),
       narrativeFunction: compactText(location.narrativeFunction, 140),
     })),
-  };
+  }, compressionLevel);
 }
 
 function buildWorldSkeletonBindingPromptContext(
@@ -363,23 +371,33 @@ function buildStagePromptSource(
   input: WorldSkeletonGenerateInput,
   options: WorldSkeletonGenerationOptions,
   section: WorldStructureSectionKey,
+  compressionLevel: WorldPromptCompressionLevel = "normal",
   retryReason?: string,
 ): string {
   const { counts } = options;
+  const inputLimits = resolveWorldPromptInputLimits(compressionLevel);
   return [
     "这是世界骨架的分阶段生成任务。",
     `当前阶段：${section}`,
-    `世界意图：${compactText(input.idea, 6_000)}`,
+    `世界意图：${compactText(input.idea, inputLimits.ideaMaxChars)}`,
     `世界类型：${input.worldType || "自定义"}`,
     `模板：${input.template || "自定义"}`,
     `规模预设：${options.preset}`,
     `目标数量：规则 ${counts.rules}、阵营 ${counts.factionGroups}、势力 ${counts.forces}、地点 ${counts.locations}、冲突 ${counts.conflicts}、故事入口 ${counts.storyEntrySuggestions}`,
-    input.blueprint ? `用户蓝图：${compactJson(input.blueprint)}` : "用户蓝图：无",
-    input.referenceContext ? `参考约束：${compactJson(input.referenceContext)}` : "参考约束：无",
+    input.blueprint ? `用户蓝图：${compactJson(input.blueprint, inputLimits.blueprintMaxChars)}` : "用户蓝图：无",
+    input.referenceContext ? `参考约束：${compactJson(input.referenceContext, inputLimits.referenceMaxChars)}` : "参考约束：无",
     "文本约束：短字段不超过 16 个汉字，说明不超过 28 个汉字；总输出保持紧凑。",
     `阶段硬约束：\n${stageConstraints(section, options)}`,
     retryReason ? `上一次本阶段结果未通过装配校验，请只修正以下问题：${retryReason}` : "",
   ].join("\n");
+}
+
+function buildPresentationPromptIdea(
+  input: WorldSkeletonGenerateInput,
+  compressionLevel: WorldPromptCompressionLevel,
+): string {
+  const inputLimits = resolveWorldPromptInputLimits(compressionLevel);
+  return compactText(input.idea, inputLimits.ideaMaxChars);
 }
 
 function errorMessage(error: unknown): string {
@@ -397,6 +415,23 @@ function isReasoningBudgetExhausted(error: unknown): boolean {
     }
   }
   return extractStructuredOutputErrorCategory(errorMessage(error)) === "reasoning_budget_exhausted";
+}
+
+function isRequestTooLarge(error: unknown): boolean {
+  if (error && typeof error === "object" && "category" in error) {
+    const category = (error as { category?: unknown }).category;
+    if (category === "request_too_large") {
+      return true;
+    }
+  }
+  if (error && typeof error === "object" && "code" in error) {
+    if ((error as { code?: unknown }).code === "LLM_REQUEST_BUDGET_EXCEEDED") {
+      return true;
+    }
+  }
+  const message = errorMessage(error);
+  return extractStructuredOutputErrorCategory(message) === "request_too_large"
+    || message.includes("[LLM_BUDGET]");
 }
 
 function annotateCheckpointError(
@@ -548,14 +583,15 @@ async function runWorldStructureStage(
 ): Promise<WorldStructuredData> {
   let retryReason = "";
   let disableReasoningOnRetry = false;
+  let compressionLevel: WorldPromptCompressionLevel = "normal";
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const result = await runStructuredPrompt({
         asset: worldStructureSectionPrompt,
         promptInput: {
           section,
-          promptSource: buildStagePromptSource(input, options, section, retryReason),
-          currentStructure: buildWorldSkeletonPromptContext(current, section),
+          promptSource: buildStagePromptSource(input, options, section, compressionLevel, retryReason),
+          currentStructure: buildWorldSkeletonPromptContext(current, section, compressionLevel),
           currentBindingSupport: buildWorldSkeletonBindingPromptContext(buildWorldBindingSupport(current)),
           stageConstraints: stageConstraints(section, options),
         },
@@ -565,7 +601,7 @@ async function runWorldStructureStage(
           temperature: 0.4,
           ...(disableReasoningOnRetry ? { reasoningEnabled: false } : {}),
           reasoningEffort: "low",
-          maxTokens: WORLD_SKELETON_STAGE_MAX_TOKENS[section],
+          maxTokens: resolveWorldStageOutputTokens(WORLD_SKELETON_STAGE_MAX_TOKENS[section], compressionLevel),
           timeoutMs: WORLD_SKELETON_GENERATION_TIMEOUT_MS,
           requestBudget: WORLD_SKELETON_REQUEST_BUDGET,
         },
@@ -581,7 +617,10 @@ async function runWorldStructureStage(
         throw error;
       }
       disableReasoningOnRetry = isReasoningBudgetExhausted(error);
-      retryReason = errorMessage(error);
+      if (isRequestTooLarge(error)) {
+        compressionLevel = "minimal";
+      }
+      retryReason = compactText(errorMessage(error), 360);
     }
   }
   throw new Error(`世界骨架阶段 ${section} 未完成。`);
@@ -616,27 +655,44 @@ async function generateWorldSkeletonOneShot(
     ? { ...checkpoint.request, checkpointStore: input.checkpointStore, checkpointRunId: checkpoint.runId }
     : input;
   const effectiveOptions = normalizeWorldSkeletonGenerationOptions(effectiveInput.options);
+  let compressionLevel: WorldPromptCompressionLevel = "normal";
   try {
-    const result = await runStructuredPrompt({
-      asset: worldSkeletonGenerationPrompt,
-      promptInput: {
-        idea: effectiveInput.idea,
-        worldType: effectiveInput.worldType,
-        template: effectiveInput.template,
-        referenceContext: effectiveInput.referenceContext ?? null,
-        blueprint: effectiveInput.blueprint ?? null,
-        options: effectiveOptions,
-      },
-      options: {
-        provider: effectiveInput.provider ?? "deepseek",
-        model: effectiveInput.model,
-        temperature: 0.7,
-        reasoningEffort: "low",
-        maxTokens: WORLD_SKELETON_GENERATION_MAX_TOKENS,
-        timeoutMs: WORLD_SKELETON_GENERATION_TIMEOUT_MS,
-        requestBudget: WORLD_SKELETON_REQUEST_BUDGET,
-      },
-    });
+    let result;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        result = await runStructuredPrompt({
+          asset: worldSkeletonGenerationPrompt,
+          promptInput: {
+            idea: compressionLevel === "minimal"
+              ? compactText(effectiveInput.idea, resolveWorldPromptInputLimits(compressionLevel).ideaMaxChars)
+              : effectiveInput.idea,
+            worldType: effectiveInput.worldType,
+            template: effectiveInput.template,
+            referenceContext: effectiveInput.referenceContext ?? null,
+            blueprint: effectiveInput.blueprint ?? null,
+            options: effectiveOptions,
+          },
+          options: {
+            provider: effectiveInput.provider ?? "deepseek",
+            model: effectiveInput.model,
+            temperature: 0.7,
+            reasoningEffort: "low",
+            maxTokens: resolveWorldStageOutputTokens(WORLD_SKELETON_GENERATION_MAX_TOKENS, compressionLevel),
+            timeoutMs: WORLD_SKELETON_GENERATION_TIMEOUT_MS,
+            requestBudget: WORLD_SKELETON_REQUEST_BUDGET,
+          },
+        });
+        break;
+      } catch (error) {
+        if (attempt === 1 || !isRequestTooLarge(error)) {
+          throw error;
+        }
+        compressionLevel = "minimal";
+      }
+    }
+    if (!result) {
+      throw new Error("世界骨架生成未返回结果。");
+    }
     const payload = assembleWorldSkeleton(result.output, "world-skeleton", runId);
     if (runId && input.checkpointStore) {
       await input.checkpointStore.complete({ runId, sequence: 1, payload });
@@ -692,26 +748,41 @@ async function generateWorldSkeletonStaged(
 
   const bindingSupport = buildWorldBindingSupport(structure);
   try {
-    const presentation = await runStructuredPrompt({
-      asset: worldSkeletonPresentationPrompt,
-      promptInput: {
-        idea: effectiveInput.idea,
-        worldType: effectiveInput.worldType,
-        template: effectiveInput.template,
-        storyEntryCount: effectiveOptions.counts.storyEntrySuggestions,
-        currentStructure: buildWorldSkeletonPresentationPromptContext(structure),
-        currentBindingSupport: buildWorldSkeletonBindingPromptContext(bindingSupport),
-      },
-      options: {
-        provider: effectiveInput.provider ?? "deepseek",
-        model: effectiveInput.model,
-        temperature: 0.3,
-        reasoningEffort: "low",
-        maxTokens: WORLD_SKELETON_STAGE_MAX_TOKENS.presentation,
-        timeoutMs: WORLD_SKELETON_GENERATION_TIMEOUT_MS,
-        requestBudget: WORLD_SKELETON_REQUEST_BUDGET,
-      },
-    });
+    let presentationCompression: WorldPromptCompressionLevel = "normal";
+    let presentation;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        presentation = await runStructuredPrompt({
+          asset: worldSkeletonPresentationPrompt,
+          promptInput: {
+            idea: buildPresentationPromptIdea(effectiveInput, presentationCompression),
+            worldType: effectiveInput.worldType,
+            template: effectiveInput.template,
+            storyEntryCount: effectiveOptions.counts.storyEntrySuggestions,
+            currentStructure: buildWorldSkeletonPresentationPromptContext(structure, presentationCompression),
+            currentBindingSupport: buildWorldSkeletonBindingPromptContext(bindingSupport),
+          },
+          options: {
+            provider: effectiveInput.provider ?? "deepseek",
+            model: effectiveInput.model,
+            temperature: 0.3,
+            reasoningEffort: "low",
+            maxTokens: resolveWorldStageOutputTokens(WORLD_SKELETON_STAGE_MAX_TOKENS.presentation, presentationCompression),
+            timeoutMs: WORLD_SKELETON_GENERATION_TIMEOUT_MS,
+            requestBudget: WORLD_SKELETON_REQUEST_BUDGET,
+          },
+        });
+        break;
+      } catch (error) {
+        if (attempt === 1 || !isRequestTooLarge(error)) {
+          throw error;
+        }
+        presentationCompression = "minimal";
+      }
+    }
+    if (!presentation) {
+      throw new Error("世界骨架开局整理未返回结果。");
+    }
     const output = presentation.output;
     const finalStructure = normalizeWorldStructuredData({
       ...structure,
