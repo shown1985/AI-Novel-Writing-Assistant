@@ -7,7 +7,15 @@ const {
   buildWorldSkeletonPromptContext,
   generateWorldSkeleton,
 } = require("../dist/services/world/worldSkeletonGeneration.js");
+const { buildStructureSectionInstructions } = require("../dist/services/world/worldServiceShared.js");
 const { createEmptyWorldStructure } = require("../dist/services/world/worldStructure.js");
+
+test("location stage instructions include every field required by map validation", () => {
+  const instructions = buildStructureSectionInstructions("locations");
+  for (const field of ["x", "y", "directionHint", "terrain", "narrativeFunction", "risk", "riskLevel", "entryConstraint", "exitCost"]) {
+    assert.match(instructions, new RegExp(`\\\"${field}\\\"`));
+  }
+});
 
 function buildStageFixture() {
   const factions = Array.from({ length: 3 }, (_, index) => ({

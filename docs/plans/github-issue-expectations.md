@@ -165,3 +165,14 @@
 - 非目标：不改变 DeepSeek、MiniMax 或其他模型参数；不在世界生成服务中增加模型分支；不调整数据库、提示词业务结构或 OpenCode 会话身份。
 - 验收：官方 GLM 结构化请求 resolved options 中出现 `thinking: { type: "disabled" }` 且不带 `reasoning_effort`；OpenCode Go GLM-5.3 Flash 结构化请求使用 `reasoning_effort: "low"`，即使调用方请求关闭也降为网关可接受的最低档位；普通文本请求保留显式推理档位；推理适配器、世界骨架定向测试与真实 OpenCode Go 标准规模回放通过。
 - 当前证据：官方 GLM 与 OpenCode Go 分支参数映射、DeepSeek 保持思考开关、普通文本行为的回归测试已通过；服务端构建与根 typecheck 通过，LLM/推理/会话/结构化调用/世界骨架定向测试共 49 项全部通过。真实 OpenCode Go 回放确认 GLM-5.3 Flash 拒绝 `thinking.type=disabled`（返回错误码 1210，要求使用 low/high/max），该端点契约已按官方网关行为调整；完整标准规模回放还被地点阶段提示契约缺陷阻断，转入 WGR-011 修复。提交：`1b6c5ba1`；个人仓库 PR：[shown1985/AI-Novel-Writing-Assistant#9](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/9)，当前未合并。
+
+### WGR-011：地点阶段提示与地图字段契约对齐
+
+- 优先级：P0
+- 状态：本地实现与真实模型回放完成，待创建个人 fork PR
+- 关联 Issue：个人仓库 Issues 当前关闭（GitHub API 返回 410），以下编号继续作为本地索引
+- 实施分支：`codex/world-location-prompt-contract`
+- 范围：让地点阶段的 JSON 示例与装配校验保持同一份字段契约，明确要求 `x`、`y`、`directionHint`、`terrain`、`narrativeFunction`、`risk`、`riskLevel`、`entryConstraint`、`exitCost`，不改变世界持久化结构或其他阶段策略。
+- 非目标：不放宽地图字段校验；不在前端补造地点坐标；不调整数据库、模型路由、OpenCode 会话身份或其他世界生成阶段。
+- 验收：地点提示契约回归测试通过；服务端构建通过；使用 OpenCode Go GLM-5.3-Flash 的 standard 科幻世界真实回放完成规则 5、阵营 3、势力 5、地点 6、势力关系 6、地点控制 6、故事入口 3，`readyForNovelUse=true`，完整度 0.92。
+- 当前证据：地点阶段此前因提示示例缺少地图字段而在装配校验失败；补齐示例后，真实回放耗时约 54.6 秒并完整通过，无 `too big`、无错误码 1210。服务端构建与地点/世界骨架定向测试通过，提交与 PR 待本阶段提交后登记。
