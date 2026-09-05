@@ -594,6 +594,10 @@ export const promptAssetLoaderEntries: PromptAssetLoaderEntry[] = [
     load: () => require("../prompts/world/worldDraft.prompts").worldSkeletonGenerationPrompt as UnknownPromptAsset,
   },
   {
+    key: "world.skeleton.present@v1",
+    load: () => require("../prompts/world/worldDraft.prompts").worldSkeletonPresentationPrompt as UnknownPromptAsset,
+  },
+  {
     key: "world.draft.refine@v1",
     load: () => require("../prompts/world/worldDraft.prompts").worldDraftRefinePrompt as UnknownPromptAsset,
   },
