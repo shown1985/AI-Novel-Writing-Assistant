@@ -209,6 +209,43 @@ test("a failed stage is retried in place without regenerating prior stages", asy
   }
 });
 
+test("reasoning budget exhaustion retries the same stage with reasoning disabled", async () => {
+  const original = promptRunner.runStructuredPrompt;
+  const calls = [];
+  const fixture = buildStageFixture();
+  let profileAttempts = 0;
+  promptRunner.runStructuredPrompt = async (request) => {
+    calls.push(request);
+    if (request.asset.id === "world.structure.generate") {
+      const section = request.promptInput.section;
+      if (section === "profile" && profileAttempts++ === 0) {
+        const error = new Error("[STRUCTURED_OUTPUT:reasoning_budget_exhausted] 推理额度耗尽");
+        error.category = "reasoning_budget_exhausted";
+        throw error;
+      }
+      const output = section === "factions"
+        ? { factions: fixture.factions, forces: fixture.forces }
+        : fixture[section] ?? fixture.relations;
+      return { output };
+    }
+    return { output: buildPresentationFixture(fixture) };
+  };
+
+  try {
+    await generateWorldSkeleton({
+      idea: "推理预算耗尽时只降低当前阶段复杂度。",
+      options: { preset: "standard" },
+      provider: "deepseek",
+    });
+    assert.equal(calls[0].options.reasoningEnabled, undefined);
+    assert.equal(calls[1].promptInput.section, "profile");
+    assert.equal(calls[1].options.reasoningEnabled, false);
+    assert.equal(calls.filter((request) => request.promptInput?.section === "profile").length, 2);
+  } finally {
+    promptRunner.runStructuredPrompt = original;
+  }
+});
+
 test("checkpointed generation resumes from the failed stage", async () => {
   const original = promptRunner.runStructuredPrompt;
   const calls = [];

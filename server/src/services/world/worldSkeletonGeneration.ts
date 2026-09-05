@@ -18,6 +18,7 @@ import {
   worldSkeletonPresentationPrompt,
 } from "../../prompting/prompts/world/worldDraft.prompts";
 import { worldStructureSectionPrompt } from "../../prompting/prompts/world/world.prompts";
+import { extractStructuredOutputErrorCategory } from "../../llm/structuredOutput";
 import {
   buildWorldBindingSupport,
   createEmptyWorldStructure,
@@ -177,6 +178,16 @@ function errorMessage(error: unknown): string {
   return String(error);
 }
 
+function isReasoningBudgetExhausted(error: unknown): boolean {
+  if (error && typeof error === "object" && "category" in error) {
+    const category = (error as { category?: unknown }).category;
+    if (category === "reasoning_budget_exhausted") {
+      return true;
+    }
+  }
+  return extractStructuredOutputErrorCategory(errorMessage(error)) === "reasoning_budget_exhausted";
+}
+
 function annotateCheckpointError(
   error: unknown,
   runId: string,
@@ -325,6 +336,7 @@ async function runWorldStructureStage(
   current: WorldStructuredData,
 ): Promise<WorldStructuredData> {
   let retryReason = "";
+  let disableReasoningOnRetry = false;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const result = await runStructuredPrompt({
@@ -340,6 +352,7 @@ async function runWorldStructureStage(
           provider: input.provider ?? "deepseek",
           model: input.model,
           temperature: 0.4,
+          ...(disableReasoningOnRetry ? { reasoningEnabled: false } : {}),
           reasoningEffort: "low",
           maxTokens: WORLD_SKELETON_STAGE_MAX_TOKENS[section],
           timeoutMs: WORLD_SKELETON_GENERATION_TIMEOUT_MS,
@@ -356,6 +369,7 @@ async function runWorldStructureStage(
       if (attempt === 1) {
         throw error;
       }
+      disableReasoningOnRetry = isReasoningBudgetExhausted(error);
       retryReason = errorMessage(error);
     }
   }
