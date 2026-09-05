@@ -126,7 +126,7 @@
 
 - 优先级：P1
 - 状态：本地实现与定向测试完成，待集成回归与用户验收
-- 关联 PR：待推送
+- 关联 PR：[个人 fork #6](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/6)
 - 实施分支：`fix/world-generation-prisma-harness`
 - 范围：让临时 SQLite 集成测试在 macOS/Prisma 7 下显式创建数据库文件；修复兼容门面代理丢失应用服务实例的问题；为已有章节计划写入执行契约哈希，避免真实链路测试意外调用外部模型。
 - 非目标：不改变生产数据库文件、不执行用户数据库迁移、不改变世界生成业务协议、不为测试注入真实 API Key。
