@@ -290,7 +290,7 @@
 ### WGR-021：Mac 打包后的宿主原生依赖隔离
 
 - 优先级：P1
-- 状态：实现完成，等待个人 fork PR 审阅
+- 状态：自动验证完成，待用户人工验收后合并
 - 关联 Issue：创建失败，个人仓库 API 返回 410
 - 关联 PR：[个人 fork PR #20](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/20)
 - 实施分支：`codex/desktop-native-isolation`
