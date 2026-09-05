@@ -268,9 +268,9 @@
 - 优先级：P1
 - 状态：本地实现与定向测试完成，待用户验收 WGR-016 后合并
 - 关联 Issue：创建失败，个人仓库 API 返回 410
-- 关联 PR：待创建（个人 fork）
+- 关联 PR：[个人 fork #18](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/18)
 - 实施分支：`codex/world-generation-opencode-session`
 - 范围：为世界观向导补充一次生成运行的稳定 `sessionId`；贯穿结构阶段、展示阶段和同阶段重试，并记录 `stage` 与 `entrypoint`，使 OpenCode Go 能按一次对话识别请求；检查点恢复优先沿用已保存会话，旧检查点缺少会话字段时由 `runId` 派生稳定值。
 - 非目标：不伪装 Trae/Claude Code 等客户端；不修改提示词业务内容、数据库结构、世界持久化结构或既有重试次数；不新增第二套 Runtime。
 - 验收：显式会话、无会话自动生成、检查点恢复和阶段/入口元数据均有回归测试；server build 与世界骨架、OpenCode 会话、LLM provider 定向测试通过。
-- 当前证据：待本阶段提交后补充个人 fork PR 链接和最终测试计数。
+- 当前证据：`pnpm --filter @ai-novel/server build` 通过；世界骨架、OpenCode 会话和 LLM provider 定向测试 23 项通过、0 项失败。个人 fork PR #18 基于 WGR-018 分支，未合并；真实模型和 Mac 人工验收仍待 WGR-016。
