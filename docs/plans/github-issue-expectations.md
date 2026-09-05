@@ -280,9 +280,9 @@
 - 优先级：P1
 - 状态：本地实现与定向测试完成，待用户验收 WGR-016 后合并
 - 关联 Issue：创建失败，个人仓库 API 返回 410
-- 关联 PR：待创建（个人 fork）
+- 关联 PR：[个人 fork #19](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/19)
 - 实施分支：`codex/opencode-header-transport-test`
 - 范围：在统一 LLM 工厂层增加传输配置回归，确认世界生成传入的会话标识最终进入 OpenAI 兼容客户端的 `x-opencode-session` 请求头；保留非 OpenCode endpoint 不注入专用头的约束。
 - 非目标：不发起真实模型请求；不修改 Provider 逻辑、数据库结构、用户数据或 OpenCode User-Agent；不新增 Runtime。
 - 验收：server build 与 LLM provider、OpenCode 会话、世界骨架定向测试通过；测试不输出 API Key。
-- 当前证据：待本阶段提交后补充个人 fork PR 链接和最终测试计数。
+- 当前证据：`pnpm --filter @ai-novel/server build` 通过；LLM provider、OpenCode 会话和世界骨架定向测试 24 项通过、0 项失败。个人 fork PR #19 基于 WGR-019 分支，未合并；真实模型和 Mac 人工验收仍待 WGR-016。
