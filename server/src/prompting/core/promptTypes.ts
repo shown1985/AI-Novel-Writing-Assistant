@@ -4,6 +4,7 @@ import type { ZodType } from "zod";
 import type { TaskType } from "../../llm/modelRouter";
 import type { LlmTokenUsageSnapshot } from "../../llm/usageTracking";
 import type { PromptSlotDef, ResolvedSlots } from "../slots/slotTypes";
+import type { LlmRequestBudgetSnapshot } from "../../llm/requestBudget";
 
 export type PromptMode = "structured" | "text";
 export type PromptLanguage = "zh" | "en";
@@ -96,6 +97,15 @@ export interface PromptInvocationMeta {
   semanticRetryAttempts: number;
 }
 
+export interface PromptRequestBudgetOptions {
+  /** Soft input-token budget used for observation and optional preflight. */
+  inputTokenLimit?: number;
+  /** Tokens reserved from the soft limit for protocol and formatting overhead. */
+  safetyMarginTokens?: number;
+  /** Observation is the default; reject is opt-in for a proven contract. */
+  mode?: "observe" | "reject";
+}
+
 export interface PromptRunTrace {
   promptId: string;
   promptVersion: string;
@@ -141,6 +151,7 @@ export interface PromptExecutionOptions {
   sceneIndex?: number;
   roundIndex?: number;
   triggerReason?: string;
+  requestBudget?: PromptRequestBudgetOptions;
 }
 
 export interface PromptExecutionMeta {
@@ -149,6 +160,7 @@ export interface PromptExecutionMeta {
   latencyMs: number;
   invocation: PromptInvocationMeta;
   tokenUsage?: LlmTokenUsageSnapshot | null;
+  requestBudget?: LlmRequestBudgetSnapshot;
 }
 
 export interface PromptRunResult<T> {

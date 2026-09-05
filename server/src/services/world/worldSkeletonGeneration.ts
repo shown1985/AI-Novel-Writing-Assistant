@@ -30,6 +30,10 @@ import { worldStructuredDataSchema } from "./worldSchemas";
 
 const WORLD_SKELETON_GENERATION_TIMEOUT_MS = 120_000;
 const WORLD_SKELETON_GENERATION_MAX_TOKENS = 6_000;
+// Soft policy for telemetry only. The exact provider context window is
+// resolved by the provider adapter; this value should not reject a request.
+const WORLD_SKELETON_INPUT_TOKEN_LIMIT = 12_000;
+const WORLD_SKELETON_INPUT_SAFETY_MARGIN_TOKENS = 512;
 
 const WORLD_SKELETON_STAGE_MAX_TOKENS: Record<WorldStructureSectionKey | "presentation", number> = {
   profile: 1_200,
@@ -47,6 +51,12 @@ const WORLD_SKELETON_STAGE_ORDER: WorldStructureSectionKey[] = [
   "locations",
   "relations",
 ];
+
+const WORLD_SKELETON_REQUEST_BUDGET = {
+  inputTokenLimit: WORLD_SKELETON_INPUT_TOKEN_LIMIT,
+  safetyMarginTokens: WORLD_SKELETON_INPUT_SAFETY_MARGIN_TOKENS,
+  mode: "observe" as const,
+};
 
 export interface WorldSkeletonCheckpointResumeState {
   runId: string;
@@ -333,6 +343,7 @@ async function runWorldStructureStage(
           reasoningEffort: "low",
           maxTokens: WORLD_SKELETON_STAGE_MAX_TOKENS[section],
           timeoutMs: WORLD_SKELETON_GENERATION_TIMEOUT_MS,
+          requestBudget: WORLD_SKELETON_REQUEST_BUDGET,
         },
       });
       let next = mergeWorldStructureSection(current, section, result.output);
@@ -398,6 +409,7 @@ async function generateWorldSkeletonOneShot(
         reasoningEffort: "low",
         maxTokens: WORLD_SKELETON_GENERATION_MAX_TOKENS,
         timeoutMs: WORLD_SKELETON_GENERATION_TIMEOUT_MS,
+        requestBudget: WORLD_SKELETON_REQUEST_BUDGET,
       },
     });
     const payload = assembleWorldSkeleton(result.output, "world-skeleton", runId);
@@ -472,6 +484,7 @@ async function generateWorldSkeletonStaged(
         reasoningEffort: "low",
         maxTokens: WORLD_SKELETON_STAGE_MAX_TOKENS.presentation,
         timeoutMs: WORLD_SKELETON_GENERATION_TIMEOUT_MS,
+        requestBudget: WORLD_SKELETON_REQUEST_BUDGET,
       },
     });
     const output = presentation.output;
