@@ -1,3 +1,10 @@
+import type { LLMProvider } from "@ai-novel/shared/types/llm";
+import {
+  resolveLlmRequestCapabilities,
+  type LlmCapabilityValueSource,
+  type LlmRequestCapabilities,
+} from "./requestCapabilities";
+
 /**
  * A conservative, provider-agnostic request budget estimate.
  *
@@ -13,6 +20,10 @@ export interface LlmRequestBudgetInput {
   inputTokenLimit?: number;
   safetyMarginTokens?: number;
   maxTokens?: number;
+  provider?: LLMProvider;
+  model?: string;
+  baseURL?: string;
+  capabilities?: LlmRequestCapabilities;
 }
 
 export interface LlmRequestBudgetSnapshot {
@@ -24,6 +35,11 @@ export interface LlmRequestBudgetSnapshot {
   estimatedTotalTokens: number | null;
   utilization: number | null;
   status: LlmRequestBudgetStatus;
+  capabilityKey: string | null;
+  inputTokenLimitSource: LlmCapabilityValueSource;
+  outputTokenLimit: number | null;
+  outputTokenLimitSource: LlmCapabilityValueSource;
+  outputLimitExceeded: boolean;
 }
 
 const DEFAULT_CHARS_PER_TOKEN = 4;
@@ -57,8 +73,24 @@ export function estimatePromptTokensFromChars(chars: number): number {
 
 export function evaluateLlmRequestBudget(input: LlmRequestBudgetInput): LlmRequestBudgetSnapshot {
   const estimatedInputTokens = estimatePromptTokensFromChars(input.renderedPromptChars);
-  const inputTokenLimit = normalizePositiveInteger(input.inputTokenLimit);
+  const capabilities = input.capabilities ?? (input.provider
+    ? resolveLlmRequestCapabilities({
+      provider: input.provider,
+      model: input.model,
+      baseURL: input.baseURL,
+      inputTokenLimit: input.inputTokenLimit,
+    })
+    : null);
+  const explicitInputTokenLimit = normalizePositiveInteger(input.inputTokenLimit);
+  const inputTokenLimit = explicitInputTokenLimit ?? capabilities?.inputTokenLimit ?? null;
+  const inputTokenLimitSource: LlmCapabilityValueSource = explicitInputTokenLimit != null
+    ? "explicit"
+    : capabilities?.inputTokenLimitSource ?? "unknown";
   const requestedOutputTokens = normalizePositiveInteger(input.maxTokens);
+  const outputTokenLimit = capabilities?.outputTokenLimit ?? null;
+  const outputLimitExceeded = outputTokenLimit != null
+    && requestedOutputTokens != null
+    && requestedOutputTokens > outputTokenLimit;
   const safetyMarginTokens = inputTokenLimit == null
     ? 0
     : Math.min(
@@ -82,6 +114,11 @@ export function evaluateLlmRequestBudget(input: LlmRequestBudgetInput): LlmReque
       estimatedTotalTokens,
       utilization: null,
       status: "unknown",
+      capabilityKey: capabilities?.capabilityKey ?? null,
+      inputTokenLimitSource,
+      outputTokenLimit,
+      outputTokenLimitSource: capabilities?.outputTokenLimitSource ?? "unknown",
+      outputLimitExceeded,
     };
   }
 
@@ -101,6 +138,11 @@ export function evaluateLlmRequestBudget(input: LlmRequestBudgetInput): LlmReque
     estimatedTotalTokens,
     utilization,
     status,
+    capabilityKey: capabilities?.capabilityKey ?? null,
+    inputTokenLimitSource,
+    outputTokenLimit,
+    outputTokenLimitSource: capabilities?.outputTokenLimitSource ?? "unknown",
+    outputLimitExceeded,
   };
 }
 

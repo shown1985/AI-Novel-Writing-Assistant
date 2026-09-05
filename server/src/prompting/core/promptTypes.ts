@@ -134,6 +134,8 @@ export interface PromptExecutionOptions {
   sessionId?: string;
   provider?: LLMProvider;
   model?: string;
+  /** Optional endpoint override used for capability and budget diagnostics. */
+  baseURL?: string;
   temperature?: number;
   reasoningEnabled?: boolean;
   reasoningEffort?: ReasoningEffort;

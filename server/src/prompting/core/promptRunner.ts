@@ -383,7 +383,11 @@ function logPromptBudget(input: {
       input.model ? `model=${input.model}` : "",
       `estimatedInputTokens=${input.budget.estimatedInputTokens}`,
       `inputTokenLimit=${input.budget.effectiveInputTokenLimit ?? "unknown"}`,
+      `inputTokenLimitSource=${input.budget.inputTokenLimitSource}`,
       `requestedOutputTokens=${input.budget.requestedOutputTokens ?? "unknown"}`,
+      `outputTokenLimit=${input.budget.outputTokenLimit ?? "unknown"}`,
+      `outputLimitExceeded=${input.budget.outputLimitExceeded}`,
+      `capabilityKey=${input.budget.capabilityKey ?? "unknown"}`,
       `status=${input.budget.status}`,
     ].filter(Boolean).join(" "),
   );
@@ -697,6 +701,7 @@ async function resolveStructuredOutput<I, O, R = O>(input: {
         label: `${input.asset.id}@${input.asset.version}#semantic-retry-${semanticRetryAttempts}`,
         provider: input.options?.provider,
         model: input.options?.model,
+        baseURL: input.options?.baseURL,
         temperature: input.options?.temperature,
         maxTokens: input.options?.maxTokens,
         timeoutMs: input.options?.timeoutMs,
@@ -797,6 +802,9 @@ export async function runStructuredPrompt<I, O, R = O>(input: {
     inputTokenLimit: input.options?.requestBudget?.inputTokenLimit,
     safetyMarginTokens: input.options?.requestBudget?.safetyMarginTokens,
     maxTokens: input.options?.maxTokens,
+    provider: input.options?.provider,
+    model: input.options?.model,
+    baseURL: input.options?.baseURL,
   });
   logPromptBudget({
     asset: input.asset as PromptAsset<unknown, unknown, unknown>,
@@ -816,6 +824,7 @@ export async function runStructuredPrompt<I, O, R = O>(input: {
       label: `${input.asset.id}@${input.asset.version}`,
       provider: input.options?.provider,
       model: input.options?.model,
+      baseURL: input.options?.baseURL,
       temperature: input.options?.temperature,
       maxTokens: input.options?.maxTokens,
       timeoutMs: input.options?.timeoutMs,
@@ -941,6 +950,7 @@ export async function runTextPrompt<I>(input: {
     const llm = await promptRunnerLLMFactory(input.options?.provider, {
       fallbackProvider: "deepseek",
       model: input.options?.model,
+      baseURL: input.options?.baseURL,
       temperature: input.options?.temperature,
       reasoningEnabled: input.options?.reasoningEnabled,
       reasoningEffort: input.options?.reasoningEffort,
@@ -1044,6 +1054,7 @@ export async function streamTextPrompt<I>(input: {
     const llm = await promptRunnerLLMFactory(input.options?.provider, {
       fallbackProvider: "deepseek",
       model: input.options?.model,
+      baseURL: input.options?.baseURL,
       temperature: input.options?.temperature,
       reasoningEnabled: input.options?.reasoningEnabled,
       reasoningEffort: input.options?.reasoningEffort,
@@ -1158,6 +1169,7 @@ export async function streamStructuredPrompt<I, O, R = O>(input: {
     const llm = await promptRunnerLLMFactory(input.options?.provider, {
       fallbackProvider: "deepseek",
       model: input.options?.model,
+      baseURL: input.options?.baseURL,
       temperature: input.options?.temperature,
       maxTokens: input.options?.maxTokens,
       timeoutMs: input.options?.timeoutMs,
