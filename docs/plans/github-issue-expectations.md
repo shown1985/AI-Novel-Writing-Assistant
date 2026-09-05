@@ -274,3 +274,15 @@
 - 非目标：不伪装 Trae/Claude Code 等客户端；不修改提示词业务内容、数据库结构、世界持久化结构或既有重试次数；不新增第二套 Runtime。
 - 验收：显式会话、无会话自动生成、检查点恢复和阶段/入口元数据均有回归测试；server build 与世界骨架、OpenCode 会话、LLM provider 定向测试通过。
 - 当前证据：`pnpm --filter @ai-novel/server build` 通过；世界骨架、OpenCode 会话和 LLM provider 定向测试 23 项通过、0 项失败。个人 fork PR #18 基于 WGR-018 分支，未合并；真实模型和 Mac 人工验收仍待 WGR-016。
+
+### WGR-020：OpenCode 会话头传输层回归
+
+- 优先级：P1
+- 状态：本地实现与定向测试完成，待用户验收 WGR-016 后合并
+- 关联 Issue：创建失败，个人仓库 API 返回 410
+- 关联 PR：待创建（个人 fork）
+- 实施分支：`codex/opencode-header-transport-test`
+- 范围：在统一 LLM 工厂层增加传输配置回归，确认世界生成传入的会话标识最终进入 OpenAI 兼容客户端的 `x-opencode-session` 请求头；保留非 OpenCode endpoint 不注入专用头的约束。
+- 非目标：不发起真实模型请求；不修改 Provider 逻辑、数据库结构、用户数据或 OpenCode User-Agent；不新增 Runtime。
+- 验收：server build 与 LLM provider、OpenCode 会话、世界骨架定向测试通过；测试不输出 API Key。
+- 当前证据：待本阶段提交后补充个人 fork PR 链接和最终测试计数。
