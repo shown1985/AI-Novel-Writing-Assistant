@@ -22,6 +22,7 @@ Docker Desktop 在 macOS 上提供的是 Linux 容器环境，不是 macOS 容�
 - 本地 Mac 构建写入 `aiNovelLocalBuild` 包元数据。这类包不自动访问公开更新通道，避免把尚未发布的 `latest-mac.yml` 当成网络故障。
 - Windows 默认命令和发布命令保持 Windows x64 语义。NSIS 模板处理只允许在 `--win` 目标执行。
 - macOS 的最后窗口关闭后应用进程可以继续存活；用户从 Dock 再次激活应用时，应复用已经运行的本地服务并重新创建主窗口。
+- macOS 打包时，宿主 Node 与 Electron 使用不同的原生 ABI：构建包装器先把 staging 中的 `better-sqlite3` 重建为当前 Electron arm64 ABI，electron-builder 在 Mac 目标关闭自动重建，并在签名前把该绑定写入 app bundle；打包结束后再恢复宿主 Node 的绑定。不要把 Electron ABI 的 staging 原生模块直接留给宿主 Node 测试使用。
 
 ## Verification
 
@@ -43,6 +44,7 @@ Docker Desktop 在 macOS 上提供的是 Linux 容器环境，不是 macOS 容�
 - DMG 可生成但复制后的应用无法启动：先检查深度签名，再检查 Electron、`.node` 和随包动态库是否均为 arm64。
 - Dock 点击不能恢复窗口：检查 `activate` 是否重新创建窗口并复用已保存的本地服务端口。
 - Mac 运行验收第二次启动连接到旧端口：检查验收脚本是否从本次启动的日志偏移读取健康记录，不要直接复用历史日志中的端口。
+- 打包后 Node 测试出现 `NODE_MODULE_VERSION 133/137` 冲突：说明宿主 Node 与 Electron 原生模块被同一份 staging 依赖覆盖。重新使用 Mac 构建包装器完成 staging 重建和宿主依赖恢复，不要手工把包内 `.node` 文件复制回 workspace。
 
 ## Related Modules
 
