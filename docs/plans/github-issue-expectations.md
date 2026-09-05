@@ -108,7 +108,7 @@
 
 - 优先级：P0
 - 状态：本地实现与定向测试完成，待用户验收
-- 关联 PR：待创建（阶段 4，基于 WGR-004 分支）
+- 关联 PR：[个人 fork #4](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/4)（阶段 4，基于 WGR-004 分支）
 - 范围：在统一 Prompt Runner 记录渲染后提示的估算输入 Token、软上限、输出预算和预算状态；世界骨架各阶段显式使用观测模式；为后续硬门禁保留结构化错误契约。
 - 验收：预算估算不调用供应商；未配置上限时状态为 `unknown`；达到 80% 时标记 `near_limit`；超过软上限时可在显式 `reject` 模式下阻断，默认 `observe` 不改变既有请求；遥测不包含 API Key、正文或完整 Prompt。
 - 当前证据：新增 provider-agnostic 预算评估模块；结构化 Prompt Runner 返回预算快照并记录 near/exceeded 计数；世界骨架单次与分阶段请求均传入 12,000 Token 软上限和 512 Token 安全余量；预算、拒绝和世界骨架回归定向测试通过。完整提示工作台测试仍受当前 Node 24 与 `better-sqlite3` 原生 ABI 环境问题影响。
