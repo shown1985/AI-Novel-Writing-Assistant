@@ -20,6 +20,8 @@
 - 单次生成只返回可引用的骨架卡片，不生成世界设定正文；说明使用短句，整体文本量控制在约 3,200 个汉字内。规模变大时优先增加条目，不增加单条篇幅。
 - 标准和复杂规模按 `profile -> rules -> factions/forces -> locations -> relations -> presentation` 顺序执行。每个阶段只携带必要的当前结构和压缩后的用户约束，阶段输出通过统一结构装配器合并，避免多个大数组在一次响应中互相挤占输出预算。
 - 每个阶段都有独立 token 上限和低推理档位；阶段结果在进入下一阶段前检查数量、唯一 ID、地图字段和跨实体引用。地点生成后会把控制势力反向补齐到 `force.controlledLocationIds`，最终只保存确定性装配后的结构。
+- 标准和复杂规模会为每次生成建立检查点运行记录，保存去除临时控制字段后的原始请求、阶段结构快照和下一阶段位置。阶段完成后才推进检查点，失败时记录失败阶段和可读错误；恢复会复用已保存请求与结构，不重新生成已经完成的阶段。
+- 检查点恢复只从世界生成源页面触发。世界生成页面会在本机保留未完成运行 ID，重新打开页面后读取状态并提供“从已完成阶段继续”；运行记录可以提供状态和来源路由，但不承载继续、重试或恢复操作。
 - 骨架调用最多等待两分钟。结构化 JSON 被截断、格式失效或不满足骨架契约时，调用在当前阶段结束，不对同一大输出反复修复或重试，也不会保存半成品。
 - 这类失败会明确提示用户缩小世界规模后重试；持续失败时再切换模型。保存世界后仍可在世界手册按层补充细节。
 - 生成结果必须满足数量约束，特别是势力和地点数量不能少于用户要求。
@@ -35,6 +37,8 @@
 - 如果模型输出在 JSON 中途结束或生成时间超过两分钟，当前请求必须结束并显示可重试提示；不要让界面继续保持“生成中”，也不要尝试持久化残缺结构。
 - 如果势力数量、地点数量不符合用户设置，应修 Prompt schema 或 postValidate，而不是在前端隐藏缺口。
 - 如果标准或复杂规模在某一阶段失败，应定位到该阶段的模型响应和结构校验；不要重新发送已经成功的前置阶段，也不要用前端拼接缺失实体。
+- 如果恢复记录显示 `failed`，先从世界生成页面继续；服务端会从 `nextStageIndex` 指向的阶段重跑。恢复记录缺失、请求快照损坏或结构快照无法解析时，应结束恢复并提示重新生成，不得把残缺快照写入世界表。
+- 检查点表是新增的运行时记录，不参与现有世界表和用户内容的覆盖；迁移需要在发布前按当前数据库备份和部署流程执行。
 - 如果地图只能环形排布，优先检查 `locations` 是否缺少 `x/y/directionHint`，以及 `relations.locationConnections` 是否为空。
 - 如果 RAG 混入无关知识库内容，应检查世界生成调用是否只传入用户明确选择的参考上下文。
 - 如果点击“重新整理六层摘要”后出现 JSON、括号残片、异常势力名或地点数骤降，优先检查 `structureJson.metadata.seededFrom` 是否被旧分层流程改成 `legacy-text`；应从可信快照或骨架源恢复，而不是继续基于污染结构生成。
@@ -45,4 +49,6 @@
 - `shared/types/world.ts`
 - `server/src/prompting/prompts/world/worldDraft.prompts.ts`
 - `server/src/services/world/worldSkeletonGeneration.ts`
+- `server/src/services/world/worldGenerationCheckpointService.ts`
+- `server/src/modules/setup/world/http/worldGenerationRoutes.ts`
 - `client/src/pages/worlds/WorldGenerator.tsx`

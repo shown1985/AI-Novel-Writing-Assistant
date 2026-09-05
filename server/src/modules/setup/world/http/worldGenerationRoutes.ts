@@ -12,6 +12,7 @@ import {
   libraryUseSchema,
   requireWorldWizard,
   worldGenerateSchema,
+  worldGenerationRunParamsSchema,
   worldSkeletonGenerateSchema,
   worldRefineSchema,
   worldIdSchema,
@@ -19,6 +20,30 @@ import {
 } from "./worldHttpContext";
 import { summarizeStructuredOutputFailure } from "../../../../llm/structuredInvoke";
 import { AppError } from "../../../../middleware/errorHandler";
+
+interface CheckpointFailureDetails {
+  generationRunId: string;
+  stage: string;
+}
+
+function getCheckpointFailureDetails(error: unknown): CheckpointFailureDetails | undefined {
+  if (!error || typeof error !== "object") {
+    return undefined;
+  }
+  const record = error as Record<string, unknown>;
+  return typeof record.worldGenerationRunId === "string"
+    && typeof record.worldGenerationStage === "string"
+    ? {
+      generationRunId: record.worldGenerationRunId,
+      stage: record.worldGenerationStage,
+    }
+    : undefined;
+}
+
+function buildGenerationErrorDetails(error: unknown, message: string): string | Record<string, string> {
+  const checkpoint = getCheckpointFailureDetails(error);
+  return checkpoint ? { message, ...checkpoint } : message;
+}
 
 export function registerGenerationWorldRoutes(router: Router): void {
   router.get("/templates", requireWorldWizard, async (_req, res, next) => {
@@ -110,7 +135,13 @@ export function registerGenerationWorldRoutes(router: Router): void {
     validate({ body: worldSkeletonGenerateSchema }),
     async (req, res, next) => {
       try {
-        const data = await worldService.generateSkeleton(req.body as WorldSkeletonGenerateInput);
+        const body = req.body as z.infer<typeof worldSkeletonGenerateSchema>;
+        const { generationRunId, ...generationInput } = body;
+        const data = await worldService.generateSkeleton({
+          ...generationInput,
+          checkpointRunId: generationRunId,
+          sourceRoute: "/worlds/new",
+        } as WorldSkeletonGenerateInput);
         res.status(200).json({
           success: true,
           data,
@@ -136,7 +167,10 @@ export function registerGenerationWorldRoutes(router: Router): void {
           next(new AppError(
             userMessage,
             422,
-            "本次没有保存不完整内容。请调整生成规模或思考深度后重新生成；仍失败时可切换模型。",
+            buildGenerationErrorDetails(
+              error,
+              "本次没有保存不完整内容。请调整生成规模或思考深度后重新生成；仍失败时可切换模型。",
+            ),
           ));
           return;
         }
@@ -145,7 +179,95 @@ export function registerGenerationWorldRoutes(router: Router): void {
           next(new AppError(
             "世界骨架生成超时，请降低世界规模后重试。",
             504,
-            "本次没有保存未完成内容；仍超时时请切换模型后重新生成。",
+            buildGenerationErrorDetails(error, "本次没有保存未完成内容；仍超时时请切换模型后重新生成。"),
+          ));
+          return;
+        }
+        next(error);
+      }
+    },
+  );
+
+  router.get(
+    "/skeleton/generate/:runId",
+    requireWorldWizard,
+    validate({ params: worldGenerationRunParamsSchema }),
+    async (req, res, next) => {
+      try {
+        const { runId } = req.params as z.infer<typeof worldGenerationRunParamsSchema>;
+        const data = await worldService.getSkeletonGenerationSummary(runId);
+        if (!data) {
+          res.status(404).json({
+            success: false,
+            error: "世界生成恢复记录不存在。",
+          } satisfies ApiResponse<null>);
+          return;
+        }
+        res.status(200).json({
+          success: true,
+          data,
+          message: "世界生成状态已加载。",
+        } satisfies ApiResponse<typeof data>);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  router.post(
+    "/skeleton/generate/:runId/recover",
+    requireWorldWizard,
+    validate({ params: worldGenerationRunParamsSchema }),
+    async (req, res, next) => {
+      try {
+        const { runId } = req.params as z.infer<typeof worldGenerationRunParamsSchema>;
+        const summary = await worldService.getSkeletonGenerationSummary(runId);
+        if (!summary) {
+          res.status(404).json({
+            success: false,
+            error: "世界生成恢复记录不存在。",
+          } satisfies ApiResponse<null>);
+          return;
+        }
+        const data = await worldService.resumeSkeleton(runId);
+        res.status(200).json({
+          success: true,
+          data,
+          message: "已从最近完成的世界骨架阶段继续生成。",
+        } satisfies ApiResponse<typeof data>);
+      } catch (error) {
+        const failure = summarizeStructuredOutputFailure({ error, fallbackAvailable: false });
+        if ([
+          "incomplete_json",
+          "malformed_json",
+          "schema_mismatch",
+          "reasoning_budget_exhausted",
+          "output_truncated",
+          "empty_content",
+        ].includes(failure.category)) {
+          const userMessage = failure.category === "reasoning_budget_exhausted"
+            ? "模型思考占用了本次输出额度，请降低思考深度后重试。"
+            : failure.category === "output_truncated"
+              ? "世界骨架输出达到额度上限，请降低世界规模后重试。"
+              : failure.category === "empty_content"
+                ? "模型没有返回世界骨架，请重试或切换模型。"
+                : "世界骨架未能完整生成，请降低世界规模后重试。";
+          next(new AppError(
+            userMessage,
+            422,
+            buildGenerationErrorDetails(
+              error,
+              "系统保留了已完成阶段，可以从世界生成页面继续；仍失败时可切换模型。",
+            ),
+          ));
+          return;
+        }
+        const message = error instanceof Error ? error.message : String(error);
+        if (/timed?\s*out|timeout|超时/i.test(message)) {
+          next(new AppError(
+            "世界骨架生成超时，请稍后从世界生成页面继续。",
+            504,
+            buildGenerationErrorDetails(error, "已保留最近完成阶段；仍超时时请切换模型后继续。"),
           ));
           return;
         }

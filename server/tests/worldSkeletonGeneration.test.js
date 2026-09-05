@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 
 const promptRunner = require("../dist/prompting/core/promptRunner.js");
 const { generateWorldSkeleton } = require("../dist/services/world/worldSkeletonGeneration.js");
+const { createEmptyWorldStructure } = require("../dist/services/world/worldStructure.js");
 
 function buildStageFixture() {
   const factions = Array.from({ length: 3 }, (_, index) => ({
@@ -201,6 +202,109 @@ test("a failed stage is retried in place without regenerating prior stages", asy
       "profile", "profile", "rules", "factions", "locations", "relations", "world.skeleton.present",
     ]);
     assert.match(calls[1].promptInput.promptSource, /缺少必要字段/);
+  } finally {
+    promptRunner.runStructuredPrompt = original;
+  }
+});
+
+test("checkpointed generation resumes from the failed stage", async () => {
+  const original = promptRunner.runStructuredPrompt;
+  const calls = [];
+  const fixture = buildStageFixture();
+  const state = {
+    runId: "run-checkpoint-1",
+    request: null,
+    structure: createEmptyWorldStructure(),
+    nextStageIndex: 0,
+    status: "running",
+    finalPayload: undefined,
+    currentStage: null,
+  };
+  const checkpointStore = {
+    async startOrResume(input) {
+      if (!state.request) {
+        state.request = {
+          idea: input.request.idea,
+          worldType: input.request.worldType,
+          template: input.request.template,
+          referenceContext: input.request.referenceContext,
+          blueprint: input.request.blueprint,
+          options: input.request.options,
+          provider: input.request.provider,
+          model: input.request.model,
+        };
+      }
+      return {
+        runId: state.runId,
+        request: state.request,
+        structure: state.structure,
+        nextStageIndex: state.nextStageIndex,
+        status: state.status,
+        finalPayload: state.finalPayload,
+      };
+    },
+    async saveStage(input) {
+      state.structure = input.structure;
+      state.nextStageIndex = input.sequence;
+      state.currentStage = input.stage;
+      state.status = "running";
+    },
+    async complete(input) {
+      state.finalPayload = input.payload;
+      state.nextStageIndex = input.sequence;
+      state.status = "succeeded";
+    },
+    async fail(input) {
+      state.currentStage = input.stage;
+      state.status = "failed";
+    },
+    async getSummary() {
+      return null;
+    },
+  };
+  let locationAttempts = 0;
+  promptRunner.runStructuredPrompt = async (request) => {
+    calls.push(request);
+    if (request.asset.id === "world.structure.generate") {
+      const section = request.promptInput.section;
+      if (section === "locations" && locationAttempts++ < 2) {
+        throw new Error("地点阶段模拟失败");
+      }
+      const output = section === "factions"
+        ? { factions: fixture.factions, forces: fixture.forces }
+        : fixture[section] ?? fixture.relations;
+      return { output };
+    }
+    return { output: buildPresentationFixture(fixture) };
+  };
+
+  try {
+    await assert.rejects(
+      generateWorldSkeleton({
+        idea: "阶段失败后保存检查点。",
+        options: { preset: "standard" },
+        provider: "deepseek",
+        checkpointStore,
+      }),
+      /地点阶段模拟失败/,
+    );
+    assert.equal(state.nextStageIndex, 3);
+    assert.equal(state.status, "failed");
+    assert.equal(state.currentStage, "locations");
+
+    const callsBeforeResume = calls.length;
+    const result = await generateWorldSkeleton({
+      idea: "恢复时应使用已保存请求。",
+      options: { preset: "standard" },
+      provider: "deepseek",
+      checkpointRunId: state.runId,
+      checkpointStore,
+    });
+    const resumedSections = calls.slice(callsBeforeResume)
+      .map((request) => request.promptInput?.section ?? request.asset.id);
+    assert.deepEqual(resumedSections, ["locations", "relations", "world.skeleton.present"]);
+    assert.equal(result.generationRunId, state.runId);
+    assert.equal(state.status, "succeeded");
   } finally {
     promptRunner.runStructuredPrompt = original;
   }

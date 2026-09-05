@@ -135,6 +135,11 @@ export const worldSkeletonGenerateSchema = z.object({
   }).optional(),
   provider: providerSchema.optional(),
   model: z.string().optional(),
+  generationRunId: z.string().trim().min(1).optional(),
+});
+
+export const worldGenerationRunParamsSchema = z.object({
+  runId: z.string().trim().min(1),
 });
 
 export const knowledgeBindingsSchema = z.object({
