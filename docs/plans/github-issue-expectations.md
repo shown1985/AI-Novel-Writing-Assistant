@@ -72,7 +72,7 @@
 
 - 优先级：P0
 - 状态：待验收
-- 计划 PR：阶段 1
+- 关联 PR：个人 fork #1（阶段 1）
 - 范围：在统一 LLM Runtime 中识别 GLM-5.3-Flash 等支持 reasoning effort 的模型；世界骨架任务请求低 reasoning 档位；不在业务服务中堆叠模型名称分支。
 - 验收：请求包含 provider 认可的低 reasoning 参数；GLM standard 世界骨架返回合法 JSON；DeepSeek 与非目标模型保持兼容。
 - 当前证据：GLM 推理参数与世界骨架低档策略已接入；服务端类型检查、构建和推理/结构化定向测试通过；隔离数据库的真实 OpenCode Go 调用返回 HTTP 200，生成 5 条规则、3 个阵营、5 个势力、6 个地点和 3 个故事入口。实际 UI 生成仍待验收。
@@ -81,7 +81,7 @@
 
 - 优先级：P0
 - 状态：待验收
-- 计划 PR：阶段 1
+- 关联 PR：个人 fork #1（阶段 1）
 - 范围：区分 reasoning 耗尽、输出截断、空正文和传输失败；保留现有恢复与错误摘要兼容性。
 - 验收：GLM `finish_reason=length` 且正文为空时归类为 reasoning 耗尽；真正网络失败仍归类为传输错误；世界向导给出可执行提示。
 - 当前证据：已覆盖 reasoning-only、预算截断和普通空正文的分类测试；真实调用以 `finish_reason=stop` 返回正文，世界向导已映射可执行提示，实际 UI 展示仍待验收。
