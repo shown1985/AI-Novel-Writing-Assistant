@@ -237,6 +237,7 @@
 - 非目标：不在未签名开发包上执行公开发布；不上传上游；不修改用户数据库。
 - 验收：自动脚本完成 DMG 挂载、独立复制、本地服务启动、首次写入、重启恢复并保留临时测试目录；用户再完成首次配置、中等规模世界生成、Dock 再激活和故障提示，失败时能返回世界生成源页面继续，而不是停留在任务中心操作。
 - 当前证据：`pnpm verify:desktop-package:mac:reuse-stage` 通过；`pnpm verify:desktop:runtime:mac` 首次启动与重启均通过并解析到不同的动态端口，临时数据目录会由脚本输出并保留供排查。
+- 个人 fork PR：[shown1985/AI-Novel-Writing-Assistant#15](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/15)，基于 WGR-014/015 PR #14，未合并；真实模型、首次配置和 Dock 再激活仍待用户验收。
 
 ### WGR-017：Agent Runtime 控制平面 MVP
 
