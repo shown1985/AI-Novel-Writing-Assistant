@@ -256,6 +256,7 @@
 - 优先级：P1
 - 状态：本地实现与定向测试完成，待用户验收 WGR-016 后合并
 - 关联 Issue：创建失败，个人仓库 API 返回 410
+- 关联 PR：[个人 fork #17](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/17)
 - 实施分支：`codex/world-generation-budget-observability`
 - 范围：在统一 Prompt Quality Telemetry 中把供应商返回的 `request_too_large` 与本地 `budget_exceeded` 分开统计，并保留按 Prompt、Provider、Model、阶段和入口的聚合维度；不改变世界生成的重试、压缩或降级行为。
 - 非目标：不修改数据库结构；不把供应商身份伪装成其他客户端；不将所有章节生产链路迁移到新遥测；不保存 API Key、完整提示词或模型正文。
