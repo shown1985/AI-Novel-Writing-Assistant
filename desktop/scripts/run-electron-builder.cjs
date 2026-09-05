@@ -15,6 +15,8 @@ const appFileCopierPatched =
   'const pmApproaches = process.env.AI_NOVEL_EB_FORCE_TRAVERSAL === "true" ? [node_module_collector_1.PM.TRAVERSAL] : [await packager.getPackageManager(), node_module_collector_1.PM.TRAVERSAL];';
 const electronBuilderPackageJson = require.resolve("electron-builder/package.json", { paths: [desktopDir, repoRoot] });
 const electronBuilderRequire = createRequire(electronBuilderPackageJson);
+const appBuilderPackageJson = electronBuilderRequire.resolve("app-builder-lib/package.json");
+const appBuilderRequire = createRequire(appBuilderPackageJson);
 
 function resolveModule(request) {
   try {
@@ -141,6 +143,47 @@ function normalizeBuildEnvironment(sourceEnv, args, options) {
   return env;
 }
 
+function restoreHostNodeNativeDependencies() {
+  console.log("[dist:desktop] restoring host Node native dependencies after macOS packaging");
+  execFileSync("pnpm", ["--filter", "@ai-novel/server", "rebuild", "better-sqlite3"], {
+    cwd: repoRoot,
+    stdio: "inherit",
+    env: process.env,
+  });
+}
+
+function rebuildMacStagedNativeDependencies() {
+  const electronPackageJson = require.resolve("electron/package.json", { paths: [desktopDir, repoRoot] });
+  const electronVersion = JSON.parse(fs.readFileSync(electronPackageJson, "utf8")).version;
+  const electronRebuildMain = appBuilderRequire.resolve("@electron/rebuild");
+  const electronRebuildCli = path.join(path.dirname(electronRebuildMain), "cli.js");
+
+  console.log(
+    `[dist:desktop] rebuilding staged native dependencies for Electron ${electronVersion} arm64`,
+  );
+  execFileSync(
+    process.execPath,
+    [
+      electronRebuildCli,
+      "--version",
+      electronVersion,
+      "--module-dir",
+      path.join(desktopDir, "build", "app"),
+      "--which-module",
+      "better-sqlite3",
+      "--arch",
+      "arm64",
+      "--sequential",
+      "--force",
+    ],
+    {
+      cwd: repoRoot,
+      stdio: "inherit",
+      env: process.env,
+    },
+  );
+}
+
 function main() {
   const requestedArgs = process.argv.slice(2);
   const isWindowsBuild = requestedArgs.includes("--win");
@@ -151,6 +194,10 @@ function main() {
   const electronBuilderCli = resolveModule("electron-builder/cli.js");
   const args = ["--config", "electron-builder.config.cjs", ...requestedArgs];
   const env = normalizeBuildEnvironment(process.env, args, { isWindowsBuild, isMacBuild });
+
+  if (isMacBuild) {
+    rebuildMacStagedNativeDependencies();
+  }
 
   if (shortNsisTemplatesDir) {
     console.log(`[dist:desktop] using NSIS templates from ${shortNsisTemplatesDir}`);
@@ -164,11 +211,32 @@ function main() {
     buildEnv[nsisEnvOverrideName] = shortNsisTemplatesDir;
   }
 
-  execFileSync(process.execPath, [electronBuilderCli, ...args], {
-    cwd: desktopDir,
-    stdio: "inherit",
-    env: buildEnv,
-  });
+  let buildError;
+  try {
+    execFileSync(process.execPath, [electronBuilderCli, ...args], {
+      cwd: desktopDir,
+      stdio: "inherit",
+      env: buildEnv,
+    });
+  } catch (error) {
+    buildError = error;
+  }
+
+  let restoreError;
+  if (isMacBuild) {
+    try {
+      restoreHostNodeNativeDependencies();
+    } catch (error) {
+      restoreError = error;
+    }
+  }
+
+  if (buildError) {
+    throw buildError;
+  }
+  if (restoreError) {
+    throw restoreError;
+  }
 }
 
 try {

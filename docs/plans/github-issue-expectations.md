@@ -286,3 +286,15 @@
 - 非目标：不发起真实模型请求；不修改 Provider 逻辑、数据库结构、用户数据或 OpenCode User-Agent；不新增 Runtime。
 - 验收：server build 与 LLM provider、OpenCode 会话、世界骨架定向测试通过；测试不输出 API Key。
 - 当前证据：`pnpm --filter @ai-novel/server build` 通过；LLM provider、OpenCode 会话和世界骨架定向测试 24 项通过、0 项失败；当前分支重新构建的 `0.4.18` Mac arm64 包已通过布局检查及 DMG 独立运行/重启持久化验证。个人 fork PR #19 基于 WGR-019 分支，未合并；真实模型、首次配置、世界生成和 Dock 再激活仍待 WGR-016 人工验收。
+
+### WGR-021：Mac 打包后的宿主原生依赖隔离
+
+- 优先级：P1
+- 状态：实现完成，等待个人 fork PR 审阅
+- 关联 Issue：创建失败，个人仓库 API 返回 410
+- 关联 PR：待创建（个人 fork）
+- 实施分支：`codex/desktop-native-isolation`
+- 范围：Mac electron-builder 完成 Electron ABI 重建后，恢复宿主 Node 使用的 `better-sqlite3` 原生绑定；Mac 包验证同时探测宿主 Node 绑定，避免打包后本机测试因 ABI 漂移失败；Windows 构建路径保持不变。
+- 非目标：不共享或覆盖用户数据库；不改变 Electron 包内 arm64 原生模块；不调整 Windows NSIS/portable 构建；不新增运行时或业务逻辑。
+- 验收：Mac 包构建后 `server/node_modules/better-sqlite3` 可被当前 Node 加载；包内原生模块仍为 Mach-O arm64；Mac DMG 启动与重启持久化保持通过。
+- 当前证据：`pnpm dist:desktop:mac` 生成 `0.4.18` Mac arm64 DMG/ZIP；`node desktop/scripts/verify-desktop-package.cjs --platform darwin --arch arm64 --require-artifacts` 通过；`pnpm verify:desktop:runtime:mac` 完成 DMG 独立安装、首次启动、重启持久化（60626/60639）；`pnpm typecheck` 通过；LLM provider、OpenCode 会话和世界骨架定向测试 24 项通过、0 项失败。构建结束后宿主 Node `better-sqlite3` 绑定可正常加载；包内 Electron ABI 原生模块通过实际启动验证。未修改数据库结构或用户数据。
