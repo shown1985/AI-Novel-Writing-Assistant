@@ -13,6 +13,8 @@
 - 推理档位沿 Prompt Runner、结构化调用、JSON 修复调用完整传递，避免主调用已降档而修复调用又恢复为高推理。
 - 供应商返回的请求超限错误统一归类为 `request_too_large`；HTTP 413、上下文长度码和常见 payload/context 文案优先于 JSON 解析分类，但 Zod 的数组数量 `Too big` 必须继续归为 schema 校验问题。
 - 长阶段任务只能把“当前阶段所需的短摘要 + 稳定实体 ID”送入下一次 Prompt；持久化世界结构不裁剪，完整内容仍由装配器和后续页面使用。
+- OpenCode Go 是兼容 OpenAI 协议的网关能力，不应伪装成 Trae、Claude Code 或其他客户端；端点能力由统一 LLM 能力层识别，业务模块只声明结构化任务。
+- OpenCode Go 的 DeepSeek V4、GLM-5.3 等推理模型在结构化 JSON 任务中默认关闭思考，把额度留给可解析正文；普通文本或流式任务仍沿用调用方明确指定的思考设置。
 
 ## Current Rule
 
@@ -31,10 +33,26 @@
 - `request_too_large`：供应商拒绝了过大的上下文或 payload；优先缩减可选参考内容、使用阶段投影或拆分任务，不通过盲目增加输出额度解决。
 - 若结构化结果已有正文但 JSON 不完整，继续使用现有 `incomplete_json`、`malformed_json` 和修复边界，不把所有解析失败归为预算耗尽。
 
+## Gateway Capability Boundary
+
+### Current Rule
+
+- `resolveStructuredOutputProfile` 可以根据受信任的端点路径识别网关能力，但不能仅凭模型名称把未知自定义接口当成上游厂商官方接口。
+- OpenCode Go 识别条件是 `opencode.ai/zen/go` 路径；只有同时识别到 DeepSeek V4、GLM-5 系列等已知推理模型时，才标记结构化任务需要非思考模式。
+- `factory.ts` 根据 profile 统一计算 `reasoningForcedOff` 和供应商参数：DeepSeek 使用 `thinking: { type: "disabled" }`，GLM 在关闭时不发送 `reasoning_effort`。这一映射不应复制到世界生成或其他业务服务。
+- 未知网关继续采用可移植的 Prompt JSON 策略，并保留调用方请求的思考设置；新增端点时必须同时补充能力识别、参数映射和普通文本不受影响的回归测试。
+
+### Failure Modes
+
+- 只在业务服务里按模型名关闭思考，会导致同一模型在不同端点产生不一致行为，也会让后续章节、修复和其他结构化任务重复维护分支。
+- 把 OpenCode Go 当成某个上游厂商官方接口，可能发送网关不支持的 `response_format` 或推理字段，进而把网关拒绝误显示为 JSON 解析错误。
+- 仅验证结构化调用而没有验证普通文本调用，会意外削弱聊天、正文续写等需要思考的流程；能力层测试必须覆盖两种执行模式。
+
 ## Related Modules
 
 - `server/src/llm/reasoning.ts`：模型推理能力识别与参数映射。
 - `server/src/llm/factory.ts`：统一解析 LLM 客户端选项。
 - `server/src/prompting/core/promptRunner.ts`：任务策略向结构化、文本和语义重试链路传递。
 - `server/src/llm/structuredInvoke.ts`、`structuredInvokeParser.ts`：流式用量采集、分类与结构校验。
+- `server/src/llm/structuredOutput.ts`：端点能力 profile、结构化策略与 OpenCode Go 能力边界。
 - `server/src/modules/setup/world/http/worldGenerationRoutes.ts`：世界向导的用户提示与状态码映射。
