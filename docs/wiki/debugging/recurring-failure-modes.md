@@ -28,6 +28,8 @@
 - 长弧伏笔被当成当前章阻断：检查时间线钩子的 `resolveMode` 和 `blocking` 是否被误标成 `immediate + blocking`，以及检测器是否把 `short_arc` / `long_arc` 升级成硬失败。
 - 重新生成候选没有进入新一轮：检查 batch reuse、command idempotency 和候选阶段运行态。
 - 生成没有使用知识库资料：检查 `knowledgeDocumentIds`、小说/世界绑定、启用状态和 prompt context requirement。
+- macOS 集成测试在 `prisma db push` 报空的 `Schema engine error`：先在临时目录创建空的 SQLite 文件，再执行 schema push；该处理只适用于隔离测试库，不得指向用户数据库。
+- 兼容门面调用应用服务时报内部字段为空：检查代理是否以应用服务实例作为 receiver 调用方法。类方法不能从 `applicationServices` 上取出后裸调用，否则卷服务、检查点和恢复方法会丢失 `this`。
 
 ## 失败模式
 

@@ -121,3 +121,14 @@
 - 范围：世界骨架某阶段明确被分类为 `reasoning_budget_exhausted` 时，仅对同一阶段执行一次关闭推理的重试；其他错误不改变既有同阶段重试策略。
 - 验收：推理额度耗尽时前置阶段不重新调用；第二次请求保持同一 section、携带 `reasoningEnabled=false`；第二次仍失败时立即结束并保留检查点；不得按模型名称增加业务分支或无限重试。
 - 当前证据：阶段编排器读取结构化错误分类，在当前阶段第二次调用关闭推理；新增回归测试验证只重试 profile 阶段且不影响后续阶段；世界骨架定向测试 4/4 通过。
+
+### WGR-007：macOS SQLite 集成测试与兼容门
+
+- 优先级：P1
+- 状态：本地实现与定向测试完成，待集成回归与用户验收
+- 关联 PR：[个人 fork #6](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/6)
+- 实施分支：`fix/world-generation-prisma-harness`
+- 范围：让临时 SQLite 集成测试在 macOS/Prisma 7 下显式创建数据库文件；修复兼容门面代理丢失应用服务实例的问题；为已有章节计划写入执行契约哈希，避免真实链路测试意外调用外部模型。
+- 非目标：不改变生产数据库文件、不执行用户数据库迁移、不改变世界生成业务协议、不为测试注入真实 API Key。
+- 验收：临时 SQLite 数据库可以完成 `prisma db push`；兼容门面调用卷级服务时保留正确接收者；p0b 真实链路中导演恢复场景和 RAG 兼容场景不因工具链或未配置模型失败；剩余失败必须能归类为既有产品测试缺陷。
+- 当前证据：空 SQLite 文件预创建已使 Prisma schema push 成功；兼容门面回归测试通过；在独立且预创建、已完成 schema push 的 SQLite 数据库上，全量 integration 套件为 136 项，其中 132 项通过、2 项跳过、2 项失败；剩余失败分别是既有 legacy source 断言（`volume` 与测试期望的 `legacy` 不一致）和既有 Prompt governance 白名单缺口（`ComicFactService.ts` 的两个内联消息构造器），均未指向本阶段工具链修复回归；RAG 兼容测试 2 项通过；世界骨架与预算定向测试保持通过。
