@@ -236,7 +236,7 @@
 - 范围：验证 DMG 安装、首次配置、GLM/DeepSeek 中等规模世界生成、保存、重启恢复、Dock 再激活和故障提示。
 - 非目标：不在未签名开发包上执行公开发布；不上传上游；不修改用户数据库。
 - 验收：自动脚本完成 DMG 挂载、独立复制、本地服务启动、首次写入、重启恢复并保留临时测试目录；用户再完成首次配置、中等规模世界生成、Dock 再激活和故障提示，失败时能返回世界生成源页面继续，而不是停留在任务中心操作。
-- 当前证据：在当前分支复用已构建包执行 `pnpm verify:desktop-package:mac:reuse-stage` 通过；`pnpm verify:desktop:runtime:mac` 首次启动与重启均通过并解析到不同动态端口，DMG 独立复制、SQLite 持久化和临时数据目录检查通过，脚本会输出临时目录供排查。
+- 当前证据：在当前分支重新执行 `pnpm verify:desktop-package:mac` 构建并检查 `0.4.18` arm64 包通过；随后执行 `pnpm verify:desktop:runtime:mac`，最新 DMG 的独立复制、首次启动、重启持久化和动态端口检查均通过，脚本会输出临时目录供排查。
 - 个人 fork PR：[shown1985/AI-Novel-Writing-Assistant#15](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/15)，基于 WGR-014/015 PR #14，未合并；真实模型、首次配置和 Dock 再激活仍待用户验收。
 
 ### WGR-017：Agent Runtime 控制平面 MVP
@@ -285,4 +285,4 @@
 - 范围：在统一 LLM 工厂层增加传输配置回归，确认世界生成传入的会话标识最终进入 OpenAI 兼容客户端的 `x-opencode-session` 请求头；保留非 OpenCode endpoint 不注入专用头的约束。
 - 非目标：不发起真实模型请求；不修改 Provider 逻辑、数据库结构、用户数据或 OpenCode User-Agent；不新增 Runtime。
 - 验收：server build 与 LLM provider、OpenCode 会话、世界骨架定向测试通过；测试不输出 API Key。
-- 当前证据：`pnpm --filter @ai-novel/server build` 通过；LLM provider、OpenCode 会话和世界骨架定向测试 24 项通过、0 项失败；当前分支上的 Mac 包布局与 DMG 独立运行/重启持久化验证通过。个人 fork PR #19 基于 WGR-019 分支，未合并；真实模型、首次配置、世界生成和 Dock 再激活仍待 WGR-016 人工验收。
+- 当前证据：`pnpm --filter @ai-novel/server build` 通过；LLM provider、OpenCode 会话和世界骨架定向测试 24 项通过、0 项失败；当前分支重新构建的 `0.4.18` Mac arm64 包已通过布局检查及 DMG 独立运行/重启持久化验证。个人 fork PR #19 基于 WGR-019 分支，未合并；真实模型、首次配置、世界生成和 Dock 再激活仍待 WGR-016 人工验收。
