@@ -1,8 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { LLMProvider } from "@ai-novel/shared/types/llm";
 import type { PromptInvocationMeta } from "../../prompting/core/promptTypes";
-
-const OPEN_CODE_HOST_PATTERN = /(?:^|\.)opencode\.ai$/i;
+import { isOpenCodeHost } from "./capabilities";
 export const OPEN_CODE_USER_AGENT = "AI-Novel-Writing-Assistant/0.4.17";
 const PROCESS_FALLBACK_SESSION = randomUUID();
 
@@ -16,18 +15,6 @@ export interface OpenCodeRequestIdentityInput {
 function normalize(value: string | undefined): string | undefined {
   const normalized = value?.trim();
   return normalized || undefined;
-}
-
-function isOpenCodeHost(baseURL: string | undefined): boolean {
-  const normalized = normalize(baseURL);
-  if (!normalized) {
-    return false;
-  }
-  try {
-    return OPEN_CODE_HOST_PATTERN.test(new URL(normalized).hostname);
-  } catch {
-    return false;
-  }
 }
 
 function toStableHeaderValue(source: string): string {

@@ -150,7 +150,18 @@
 - 状态：待用户真实模型验收
 - 关联 Issue：个人仓库 Issues 当前关闭（GitHub API 返回 410），以下编号继续作为本地索引
 - 实施分支：`codex/world-generation-opencode-capability`
-- 范围：在统一 LLM 能力层识别 OpenCode Go 端点；对 DeepSeek V4 Flash、GLM-5.3 Flash 等结构化 JSON 请求采用非思考默认策略，并继续通过 provider adapter 发送标准关闭参数；普通文本/流式请求保留显式思考配置。新增端点、模型组合与未知自定义端点的回归测试。
+- 范围：在统一 LLM 能力层识别 OpenCode Go 端点；对 DeepSeek V4 Flash 结构化 JSON 请求采用非思考策略，对 OpenCode Go 的 GLM-5.3 Flash 使用网关支持的低推理档位，避免发送该端点拒绝的关闭思考参数；普通文本/流式请求保留显式思考配置。新增端点、模型组合与未知自定义端点的回归测试。
 - 非目标：不伪装 Trae/Claude Code 等客户端；不改变 API Key 存储、数据库结构、世界持久化结构或所有任务的 Agent Runtime；不在业务服务中堆叠模型名称分支。
-- 验收：OpenCode Go 结构化请求的 resolved options 标记 `reasoningForcedOff=true` 并携带供应商认可的关闭思考参数；普通文本请求不被强制关闭；官方端点和未知自定义端点保持既有行为；LLM/世界生成定向测试与服务端类型检查通过。
+- 验收：OpenCode Go + DeepSeek V4 结构化请求的 resolved options 标记 `reasoningForcedOff=true` 并携带关闭思考参数；OpenCode Go + GLM-5.3 Flash 使用 `reasoning_effort=low` 且不发送 `thinking.type=disabled`；普通文本请求不被强制关闭；官方端点和未知自定义端点保持既有行为；LLM/世界生成定向测试与服务端类型检查通过。
 - 当前证据：OpenCode Go 端点识别、DeepSeek V4/GLM-5.3 Flash 结构化关闭思考、普通文本保留思考、官方与未知自定义端点回归测试均已覆盖；服务端构建、根 typecheck，以及 LLM/推理/会话/结构化调用/世界骨架定向测试共 49 项全部通过。GitHub Issues 当前关闭，远端 Issue 无法创建（API 410）；个人仓库 PR：[shown1985/AI-Novel-Writing-Assistant#8](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/8)，当前未合并。真实 OpenCode Go 模型和 UI 世界生成仍需用户验收。
+
+### WGR-010：GLM 思考开关参数映射
+
+- 优先级：P0
+- 状态：本地实现完成，待合并与用户真实模型验收
+- 关联 Issue：个人仓库 Issues 当前关闭（GitHub API 返回 410），以下编号继续作为本地索引
+- 实施分支：`codex/opencode-glm-thinking-toggle`
+- 范围：在统一推理适配器中区分官方 GLM 与 OpenCode Go 网关的思考契约：官方 GLM 显式发送 `thinking.type`，OpenCode Go GLM-5.3 Flash 使用网关要求的 `reasoning_effort`，不发送被网关拒绝的 `thinking.type=disabled`。DeepSeek、其他模型和会话身份保持既有映射。
+- 非目标：不改变 DeepSeek、MiniMax 或其他模型参数；不在世界生成服务中增加模型分支；不调整数据库、提示词业务结构或 OpenCode 会话身份。
+- 验收：官方 GLM 结构化请求 resolved options 中出现 `thinking: { type: "disabled" }` 且不带 `reasoning_effort`；OpenCode Go GLM-5.3 Flash 结构化请求使用 `reasoning_effort: "low"`，即使调用方请求关闭也降为网关可接受的最低档位；普通文本请求保留显式推理档位；推理适配器、世界骨架定向测试与真实 OpenCode Go 标准规模回放通过。
+- 当前证据：官方 GLM 与 OpenCode Go 分支参数映射、DeepSeek 保持思考开关、普通文本行为的回归测试已通过；服务端构建与根 typecheck 通过，LLM/推理/会话/结构化调用/世界骨架定向测试共 49 项全部通过。真实 OpenCode Go 回放确认 GLM-5.3 Flash 拒绝 `thinking.type=disabled`（返回错误码 1210，要求使用 low/high/max），该端点契约已按官方网关行为调整；完整标准规模回放还被地点阶段提示契约缺陷阻断，转入 WGR-011 修复。提交：`1b6c5ba1`；个人仓库 PR：[shown1985/AI-Novel-Writing-Assistant#9](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/9)，当前未合并。

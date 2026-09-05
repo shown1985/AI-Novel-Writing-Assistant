@@ -14,7 +14,7 @@
 - 供应商返回的请求超限错误统一归类为 `request_too_large`；HTTP 413、上下文长度码和常见 payload/context 文案优先于 JSON 解析分类，但 Zod 的数组数量 `Too big` 必须继续归为 schema 校验问题。
 - 长阶段任务只能把“当前阶段所需的短摘要 + 稳定实体 ID”送入下一次 Prompt；持久化世界结构不裁剪，完整内容仍由装配器和后续页面使用。
 - OpenCode Go 是兼容 OpenAI 协议的网关能力，不应伪装成 Trae、Claude Code 或其他客户端；端点能力由统一 LLM 能力层识别，业务模块只声明结构化任务。
-- OpenCode Go 的 DeepSeek V4、GLM-5.3 等推理模型在结构化 JSON 任务中默认关闭思考，把额度留给可解析正文；普通文本或流式任务仍沿用调用方明确指定的思考设置。
+- OpenCode Go 的 DeepSeek V4 在结构化 JSON 任务中可以关闭思考；GLM-5.3 Flash 则由网关规定始终进入思考，必须使用 `reasoning_effort=low`，不能发送 `thinking.type=disabled`。普通文本或流式任务仍沿用调用方明确指定的思考设置。
 
 ## Current Rule
 
@@ -38,14 +38,14 @@
 ### Current Rule
 
 - `resolveStructuredOutputProfile` 可以根据受信任的端点路径识别网关能力，但不能仅凭模型名称把未知自定义接口当成上游厂商官方接口。
-- OpenCode Go 识别条件是 `opencode.ai/zen/go` 路径；只有同时识别到 DeepSeek V4、GLM-5 系列等已知推理模型时，才标记结构化任务需要非思考模式。
-- `factory.ts` 根据 profile 统一计算 `reasoningForcedOff` 和供应商参数：DeepSeek 使用 `thinking: { type: "disabled" }`，GLM 在关闭时不发送 `reasoning_effort`。这一映射不应复制到世界生成或其他业务服务。
+- OpenCode Go 识别条件是 `opencode.ai/zen/go` 路径；DeepSeek V4 与 GLM-5 系列虽然都属于推理模型，但能力不同：DeepSeek 可在结构化任务关闭思考，GLM-5.3 Flash 只能把 `reasoning_effort` 降到 `low`。
+- `factory.ts` 根据 profile 统一计算 `reasoningForcedOff` 和供应商参数：官方 GLM 使用 `thinking.type`，OpenCode Go GLM 使用 `reasoning_effort`，DeepSeek 使用 `thinking.type`。这一映射不应复制到世界生成或其他业务服务。
 - 未知网关继续采用可移植的 Prompt JSON 策略，并保留调用方请求的思考设置；新增端点时必须同时补充能力识别、参数映射和普通文本不受影响的回归测试。
 
 ### Failure Modes
 
 - 只在业务服务里按模型名关闭思考，会导致同一模型在不同端点产生不一致行为，也会让后续章节、修复和其他结构化任务重复维护分支。
-- 把 OpenCode Go 当成某个上游厂商官方接口，可能发送网关不支持的 `response_format` 或推理字段，进而把网关拒绝误显示为 JSON 解析错误。
+- 把 OpenCode Go 当成某个上游厂商官方接口，可能发送网关不支持的 `response_format` 或推理字段；例如 GLM-5.3 Flash 会拒绝 `thinking.type=disabled`，进而把能力不匹配误显示为 JSON 或空响应错误。
 - 仅验证结构化调用而没有验证普通文本调用，会意外削弱聊天、正文续写等需要思考的流程；能力层测试必须覆盖两种执行模式。
 
 ## Related Modules
@@ -56,3 +56,8 @@
 - `server/src/llm/structuredInvoke.ts`、`structuredInvokeParser.ts`：流式用量采集、分类与结构校验。
 - `server/src/llm/structuredOutput.ts`：端点能力 profile、结构化策略与 OpenCode Go 能力边界。
 - `server/src/modules/setup/world/http/worldGenerationRoutes.ts`：世界向导的用户提示与状态码映射。
+
+## Source Documents
+
+- [OpenCode Go 官方说明](https://dev.opencode.ai/docs/go/)：模型端点、`x-opencode-session` 要求，以及 OpenCode Go 的网关能力边界。
+- [智谱 GLM 深度思考文档](https://docs.bigmodel.cn/cn/guide/capabilities/thinking)：官方 GLM 端点的 `thinking.type` 与 `reasoning_effort` 参数语义。

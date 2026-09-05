@@ -1,6 +1,7 @@
 import type { BaseMessageChunk } from "@langchain/core/messages";
 import { REASONING_EFFORTS, type LLMProvider, type ReasoningEffort } from "@ai-novel/shared/types/llm";
 import { isBuiltInProvider } from "./providers";
+import { isOpenCodeGoEndpoint } from "./opencode/capabilities";
 
 const THINK_OPEN_TAG = "<think>";
 const THINK_CLOSE_TAG = "</think>";
@@ -169,10 +170,33 @@ export function resolveProviderReasoningBehavior(input: {
 
   if (isGlmReasoningModeProvider(input.provider, input.baseURL, input.model)) {
     const reasoningEffort = normalizeReasoningEffort(input.reasoningEffort);
+    // OpenCode Go's GLM-5.3 gateway always engages thinking and rejects an
+    // explicit disabled toggle.  Use its supported effort parameter instead;
+    // direct GLM endpoints still receive the documented thinking toggle below.
+    if (isOpenCodeGoEndpoint(input.baseURL)) {
+      const effectiveReasoningEffort = input.reasoningEnabled ? reasoningEffort : "low";
+      return {
+        // The gateway cannot honor a disabled request; report the effective
+        // provider behavior and keep the request valid at the lowest effort.
+        reasoningEnabled: true,
+        reasoningEffort: effectiveReasoningEffort,
+        modelKwargs: { reasoning_effort: effectiveReasoningEffort },
+        includeRawResponse: false,
+        usesAccumulatedStreamDeltas: false,
+      };
+    }
     return {
       reasoningEnabled: input.reasoningEnabled,
       reasoningEffort: input.reasoningEnabled ? reasoningEffort : null,
-      modelKwargs: input.reasoningEnabled ? { reasoning_effort: reasoningEffort } : undefined,
+      // GLM-5 defaults to thinking on.  Omitting reasoning_effort does not
+      // disable that default, so always send the explicit thinking toggle;
+      // only send reasoning_effort when thinking remains enabled.
+      modelKwargs: {
+        thinking: {
+          type: input.reasoningEnabled ? "enabled" : "disabled",
+        },
+        ...(input.reasoningEnabled ? { reasoning_effort: reasoningEffort } : {}),
+      },
       includeRawResponse: false,
       usesAccumulatedStreamDeltas: false,
     };

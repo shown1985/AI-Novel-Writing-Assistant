@@ -10,10 +10,10 @@ const {
 const { resolveLLMClientOptions, setProviderSecretCache } = require("../dist/llm/factory.js");
 const {
   classifyStructuredOutputFailure,
-  isOpenCodeGoEndpoint,
   resolveStructuredOutputProfile,
   selectStructuredOutputStrategy,
 } = require("../dist/llm/structuredOutput.js");
+const { isOpenCodeGoEndpoint } = require("../dist/llm/opencode/capabilities.js");
 
 test("supported providers include kimi, minimax, glm, qwen, gemini and ollama", () => {
   for (const provider of ["kimi", "minimax", "glm", "qwen", "gemini", "ollama"]) {
@@ -163,8 +163,8 @@ test("structured output profiles distinguish official, ModelScope Qwen and unkno
     executionMode: "structured",
   });
   assert.equal(openCodeGlmProfile.family, "opencode_go");
-  assert.equal(openCodeGlmProfile.requiresNonThinkingForStructured, true);
-  assert.equal(openCodeGlmProfile.supportsReasoningToggle, true);
+  assert.equal(openCodeGlmProfile.requiresNonThinkingForStructured, false);
+  assert.equal(openCodeGlmProfile.supportsReasoningToggle, false);
 
   const openCodeUnknownModelProfile = resolveStructuredOutputProfile({
     provider: "deepseek",
@@ -366,12 +366,27 @@ test("resolveLLMClientOptions applies structured reasoning and token guardrails"
       executionMode: "structured",
       structuredStrategy: "prompt_json",
       maxTokens: 5000,
+      reasoningEffort: "low",
     });
     assert.equal(openCodeGlm.structuredProfile?.family, "opencode_go");
-    assert.equal(openCodeGlm.reasoningEnabled, false);
-    assert.equal(openCodeGlm.reasoningForcedOff, true);
-    assert.equal(openCodeGlm.modelKwargs, undefined);
-    assert.equal(openCodeGlm.reasoningEffort, null);
+    assert.equal(openCodeGlm.reasoningEnabled, true);
+    assert.equal(openCodeGlm.reasoningForcedOff, false);
+    assert.deepEqual(openCodeGlm.modelKwargs, { reasoning_effort: "low" });
+    assert.equal(openCodeGlm.reasoningEffort, "low");
+
+    const openCodeGlmDisabledRequest = await resolveLLMClientOptions("glm", {
+      apiKey: "test-key",
+      model: "glm-5.3-flash",
+      baseURL: "https://opencode.ai/zen/go/v1",
+      executionMode: "structured",
+      structuredStrategy: "prompt_json",
+      reasoningEnabled: false,
+      reasoningEffort: "high",
+    });
+    assert.equal(openCodeGlmDisabledRequest.reasoningEnabled, true);
+    assert.equal(openCodeGlmDisabledRequest.reasoningForcedOff, false);
+    assert.deepEqual(openCodeGlmDisabledRequest.modelKwargs, { reasoning_effort: "low" });
+    assert.equal(openCodeGlmDisabledRequest.reasoningEffort, "low");
 
     const openCodePlain = await resolveLLMClientOptions("deepseek", {
       apiKey: "test-key",
