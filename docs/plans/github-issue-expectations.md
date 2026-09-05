@@ -298,3 +298,14 @@
 - 非目标：不共享或覆盖用户数据库；不改变 Electron 包内 arm64 原生模块；不调整 Windows NSIS/portable 构建；不新增运行时或业务逻辑。
 - 验收：Mac 包构建后 `server/node_modules/better-sqlite3` 可被当前 Node 加载；包内原生模块仍为 Mach-O arm64；Mac DMG 启动与重启持久化保持通过。
 - 当前证据：当前分支最新提交执行 `pnpm verify:desktop-package:mac`，生成 `0.4.18` Mac arm64 DMG/ZIP 并通过包布局与宿主绑定检查；随后 `pnpm verify:desktop:runtime:mac` 完成 DMG 独立安装、首次启动、重启持久化（61245/61259）；`pnpm typecheck` 通过；LLM provider、OpenCode 会话和世界骨架定向测试 24 项通过、0 项失败。构建结束后宿主 Node `better-sqlite3` 绑定可正常加载；包内 Electron ABI 原生模块通过实际启动验证。未修改数据库结构或用户数据。
+
+### WGR-022：快速配置后的模型选择水合竞态
+
+- 优先级：P0
+- 状态：本地实现与定向验证完成，待用户重新执行一次中等规模世界生成验收
+- 关联 Issue：创建失败，个人仓库 API 返回 410
+- 实施分支：`codex/llm-selection-hydration`
+- 范围：快速配置成功后先刷新厂商配置与当前选择事实源，再更新前端运行时模型；启动水合和通用模型选择器在配置请求刷新期间暂停失效厂商回退写入，避免新配置被旧缓存中的 Ollama 覆盖。
+- 非目标：不修改 API Key、数据库结构或已有任务数据；不改变 OpenCode 会话头；不把供应商身份伪装成 Trae/Claude Code；不处理仍引用旧厂商的历史任务重试。
+- 验收：OpenCode Go 配置成功后 `llm.currentSelection` 与新任务种子均保持 `custom_opencode_go`；刷新期间不向服务端写入首个旧候选；客户端定向竞态测试和根类型检查通过；Mac 包可正常启动。修复后再进行一次真实中等规模世界生成，确认请求实际到达 OpenCode Go，再单独判断是否仍有 `too big`。
+- 当前证据：手工回放显示密钥记录仍存在且 OpenCode Go 已配置，但失败任务种子被写成 `ollama + glm-5.3-flash`，最终在 `127.0.0.1:11434` 产生 `Connection error`；修复加入请求刷新等待与水合保护，定向测试 6/6、客户端类型检查和根 `typecheck` 通过，重新构建的 Mac arm64 `.app` 已启动并保持 OpenCode Go 选择。

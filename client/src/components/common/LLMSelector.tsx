@@ -204,6 +204,9 @@ export default function LLMSelector({
     if (shouldWaitForGlobalHydration) {
       return;
     }
+    if (apiKeySettingsQuery.isFetching) {
+      return;
+    }
     if (!hasRunnableProviders) {
       return;
     }
@@ -221,6 +224,7 @@ export default function LLMSelector({
     currentValue.provider,
     effectiveProvider,
     hasRunnableProviders,
+    apiKeySettingsQuery.isFetching,
     resolvedMaxTokens,
     resolvedModel,
     resolvedTemperature,
