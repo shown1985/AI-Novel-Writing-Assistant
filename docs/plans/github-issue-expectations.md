@@ -292,7 +292,7 @@
 - 优先级：P1
 - 状态：实现完成，等待个人 fork PR 审阅
 - 关联 Issue：创建失败，个人仓库 API 返回 410
-- 关联 PR：待创建（个人 fork）
+- 关联 PR：[个人 fork PR #20](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/20)
 - 实施分支：`codex/desktop-native-isolation`
 - 范围：Mac electron-builder 完成 Electron ABI 重建后，恢复宿主 Node 使用的 `better-sqlite3` 原生绑定；Mac 包验证同时探测宿主 Node 绑定，避免打包后本机测试因 ABI 漂移失败；Windows 构建路径保持不变。
 - 非目标：不共享或覆盖用户数据库；不改变 Electron 包内 arm64 原生模块；不调整 Windows NSIS/portable 构建；不新增运行时或业务逻辑。
