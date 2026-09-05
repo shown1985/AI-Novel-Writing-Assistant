@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { LLMProvider } from "@ai-novel/shared/types/llm";
 import type {
   WorldBindingSupport,
@@ -136,6 +137,8 @@ export interface WorldSkeletonGenerateInput {
   provider?: LLMProvider;
   model?: string;
   checkpointRunId?: string;
+  /** Stable identity for all LLM calls belonging to one world-generation run. */
+  sessionId?: string;
   sourceRoute?: string;
   checkpointStore?: WorldSkeletonCheckpointStore;
 }
@@ -150,6 +153,22 @@ function compactText(value: unknown, maxChars = 240): string {
   }
   const suffixLength = Math.min(48, Math.floor(maxChars / 4));
   return `${normalized.slice(0, maxChars - suffixLength - 1)}…${normalized.slice(-suffixLength)}`;
+}
+
+function resolveWorldGenerationSessionId(input: WorldSkeletonGenerateInput, fallbackRunId?: string): string {
+  const explicit = input.sessionId?.trim();
+  if (explicit) {
+    return explicit;
+  }
+  const checkpointRunId = input.checkpointRunId?.trim();
+  if (checkpointRunId) {
+    return `world-generation:${checkpointRunId}`;
+  }
+  const resumedRunId = fallbackRunId?.trim();
+  if (resumedRunId) {
+    return `world-generation:${resumedRunId}`;
+  }
+  return `world-generation:${randomUUID()}`;
 }
 
 function compactList(value: unknown, maxItems = 6, itemMaxChars = 120): string[] {
@@ -598,6 +617,9 @@ async function runWorldStructureStage(
         options: {
           provider: input.provider ?? "deepseek",
           model: input.model,
+          sessionId: input.sessionId,
+          stage: section,
+          entrypoint: input.sourceRoute ?? "/worlds/new",
           temperature: 0.4,
           ...(disableReasoningOnRetry ? { reasoningEnabled: false } : {}),
           reasoningEffort: "low",
@@ -652,8 +674,13 @@ async function generateWorldSkeletonOneShot(
   }
   const runId = checkpoint?.runId;
   const effectiveInput = checkpoint
-    ? { ...checkpoint.request, checkpointStore: input.checkpointStore, checkpointRunId: checkpoint.runId }
-    : input;
+    ? {
+      ...checkpoint.request,
+      checkpointStore: input.checkpointStore,
+      checkpointRunId: checkpoint.runId,
+      sessionId: checkpoint.request.sessionId?.trim() || resolveWorldGenerationSessionId(input, checkpoint.runId),
+    }
+    : { ...input, sessionId: resolveWorldGenerationSessionId(input) };
   const effectiveOptions = normalizeWorldSkeletonGenerationOptions(effectiveInput.options);
   let compressionLevel: WorldPromptCompressionLevel = "normal";
   try {
@@ -675,6 +702,9 @@ async function generateWorldSkeletonOneShot(
           options: {
             provider: effectiveInput.provider ?? "deepseek",
             model: effectiveInput.model,
+            sessionId: effectiveInput.sessionId,
+            stage: "skeleton",
+            entrypoint: effectiveInput.sourceRoute ?? "/worlds/new",
             temperature: 0.7,
             reasoningEffort: "low",
             maxTokens: resolveWorldStageOutputTokens(WORLD_SKELETON_GENERATION_MAX_TOKENS, compressionLevel),
@@ -720,8 +750,13 @@ async function generateWorldSkeletonStaged(
   }
   const runId = checkpoint?.runId;
   const effectiveInput = checkpoint
-    ? { ...checkpoint.request, checkpointStore: input.checkpointStore, checkpointRunId: checkpoint.runId }
-    : input;
+    ? {
+      ...checkpoint.request,
+      checkpointStore: input.checkpointStore,
+      checkpointRunId: checkpoint.runId,
+      sessionId: checkpoint.request.sessionId?.trim() || resolveWorldGenerationSessionId(input, checkpoint.runId),
+    }
+    : { ...input, sessionId: resolveWorldGenerationSessionId(input) };
   const effectiveOptions = normalizeWorldSkeletonGenerationOptions(effectiveInput.options);
   let structure = checkpoint?.structure ?? createEmptyWorldStructure();
   const startIndex = Math.min(Math.max(0, checkpoint?.nextStageIndex ?? 0), WORLD_SKELETON_STAGE_ORDER.length);
@@ -765,6 +800,9 @@ async function generateWorldSkeletonStaged(
           options: {
             provider: effectiveInput.provider ?? "deepseek",
             model: effectiveInput.model,
+            sessionId: effectiveInput.sessionId,
+            stage: "presentation",
+            entrypoint: effectiveInput.sourceRoute ?? "/worlds/new",
             temperature: 0.3,
             reasoningEffort: "low",
             maxTokens: resolveWorldStageOutputTokens(WORLD_SKELETON_STAGE_MAX_TOKENS.presentation, presentationCompression),
