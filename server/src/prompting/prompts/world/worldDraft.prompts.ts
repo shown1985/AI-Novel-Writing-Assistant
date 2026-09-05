@@ -7,6 +7,7 @@ import type {
   WorldReferenceContext,
   WorldSkeletonGenerationOptions,
 } from "@ai-novel/shared/types/worldWizard";
+import type { WorldBindingSupport, WorldStructuredData } from "@ai-novel/shared/types/world";
 
 const worldDraftFieldSchema = z.string().trim().min(1).optional().nullable();
 
@@ -186,6 +187,32 @@ const worldSkeletonSchema = z.object({
   }).strict(),
 }).strict();
 
+const worldSkeletonPresentationSchema = z.object({
+  concept: z.object({
+    name: z.string().trim().min(1),
+    oneSentence: z.string().trim().min(1),
+    readerImpression: z.string().trim().min(1),
+    genrePromise: z.string().trim().min(1),
+  }).strict(),
+  storyEntrySuggestions: z.array(z.object({
+    title: z.string().trim().min(1),
+    description: z.string().trim().min(1),
+    recommendedLocationIds: stringListSchema,
+    involvedForceIds: stringListSchema,
+    firstConflict: z.string().trim().min(1),
+  }).strict()),
+  assessment: z.object({
+    completenessScore: z.number().min(0).max(100),
+    readyForNovelUse: z.boolean(),
+    missingParts: z.array(z.object({
+      area: z.enum(["rules", "forces", "locations", "relations", "storyEntry"]),
+      issue: z.string().trim().min(1),
+      suggestedAction: z.string().trim().min(1),
+    }).strict()),
+    recommendedNextActions: stringListSchema,
+  }).strict(),
+}).strict();
+
 export interface WorldSkeletonGenerationPromptInput {
   idea: string;
   worldType?: string;
@@ -193,6 +220,15 @@ export interface WorldSkeletonGenerationPromptInput {
   referenceContext?: WorldReferenceContext | null;
   blueprint?: WorldGenerationBlueprint | null;
   options: WorldSkeletonGenerationOptions;
+}
+
+export interface WorldSkeletonPresentationPromptInput {
+  idea: string;
+  worldType?: string;
+  template?: string;
+  storyEntryCount: number;
+  currentStructure: WorldStructuredData;
+  currentBindingSupport: WorldBindingSupport;
 }
 
 function buildWorldDraftRequirements(input: WorldDraftGenerationPromptInput): string[] {
@@ -409,6 +445,73 @@ export const worldSkeletonGenerationPrompt: PromptAsset<
     );
     if (invalidLocationConnection) {
       throw new Error("世界骨架生成结果存在无法匹配地点 id 的地点连接。");
+    }
+    return output;
+  },
+};
+
+export const worldSkeletonPresentationPrompt: PromptAsset<
+  WorldSkeletonPresentationPromptInput,
+  z.infer<typeof worldSkeletonPresentationSchema>
+> = {
+  id: "world.skeleton.present",
+  version: "v1",
+  taskType: "planner",
+  mode: "structured",
+  language: "zh",
+  contextPolicy: {
+    maxTokensBudget: 0,
+  },
+  repairPolicy: {
+    maxAttempts: 0,
+  },
+  semanticRetryPolicy: {
+    maxAttempts: 0,
+  },
+  outputSchema: worldSkeletonPresentationSchema,
+  render: (input) => [
+    new SystemMessage([
+      "你是世界骨架的开局整理器。",
+      "当前世界结构已经由多个阶段生成并通过基础结构校验。你只负责整理世界名称、开局入口和完整度判断。",
+      "不要重写或补充 structuredData，不要输出任何未提供的实体 id。",
+      "只输出一个合法 JSON 对象，不要输出 Markdown、解释、注释、代码块或额外文本。",
+      "",
+      "输出对象必须包含 concept、storyEntrySuggestions、assessment，不能包含其他键。",
+      `storyEntrySuggestions 必须正好输出 ${input.storyEntryCount} 个。`,
+      "每个故事入口必须至少引用一个已存在的地点 id 和一个已存在的势力 id，并明确第一冲突。",
+      "名称和说明保持短小具体；不要把完整世界设定或剧情大纲重复到入口中。",
+      "assessment 只评价当前结构是否足以开始写作；如果结构已满足要求，missingParts 输出空数组。",
+    ].join("\n")),
+    new HumanMessage([
+      `世界意图：${input.idea}`,
+      `世界类型：${input.worldType || "自定义"}`,
+      `模板：${input.template || "自定义"}`,
+      "",
+      "已生成世界结构（只可引用其中的 id）：",
+      JSON.stringify(input.currentStructure, null, 2),
+      "",
+      "已生成绑定建议：",
+      JSON.stringify(input.currentBindingSupport, null, 2),
+      "",
+      "请整理开局展示信息。",
+    ].join("\n")),
+  ],
+  postValidate: (output, input) => {
+    if (output.storyEntrySuggestions.length !== input.storyEntryCount) {
+      throw new Error(`world.skeleton.present 必须返回 ${input.storyEntryCount} 个故事入口。`);
+    }
+    const forceIds = new Set(input.currentStructure.forces.map((item) => item.id));
+    const locationIds = new Set(input.currentStructure.locations.map((item) => item.id));
+    for (const suggestion of output.storyEntrySuggestions) {
+      if (suggestion.recommendedLocationIds.length === 0 || suggestion.involvedForceIds.length === 0) {
+        throw new Error("world.skeleton.present 的故事入口必须同时引用地点和势力 id。");
+      }
+      if (suggestion.recommendedLocationIds.some((id) => !locationIds.has(id))) {
+        throw new Error("world.skeleton.present 的故事入口引用了不存在的地点 id。");
+      }
+      if (suggestion.involvedForceIds.some((id) => !forceIds.has(id))) {
+        throw new Error("world.skeleton.present 的故事入口引用了不存在的势力 id。");
+      }
     }
     return output;
   },
