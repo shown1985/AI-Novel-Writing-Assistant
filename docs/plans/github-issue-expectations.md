@@ -297,4 +297,4 @@
 - 范围：Mac electron-builder 完成 Electron ABI 重建后，恢复宿主 Node 使用的 `better-sqlite3` 原生绑定；Mac 包验证同时探测宿主 Node 绑定，避免打包后本机测试因 ABI 漂移失败；Windows 构建路径保持不变。
 - 非目标：不共享或覆盖用户数据库；不改变 Electron 包内 arm64 原生模块；不调整 Windows NSIS/portable 构建；不新增运行时或业务逻辑。
 - 验收：Mac 包构建后 `server/node_modules/better-sqlite3` 可被当前 Node 加载；包内原生模块仍为 Mach-O arm64；Mac DMG 启动与重启持久化保持通过。
-- 当前证据：`pnpm dist:desktop:mac` 生成 `0.4.18` Mac arm64 DMG/ZIP；`node desktop/scripts/verify-desktop-package.cjs --platform darwin --arch arm64 --require-artifacts` 通过；`pnpm verify:desktop:runtime:mac` 完成 DMG 独立安装、首次启动、重启持久化（60626/60639）；`pnpm typecheck` 通过；LLM provider、OpenCode 会话和世界骨架定向测试 24 项通过、0 项失败。构建结束后宿主 Node `better-sqlite3` 绑定可正常加载；包内 Electron ABI 原生模块通过实际启动验证。未修改数据库结构或用户数据。
+- 当前证据：当前分支最新提交执行 `pnpm verify:desktop-package:mac`，生成 `0.4.18` Mac arm64 DMG/ZIP 并通过包布局与宿主绑定检查；随后 `pnpm verify:desktop:runtime:mac` 完成 DMG 独立安装、首次启动、重启持久化（61245/61259）；`pnpm typecheck` 通过；LLM provider、OpenCode 会话和世界骨架定向测试 24 项通过、0 项失败。构建结束后宿主 Node `better-sqlite3` 绑定可正常加载；包内 Electron ABI 原生模块通过实际启动验证。未修改数据库结构或用户数据。
