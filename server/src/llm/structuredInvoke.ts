@@ -1,7 +1,7 @@
 import type { ZodType } from "zod";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
-import type { LLMProvider } from "@ai-novel/shared/types/llm";
+import type { LLMProvider, ReasoningEffort } from "@ai-novel/shared/types/llm";
 import type { TaskType } from "./modelRouter";
 import type { ModelRouteRequestProtocol } from "@ai-novel/shared/types/novel";
 import {
@@ -24,6 +24,7 @@ import {
 } from "./structuredOutput";
 import { getStructuredFallbackSettings } from "./structuredFallbackSettings";
 import { extractLlmTokenUsage, mergeStreamTokenUsage } from "./usageTracking";
+import { extractReasoningTextFromChunk } from "./reasoning";
 import { runWithEnforcedTimeout } from "./invokeTimeout";
 import { beginLlmLiveSession } from "../platform/llm/live/llmLiveSession";
 import {
@@ -63,6 +64,7 @@ export interface StructuredInvokeInput<T> {
   maxRepairAttempts?: number;
   promptMeta?: PromptInvocationMeta;
   sessionId?: string;
+  reasoningEffort?: ReasoningEffort;
   disableFallbackModel?: boolean;
 }
 
@@ -131,6 +133,7 @@ async function resolveAttemptTarget(input: {
   requestProtocol?: ModelRouteRequestProtocol;
   structuredStrategy?: StructuredOutputStrategy;
   sessionId?: string;
+  reasoningEffort?: ReasoningEffort;
 }): Promise<StructuredAttemptTarget> {
   const shouldResolveRoutePreference = Boolean(
     input.taskType
@@ -150,6 +153,7 @@ async function resolveAttemptTarget(input: {
     requestProtocol: input.requestProtocol,
     structuredStrategy: input.structuredStrategy,
     sessionId: input.sessionId,
+    reasoningEffort: input.reasoningEffort,
     executionMode: "plain",
   });
   const preferredStrategy = input.structuredStrategy ?? (route
@@ -196,6 +200,7 @@ async function invokeStructuredAttempt<T>(input: {
     taskType: input.baseInput.taskType ?? "planner",
     promptMeta: input.baseInput.promptMeta,
     sessionId: input.baseInput.sessionId,
+    reasoningEffort: input.baseInput.reasoningEffort,
     executionMode: "structured",
     structuredStrategy: input.strategy,
     requestProtocol: input.target.requestProtocol,
@@ -247,13 +252,15 @@ async function invokeStructuredAttempt<T>(input: {
         );
         let rawContent = "";
         let tokenUsage = null;
+        let reasoningChars = 0;
         for await (const chunk of stream) {
           const content = toText(chunk.content);
+          reasoningChars += extractReasoningTextFromChunk(chunk).length;
           rawContent += content;
           liveSession.delta(content);
           tokenUsage = mergeStreamTokenUsage(tokenUsage, extractLlmTokenUsage(chunk));
         }
-        return { rawContent, tokenUsage };
+        return { rawContent, tokenUsage, reasoningChars };
       },
     });
     const rawContent = collected.rawContent;
@@ -265,6 +272,7 @@ async function invokeStructuredAttempt<T>(input: {
       taskType: input.baseInput.taskType,
       latencyMs: Date.now() - startedAt,
       rawChars: rawContent.length,
+      reasoningChars: collected.reasoningChars,
       strategy: input.strategy,
       fallbackUsed: input.fallbackUsed,
       reasoningForcedOff: resolved.reasoningForcedOff,
@@ -300,6 +308,8 @@ async function invokeStructuredAttempt<T>(input: {
       fallbackAvailable: input.fallbackAvailable,
       fallbackUsed: input.fallbackUsed,
       reasoningForcedOff: resolved.reasoningForcedOff,
+      reasoningChars: collected.reasoningChars,
+      reasoningEffort: input.baseInput.reasoningEffort,
     });
     liveSession.complete();
     return parsed;
@@ -366,7 +376,12 @@ async function tryStructuredStrategies<T>(input: {
         fallbackAvailable: input.fallbackAvailable,
         fallbackUsed: input.fallbackUsed,
       });
-      if (lastError.category === "transport_error") {
+      if ([
+        "transport_error",
+        "reasoning_budget_exhausted",
+        "output_truncated",
+        "empty_content",
+      ].includes(lastError.category)) {
         break;
       }
       if (lastError.category === "schema_mismatch" && strategy === "prompt_json") {
@@ -395,6 +410,8 @@ export async function invokeStructuredLlmDetailed<T>(input: StructuredInvokeInpu
     taskType: input.taskType ?? "planner",
     requestProtocol: input.requestProtocol,
     structuredStrategy: input.structuredStrategy,
+    sessionId: input.sessionId,
+    reasoningEffort: input.reasoningEffort,
   });
   const fallbackSettings = input.disableFallbackModel ? null : await getStructuredFallbackSettings();
   const fallbackEnabled = Boolean(
@@ -425,6 +442,7 @@ export async function invokeStructuredLlmDetailed<T>(input: StructuredInvokeInpu
       maxTokens: fallbackSettings.maxTokens ?? undefined,
       taskType: input.taskType ?? "planner",
       sessionId: input.sessionId,
+      reasoningEffort: input.reasoningEffort,
     });
     try {
       return await tryStructuredStrategies({
@@ -475,6 +493,9 @@ export function summarizeStructuredOutputFailure(input: {
     incomplete_json: incompleteJsonSummary,
     malformed_json: `模型输出的 JSON 格式不稳定${suffix}`,
     schema_mismatch: `模型输出未满足目标结构要求${suffix}`,
+    reasoning_budget_exhausted: `模型思考消耗了输出额度，未生成结构化正文${suffix}`,
+    output_truncated: `模型输出达到额度上限，结构化结果不完整${suffix}`,
+    empty_content: `模型没有返回结构化正文${suffix}`,
     transport_error: `结构化调用过程发生传输或服务端错误${suffix}`,
   };
   return {

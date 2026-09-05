@@ -5,6 +5,7 @@ import { isBuiltInProvider } from "./providers";
 const THINK_OPEN_TAG = "<think>";
 const THINK_CLOSE_TAG = "</think>";
 const DEEPSEEK_HOST_PATTERN = /(?:^|:\/\/)(?:api\.)?deepseek\.com(?:\/|$)/i;
+const GLM_MODEL_PATTERN = /^glm-5(?:\.\d+)?(?:-flash)?(?:[-.]|$)/i;
 const MINIMAX_HOST_PATTERN = /(?:^|:\/\/)(?:api\.)?minimax(?:i)?\.(?:io|com)(?:\/|$)/i;
 const MINIMAX_MODEL_PATTERN = /^minimax-m2(?:[.-]|$)/i;
 
@@ -35,6 +36,33 @@ export interface MiniMaxStreamState {
 function normalizeOptionalText(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
+}
+
+function normalizeModelId(value: string | undefined): string | undefined {
+  const normalized = normalizeOptionalText(value)?.toLowerCase();
+  if (!normalized) {
+    return undefined;
+  }
+  const parts = normalized.split("/").filter(Boolean);
+  return parts.at(-1) ?? normalized;
+}
+
+export function isGlmReasoningModeProvider(
+  _provider: LLMProvider,
+  _baseURL: string | undefined,
+  model: string | undefined,
+): boolean {
+  const modelId = normalizeModelId(model);
+  return Boolean(modelId && GLM_MODEL_PATTERN.test(modelId));
+}
+
+export function supportsReasoningEffort(
+  provider: LLMProvider,
+  baseURL?: string,
+  model?: string,
+): boolean {
+  return isDeepSeekThinkingModeProvider(provider, baseURL, model)
+    || isGlmReasoningModeProvider(provider, baseURL, model);
 }
 
 function collectTextArray(value: unknown): string[] {
@@ -134,6 +162,17 @@ export function resolveProviderReasoningBehavior(input: {
         },
         ...(input.reasoningEnabled ? { reasoning_effort: reasoningEffort } : {}),
       },
+      includeRawResponse: false,
+      usesAccumulatedStreamDeltas: false,
+    };
+  }
+
+  if (isGlmReasoningModeProvider(input.provider, input.baseURL, input.model)) {
+    const reasoningEffort = normalizeReasoningEffort(input.reasoningEffort);
+    return {
+      reasoningEnabled: input.reasoningEnabled,
+      reasoningEffort: input.reasoningEnabled ? reasoningEffort : null,
+      modelKwargs: input.reasoningEnabled ? { reasoning_effort: reasoningEffort } : undefined,
       includeRawResponse: false,
       usesAccumulatedStreamDeltas: false,
     };

@@ -1,6 +1,6 @@
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { toJSONSchema, type ZodError, type ZodType } from "zod";
-import type { LLMProvider } from "@ai-novel/shared/types/llm";
+import type { LLMProvider, ReasoningEffort } from "@ai-novel/shared/types/llm";
 import type { ModelRouteRequestProtocol } from "@ai-novel/shared/types/novel";
 import { getLLM } from "./factory";
 import { runWithEnforcedTimeout } from "./invokeTimeout";
@@ -24,6 +24,7 @@ export interface StructuredRepairInput<T> {
   schema: ZodType<T>;
   promptMeta?: PromptInvocationMeta;
   onRepairOutputDelta?: (content: string) => void;
+  reasoningEffort?: ReasoningEffort;
 }
 
 interface ArrayLengthRepairHint {
@@ -171,6 +172,7 @@ export async function repairWithLlm<T>(
     model: input.model,
     temperature: 0.15,
     maxTokens: input.maxTokens,
+    reasoningEffort: input.reasoningEffort,
     timeoutMs: input.timeoutMs,
     taskType: input.taskType ?? "planner",
     requestProtocol: input.requestProtocol,

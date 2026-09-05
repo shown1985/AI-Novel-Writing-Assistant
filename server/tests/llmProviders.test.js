@@ -375,4 +375,22 @@ test("structured failure classification separates native-json, thinking and sche
     }),
     "malformed_json",
   );
+  assert.equal(
+    classifyStructuredOutputFailure({
+      rawContent: "",
+      reasoningChars: 800,
+      maxTokens: 6000,
+      tokenUsage: { promptTokens: 100, completionTokens: 6000, totalTokens: 6100 },
+    }),
+    "reasoning_budget_exhausted",
+  );
+  assert.equal(
+    classifyStructuredOutputFailure({
+      rawContent: "",
+      maxTokens: 6000,
+      tokenUsage: { promptTokens: 100, completionTokens: 6000, totalTokens: 6100 },
+    }),
+    "output_truncated",
+  );
+  assert.equal(classifyStructuredOutputFailure({ rawContent: "" }), "empty_content");
 });

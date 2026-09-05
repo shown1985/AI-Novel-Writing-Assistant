@@ -47,6 +47,7 @@ export async function generateWorldSkeleton(
       provider: input.provider ?? "deepseek",
       model: input.model,
       temperature: 0.7,
+      reasoningEffort: "low",
       maxTokens: WORLD_SKELETON_GENERATION_MAX_TOKENS,
       timeoutMs: WORLD_SKELETON_GENERATION_TIMEOUT_MS,
     },

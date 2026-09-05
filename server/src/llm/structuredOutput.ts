@@ -3,6 +3,7 @@ import type { LLMProvider } from "@ai-novel/shared/types/llm";
 import type { ModelRouteRequestProtocol } from "@ai-novel/shared/types/novel";
 import { isBuiltInProvider } from "./providers";
 import { isDeepSeekThinkingModeProvider } from "./reasoning";
+import type { LlmTokenUsageSnapshot } from "./usageTracking";
 
 export type StructuredExecutionMode = "plain" | "structured";
 export type StructuredOutputStrategy = "json_schema" | "json_object" | "prompt_json";
@@ -12,6 +13,9 @@ export type StructuredOutputErrorCategory =
   | "incomplete_json"
   | "malformed_json"
   | "schema_mismatch"
+  | "reasoning_budget_exhausted"
+  | "output_truncated"
+  | "empty_content"
   | "transport_error";
 
 export interface StructuredOutputProfile {
@@ -346,6 +350,9 @@ export function buildStructuredResponseFormat<T>(input: {
 export function classifyStructuredOutputFailure(input: {
   error?: unknown;
   rawContent?: string;
+  tokenUsage?: LlmTokenUsageSnapshot | null;
+  maxTokens?: number;
+  reasoningChars?: number;
 }): StructuredOutputErrorCategory {
   const message = input.error instanceof Error
     ? input.error.message
@@ -417,6 +424,18 @@ export function classifyStructuredOutputFailure(input: {
   if (haystack.includes("zod") || haystack.includes("schema") || haystack.includes("校验错误")) {
     return "schema_mismatch";
   }
+  if (!trimmedRawContent) {
+    const exhausted = typeof input.maxTokens === "number"
+      && input.maxTokens > 0
+      && (input.tokenUsage?.completionTokens ?? 0) >= input.maxTokens;
+    if (exhausted && (input.reasoningChars ?? 0) > 0) {
+      return "reasoning_budget_exhausted";
+    }
+    if (exhausted) {
+      return "output_truncated";
+    }
+    return "empty_content";
+  }
   return "transport_error";
 }
 
@@ -432,6 +451,9 @@ export function extractStructuredOutputErrorCategory(message?: string | null): S
     "incomplete_json",
     "malformed_json",
     "schema_mismatch",
+    "reasoning_budget_exhausted",
+    "output_truncated",
+    "empty_content",
     "transport_error",
   ].includes(category) ? category : null;
 }

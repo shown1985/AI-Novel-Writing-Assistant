@@ -118,11 +118,25 @@ export function registerGenerationWorldRoutes(router: Router): void {
         } satisfies ApiResponse<typeof data>);
       } catch (error) {
         const failure = summarizeStructuredOutputFailure({ error, fallbackAvailable: false });
-        if (["incomplete_json", "malformed_json", "schema_mismatch"].includes(failure.category)) {
+        if ([
+          "incomplete_json",
+          "malformed_json",
+          "schema_mismatch",
+          "reasoning_budget_exhausted",
+          "output_truncated",
+          "empty_content",
+        ].includes(failure.category)) {
+          const userMessage = failure.category === "reasoning_budget_exhausted"
+            ? "模型思考占用了本次输出额度，请降低思考深度后重试。"
+            : failure.category === "output_truncated"
+              ? "世界骨架输出达到额度上限，请降低世界规模后重试。"
+              : failure.category === "empty_content"
+                ? "模型没有返回世界骨架，请重试或切换模型。"
+                : "世界骨架未能完整生成，请降低世界规模后重试。";
           next(new AppError(
-            "世界骨架未能完整生成，请降低世界规模后重试。",
+            userMessage,
             422,
-            "本次没有保存不完整内容。可先选择较小规模；仍失败时请切换模型后重新生成。",
+            "本次没有保存不完整内容。请调整生成规模或思考深度后重新生成；仍失败时可切换模型。",
           ));
           return;
         }

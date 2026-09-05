@@ -1,5 +1,5 @@
 import { z, type ZodError, type ZodType } from "zod";
-import type { LLMProvider } from "@ai-novel/shared/types/llm";
+import type { LLMProvider, ReasoningEffort } from "@ai-novel/shared/types/llm";
 import type { ModelRouteRequestProtocol } from "@ai-novel/shared/types/novel";
 import type { TaskType } from "./modelRouter";
 import { relaxGeneratedContentSchema } from "./generatedContentSchema";
@@ -50,6 +50,8 @@ export interface StructuredInvokeRawParseInput<T> {
   fallbackAvailable?: boolean;
   fallbackUsed?: boolean;
   reasoningForcedOff?: boolean;
+  reasoningChars?: number;
+  reasoningEffort?: ReasoningEffort;
 }
 
 function tryFixTruncatedJson(raw: string): string {
@@ -251,6 +253,7 @@ export function logStructuredInvokeEvent(input: {
   taskType?: TaskType;
   latencyMs?: number;
   rawChars?: number;
+  reasoningChars?: number;
   repairAttempt?: number;
   strategy?: StructuredOutputStrategy;
   errorCategory?: StructuredOutputErrorCategory | null;
@@ -270,6 +273,7 @@ export function logStructuredInvokeEvent(input: {
       typeof input.repairAttempt === "number" ? `repairAttempt=${input.repairAttempt}` : "",
       typeof input.latencyMs === "number" ? `latencyMs=${input.latencyMs}` : "",
       typeof input.rawChars === "number" ? `rawChars=${input.rawChars}` : "",
+      typeof input.reasoningChars === "number" ? `reasoningChars=${input.reasoningChars}` : "",
       input.fallbackUsed ? "fallbackUsed=true" : "",
       input.reasoningForcedOff ? "reasoningForcedOff=true" : "",
     ].filter(Boolean).join(" "),
@@ -369,9 +373,20 @@ export async function parseStructuredLlmRawContentDetailed<T>(
     fallbackUsed: input.fallbackUsed,
   });
   if (!input.rawContent.trim()) {
+    const category = classifyStructuredOutputFailure({
+      rawContent: input.rawContent,
+      tokenUsage: input.tokenUsage,
+      maxTokens: input.maxTokens,
+      reasoningChars: input.reasoningChars,
+    });
+    const message = category === "reasoning_budget_exhausted"
+      ? `[${input.label}] 模型将输出额度用于思考，未返回结构化正文。请降低思考深度后重试。`
+      : category === "output_truncated"
+        ? `[${input.label}] 模型输出在完成前达到额度上限。请降低生成规模或增加输出预算后重试。`
+        : `[${input.label}] 模型没有返回可用内容，无法执行结构校验或 JSON 修复。`;
     throw buildStructuredError({
-      message: `[${input.label}] 模型没有返回可用内容，无法执行结构校验或 JSON 修复。`,
-      category: "transport_error",
+      message,
+      category,
       strategy: input.strategy,
       profile: input.profile,
       reasoningForcedOff: input.reasoningForcedOff,

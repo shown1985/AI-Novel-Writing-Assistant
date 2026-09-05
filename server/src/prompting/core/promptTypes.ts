@@ -1,5 +1,5 @@
 import type { BaseMessage, BaseMessageChunk } from "@langchain/core/messages";
-import type { LLMProvider } from "@ai-novel/shared/types/llm";
+import type { LLMProvider, ReasoningEffort } from "@ai-novel/shared/types/llm";
 import type { ZodType } from "zod";
 import type { TaskType } from "../../llm/modelRouter";
 import type { LlmTokenUsageSnapshot } from "../../llm/usageTracking";
@@ -126,6 +126,7 @@ export interface PromptExecutionOptions {
   model?: string;
   temperature?: number;
   reasoningEnabled?: boolean;
+  reasoningEffort?: ReasoningEffort;
   maxTokens?: number;
   timeoutMs?: number;
   signal?: AbortSignal;

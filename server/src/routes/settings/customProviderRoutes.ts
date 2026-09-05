@@ -6,7 +6,7 @@ import { prisma } from "../../db/prisma";
 import { setProviderSecretCache } from "../../llm/factory";
 import { evictSharedLimiters } from "../../llm/requestLimiter";
 import { refreshProviderModels } from "../../llm/modelCatalog";
-import { isDeepSeekThinkingModeProvider, normalizeReasoningEffort } from "../../llm/reasoning";
+import { normalizeReasoningEffort, supportsReasoningEffort as supportsModelReasoningEffort } from "../../llm/reasoning";
 import { llmProviderSchema } from "../../llm/providerSchema";
 import { isBuiltInProvider } from "../../llm/providers";
 import { AppError } from "../../middleware/errorHandler";
@@ -186,7 +186,7 @@ export function registerCustomProviderRoutes(router: Router): void {
           ...getImageModelOptions(provider),
           imageModel ?? "",
         ].filter(Boolean)));
-        const supportsReasoningEffort = isDeepSeekThinkingModeProvider(provider, data.baseURL ?? undefined, data.model ?? undefined);
+        const supportsReasoningEffort = supportsModelReasoningEffort(provider, data.baseURL ?? undefined, data.model ?? undefined);
         res.status(201).json({
           success: true,
           data: {
