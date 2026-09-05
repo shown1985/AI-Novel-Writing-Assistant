@@ -446,11 +446,11 @@ export async function invokeStructuredLlmDetailed<T>(input: StructuredInvokeInpu
       provider: fallbackSettings.provider,
       model: fallbackSettings.model,
       temperature: fallbackSettings.temperature,
-      maxTokens: fallbackSettings.maxTokens ?? undefined,
-      taskType: input.taskType ?? "planner",
-      sessionId: input.sessionId,
-      reasoningEffort: input.reasoningEffort,
-    });
+        maxTokens: fallbackSettings.maxTokens ?? undefined,
+        taskType: input.taskType ?? "planner",
+        sessionId: input.sessionId,
+        reasoningEffort: input.reasoningEffort,
+      });
     try {
       return await tryStructuredStrategies({
         baseInput: {

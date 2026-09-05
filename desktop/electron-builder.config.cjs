@@ -25,9 +25,12 @@ const allowUnsignedRelease =
     process.env.AI_NOVEL_ALLOW_UNSIGNED_WINDOWS_RELEASE,
   ).toLowerCase() === "true";
 const hasWindowsSigningMaterial = Boolean(windowsSigningLink);
-const builderIconPath = path.join("builder", "app-icon.ico");
+const isMacOnlyBuild = process.argv.includes("--mac") && !process.argv.includes("--win");
+const isLocalDesktopBuild = firstNonEmpty(process.env.AI_NOVEL_LOCAL_DESKTOP_BUILD).toLowerCase() === "true";
+const windowsIconPath = path.join("builder", "app-icon.ico");
+const macIconPath = path.join("builder", "app-icon.png");
 
-if (!isBetaRelease && !hasWindowsSigningMaterial && !allowUnsignedRelease) {
+if (!isMacOnlyBuild && !isBetaRelease && !hasWindowsSigningMaterial && !allowUnsignedRelease) {
   throw new Error(
     "Public Windows desktop releases require signing material. Provide CSC_LINK/WIN_CSC_LINK, or explicitly opt in to an unsigned release.",
   );
@@ -52,6 +55,10 @@ module.exports = {
       to: "icons/app-icon.ico",
     },
     {
+      from: "builder/app-icon.png",
+      to: "icons/app-icon.png",
+    },
+    {
       from: "build/resources/app-update.yml",
       to: "app-update.yml",
     },
@@ -69,6 +76,7 @@ module.exports = {
   nativeRebuilder: "sequential",
   extraMetadata: {
     main: "dist/main.js",
+    aiNovelLocalBuild: isLocalDesktopBuild,
   },
   publish: [
     {
@@ -81,7 +89,7 @@ module.exports = {
   electronUpdaterCompatibility: ">=2.16",
   generateUpdatesFilesForAllChannels: false,
   win: {
-    icon: builderIconPath,
+    icon: windowsIconPath,
     // Keep EXE resource editing enabled for unsigned builds so Windows uses the app icon and metadata.
     signAndEditExecutable: true,
     target: [
@@ -105,11 +113,30 @@ module.exports = {
     createStartMenuShortcut: true,
     deleteAppDataOnUninstall: false,
     runAfterFinish: true,
-    installerIcon: builderIconPath,
-    uninstallerIcon: builderIconPath,
-    installerHeaderIcon: builderIconPath,
+    installerIcon: windowsIconPath,
+    uninstallerIcon: windowsIconPath,
+    installerHeaderIcon: windowsIconPath,
   },
   portable: {
     artifactName: "${productName}-${version}-portable-${arch}.${ext}",
+  },
+  mac: {
+    icon: macIconPath,
+    category: "public.app-category.productivity",
+    artifactName: "${productName}-${version}-${arch}.${ext}",
+    target: [
+      {
+        target: "dmg",
+        arch: ["arm64"],
+      },
+      {
+        target: "zip",
+        arch: ["arm64"],
+      },
+    ],
+  },
+  dmg: {
+    artifactName: "${productName}-${version}-${arch}.${ext}",
+    title: "${productName} ${version}",
   },
 };
