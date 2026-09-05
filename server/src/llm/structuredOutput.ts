@@ -16,6 +16,7 @@ export type StructuredOutputErrorCategory =
   | "reasoning_budget_exhausted"
   | "output_truncated"
   | "empty_content"
+  | "request_too_large"
   | "transport_error";
 
 export interface StructuredOutputProfile {
@@ -364,6 +365,46 @@ export function classifyStructuredOutputFailure(input: {
   const trimmedRawContent = rawContent.trim().toLowerCase();
   const haystack = `${message}\n${rawContent}`.toLowerCase();
 
+  // Provider gateways use several different error shapes for the same
+  // context/payload limit. Classify these before JSON/schema parsing so the
+  // caller can explain that the request must be reduced or split. Do not
+  // classify Zod's "Too big: expected array ..." validation message here.
+  const errorRecord = input.error && typeof input.error === "object"
+    ? input.error as Record<string, unknown>
+    : null;
+  const responseRecord = errorRecord?.response && typeof errorRecord.response === "object"
+    ? errorRecord.response as Record<string, unknown>
+    : null;
+  const status = errorRecord?.status
+    ?? errorRecord?.statusCode
+    ?? errorRecord?.httpStatus
+    ?? responseRecord?.status;
+  const providerCode = [errorRecord?.code, errorRecord?.type, errorRecord?.error]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
+  let metadataText = "";
+  try {
+    metadataText = JSON.stringify(errorRecord ?? {}) ?? "";
+  } catch {
+    metadataText = "";
+  }
+  const metadataHaystack = `${message}\n${providerCode}\n${metadataText}`;
+  const contextLimitMessage = /(?:context[_ -]?length|maximum context|context window|prompt.{0,20}(?:too long|too large)|input.{0,20}(?:too long|too large)|payload.{0,20}(?:too large|too big)|request.{0,20}(?:too large|too big)|request entity too large|entity too large|content too large|too many tokens|token limit exceeded|tokens exceed|上下文.{0,8}(?:超出|过长|过大)|请求.{0,8}(?:过大|过长|超限)|内容.{0,8}(?:过大|过长|超限))/i;
+  const explicitTooBig = /\btoo\s+big\b/i.test(metadataHaystack)
+    && !/expected\s+array\s+to\s+have/i.test(metadataHaystack);
+  if (
+    String(status) === "413"
+    || providerCode.includes("context_length_exceeded")
+    || providerCode.includes("prompt_is_too_long")
+    || providerCode.includes("request_too_large")
+    || providerCode.includes("payload_too_large")
+    || contextLimitMessage.test(metadataHaystack)
+    || explicitTooBig
+  ) {
+    return "request_too_large";
+  }
+
   if (
     haystack.includes("response_format")
     || haystack.includes("json_schema")
@@ -454,6 +495,7 @@ export function extractStructuredOutputErrorCategory(message?: string | null): S
     "reasoning_budget_exhausted",
     "output_truncated",
     "empty_content",
+    "request_too_large",
     "transport_error",
   ].includes(category) ? category : null;
 }

@@ -530,6 +530,7 @@ test("invokeStructuredLlmDetailed preserves explicit Anthropic protocol through 
   const originalGetLLM = factory.getLLM;
   const resolveCalls = [];
   let repairRequestProtocol = null;
+  let repairReasoningEnabled = null;
 
   factory.resolveLLMClientOptions = async (provider, options = {}) => {
     resolveCalls.push({
@@ -537,6 +538,7 @@ test("invokeStructuredLlmDetailed preserves explicit Anthropic protocol through 
       requestProtocol: options.requestProtocol,
       structuredStrategy: options.structuredStrategy,
       executionMode: options.executionMode,
+      reasoningEnabled: options.reasoningEnabled,
     });
     const resolvedProvider = provider ?? "openai";
     const resolvedModel = options.model ?? "claude-sonnet-4-5";
@@ -558,7 +560,7 @@ test("invokeStructuredLlmDetailed preserves explicit Anthropic protocol through 
       baseURL: options.baseURL ?? "https://api.anthropic.com",
       maxTokens: options.maxTokens,
       requestProtocol,
-      reasoningEnabled: true,
+      reasoningEnabled: options.reasoningEnabled ?? true,
       modelKwargs: undefined,
       includeRawResponse: false,
       executionMode: options.executionMode ?? "plain",
@@ -576,6 +578,7 @@ test("invokeStructuredLlmDetailed preserves explicit Anthropic protocol through 
   });
   factory.getLLM = async (_provider, options = {}) => {
     repairRequestProtocol = options.requestProtocol ?? null;
+    repairReasoningEnabled = options.reasoningEnabled ?? null;
     return {
       stream: async function* () {
         yield { content: "{\"value\":\"fixed\"}" };
@@ -595,6 +598,7 @@ test("invokeStructuredLlmDetailed preserves explicit Anthropic protocol through 
       }),
       systemPrompt: "只返回 JSON。",
       userPrompt: "给我一个 value。",
+      reasoningEnabled: false,
       disableFallbackModel: true,
     });
 
@@ -602,7 +606,9 @@ test("invokeStructuredLlmDetailed preserves explicit Anthropic protocol through 
     assert.equal(resolveCalls[0].requestProtocol, "anthropic");
     assert.equal(resolveCalls[1].requestProtocol, "anthropic");
     assert.deepEqual(resolveCalls.map((call) => call.structuredStrategy), [undefined, "prompt_json"]);
+    assert.deepEqual(resolveCalls.map((call) => call.reasoningEnabled), [false, false]);
     assert.equal(repairRequestProtocol, "anthropic");
+    assert.equal(repairReasoningEnabled, false);
   } finally {
     factory.resolveLLMClientOptions = originalResolveOptions;
     factory.createLLMFromResolvedOptions = originalCreateLLM;

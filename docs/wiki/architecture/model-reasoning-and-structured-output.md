@@ -11,6 +11,8 @@
 - 结构化调用保留一次流式调用中的正文、token 用量和思考字符数，解析层据此区分输出失败原因。
 - 空正文且 completion tokens 达到 max tokens 时：有思考内容归为 `reasoning_budget_exhausted`，没有思考内容归为 `output_truncated`；没有预算证据的空正文归为 `empty_content`。真实网络或服务端异常仍为 `transport_error`。
 - 推理档位沿 Prompt Runner、结构化调用、JSON 修复调用完整传递，避免主调用已降档而修复调用又恢复为高推理。
+- 供应商返回的请求超限错误统一归类为 `request_too_large`；HTTP 413、上下文长度码和常见 payload/context 文案优先于 JSON 解析分类，但 Zod 的数组数量 `Too big` 必须继续归为 schema 校验问题。
+- 长阶段任务只能把“当前阶段所需的短摘要 + 稳定实体 ID”送入下一次 Prompt；持久化世界结构不裁剪，完整内容仍由装配器和后续页面使用。
 
 ## Current Rule
 
@@ -18,6 +20,7 @@
 - 结构化调用遇到推理耗尽、输出截断或空正文时停止同一模型的格式策略轮换；切换备用模型仍由既有 fallback 配置决定。
 - 世界向导将上述三类可恢复失败映射为 422，并给出降低思考深度、降低规模、重试或切换模型的下一步建议；不会保存不完整世界数据。
 - 只有模型能力适配器读取模型名称和端点信息，世界业务模块不堆叠模型名称分支。
+- `reasoningEnabled` 必须从业务阶段策略经 Prompt Runner 传到 `resolveLLMClientOptions`；仅在阶段编排器设置标志而未进入客户端的改动视为无效。
 
 ## Failure Modes
 
@@ -25,6 +28,7 @@
 - `output_truncated`：正文为空且 completion 用量触顶，但没有可识别思考增量。优先降低生成规模或调整预算。
 - `empty_content`：正文为空但没有额度触顶证据。优先重试或切换模型，并检查服务端响应。
 - `transport_error`：网络、认证、服务端 HTML 错误等调用级故障，不应被误报为 JSON 结构问题。
+- `request_too_large`：供应商拒绝了过大的上下文或 payload；优先缩减可选参考内容、使用阶段投影或拆分任务，不通过盲目增加输出额度解决。
 - 若结构化结果已有正文但 JSON 不完整，继续使用现有 `incomplete_json`、`malformed_json` 和修复边界，不把所有解析失败归为预算耗尽。
 
 ## Related Modules

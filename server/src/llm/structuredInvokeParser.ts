@@ -51,6 +51,7 @@ export interface StructuredInvokeRawParseInput<T> {
   fallbackUsed?: boolean;
   reasoningForcedOff?: boolean;
   reasoningChars?: number;
+  reasoningEnabled?: boolean;
   reasoningEffort?: ReasoningEffort;
 }
 

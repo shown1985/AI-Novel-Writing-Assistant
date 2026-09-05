@@ -2,7 +2,11 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const promptRunner = require("../dist/prompting/core/promptRunner.js");
-const { generateWorldSkeleton } = require("../dist/services/world/worldSkeletonGeneration.js");
+const { worldSkeletonGenerationPrompt } = require("../dist/prompting/prompts/world/worldDraft.prompts.js");
+const {
+  buildWorldSkeletonPromptContext,
+  generateWorldSkeleton,
+} = require("../dist/services/world/worldSkeletonGeneration.js");
 const { createEmptyWorldStructure } = require("../dist/services/world/worldStructure.js");
 
 function buildStageFixture() {
@@ -124,6 +128,70 @@ function buildPresentationFixture(structure) {
     },
   };
 }
+
+test("world stage prompt context keeps continuity ids while dropping unbounded prose", () => {
+  const fixture = buildStageFixture();
+  fixture.forces[0].summary = "组织摘要".repeat(500);
+  fixture.locations[0].summary = "地点摘要".repeat(500);
+
+  const fullSize = JSON.stringify(fixture).length;
+  const projected = buildWorldSkeletonPromptContext(fixture, "relations");
+  const projectedJson = JSON.stringify(projected);
+
+  assert.ok(projectedJson.length < fullSize * 0.7);
+  assert.match(projectedJson, /force-1/);
+  assert.match(projectedJson, /location-1/);
+  assert.ok(projected.forces[0].summary.length < 220);
+  assert.ok(projected.locations[0].summary.length < 220);
+  assert.equal(projected.metadata, undefined);
+});
+
+test("light world skeleton prompt bounds untrusted idea and reference prose", () => {
+  const idea = `${"前置设定".repeat(3_000)}尾部线索`;
+  const messages = worldSkeletonGenerationPrompt.render({
+    idea,
+    worldType: "科幻",
+    template: "自定义",
+    referenceContext: {
+      mode: "adapt_world",
+      preserveElements: ["必须保留".repeat(200)],
+      allowedChanges: ["允许改造".repeat(200)],
+      forbiddenElements: ["禁止偏离".repeat(200)],
+      anchors: [{ id: "anchor-1", label: "锚点", content: "参考内容".repeat(300) }],
+    },
+    blueprint: {
+      classicElements: ["经典元素".repeat(100)],
+      propertySelections: Array.from({ length: 30 }, (_, index) => ({
+        name: `属性${index}`,
+        choiceLabel: "选择".repeat(100),
+        description: "描述".repeat(100),
+        detail: "补充".repeat(100),
+      })),
+    },
+    options: {
+      preset: "light",
+      counts: {
+        rules: 3,
+        factionGroups: 2,
+        forces: 3,
+        locations: 4,
+        conflicts: 2,
+        storyEntrySuggestions: 2,
+      },
+    },
+  }, {
+    blocks: [],
+    selectedBlockIds: [],
+    droppedBlockIds: [],
+    summarizedBlockIds: [],
+    estimatedInputTokens: 0,
+  });
+  const rendered = messages.map((message) => String(message.content)).join("\n");
+
+  assert.ok(rendered.length < 20_000);
+  assert.match(rendered, /尾部线索/);
+  assert.match(rendered, /内容已压缩|参考锚点/);
+});
 
 test("standard world skeleton uses staged generation and deterministic assembly", async () => {
   const original = promptRunner.runStructuredPrompt;
