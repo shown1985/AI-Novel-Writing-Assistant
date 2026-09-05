@@ -206,24 +206,26 @@
 ### WGR-014：Provider 能力矩阵与请求预算契约
 
 - 优先级：P0
-- 状态：本地实现与定向测试完成，待提交个人 fork PR
+- 状态：个人 fork PR #14 待验收
 - 关联 Issue：创建失败，个人仓库 API 返回 410
 - 实施分支：`codex/world-generation-budget-runtime`
 - 范围：为 Provider/Model/Endpoint 建立统一能力描述，覆盖输入上下文上限、最大输出上限、JSON 能力、reasoning 契约和未知能力状态；让统一 Prompt Runner 在调用前读取能力并生成预算快照；保留 observe/reject 两种策略；区分本地预算错误、供应商 413 和 schema 数组 Too big。
 - 非目标：不修改数据库结构、世界骨架持久化结构或用户数据；不在世界服务中增加 provider/model 分支；不把供应商文档上限当作精确 tokenizer 结果。
 - 验收：OpenCode Go、内置 Provider、自定义端点使用同一能力契约；未知上限不误阻断；reject 才抛出本地预算错误；日志不含 API Key、完整提示词或正文；既有 WGR-001～013 回归保持通过。
 - 当前证据：新增统一能力快照与请求预算来源字段，覆盖显式上限、Provider 默认输出上限、未知自定义端点、OpenCode Go reasoning 能力和端点查询参数脱敏；预算与能力定向测试通过，根类型检查通过。
+- 个人 fork PR：[shown1985/AI-Novel-Writing-Assistant#14](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/14)，基于 `codex/macos-wgr-acceptance`，未合并。
 
 ### WGR-015：世界阶段上下文预算器与降级策略
 
 - 优先级：P0
-- 状态：本地实现与定向测试完成，待提交个人 fork PR
+- 状态：个人 fork PR #14 待验收
 - 关联 Issue：创建失败，个人仓库 API 返回 410
 - 实施分支：`codex/world-generation-budget-runtime`
 - 范围：将世界骨架各阶段的上下文选择、摘要、可选块丢弃和请求重试收敛为独立预算器；超预算时按必选约束、稳定 ID、关系引用、用户约束的优先级降级；保留成功阶段和检查点，不重复生成前置阶段。
 - 非目标：不扩展到所有小说生成链路；不在前端猜测缺失实体或坐标；不通过关键词匹配替代 AI 结构化决策；不修改数据库结构。
 - 验收：小、中、大规模和长参考输入均有可追踪预算快照；必选上下文不会静默丢失；可选上下文按策略摘要或丢弃；请求过大时能给出缩小规模/拆分阶段提示；增加预算边界、降级、重试和脱敏日志测试。
 - 当前证据：请求过大时同一阶段只重试一次，第二次使用最小上下文、截短用户意图/参考约束并降低输出预算；开局整理阶段和轻量单次流程同样受保护；新增阶段与展示重试回归测试，世界骨架测试通过 13/13，组合 LLM/预算/会话/结构化测试通过 60/60。
+- 个人 fork PR：[shown1985/AI-Novel-Writing-Assistant#14](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/14)，基于 `codex/macos-wgr-acceptance`，未合并。
 
 ### WGR-016：Mac 世界生成端到端验收门
 
