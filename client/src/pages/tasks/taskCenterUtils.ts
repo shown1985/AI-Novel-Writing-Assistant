@@ -155,6 +155,9 @@ export function formatKind(kind: TaskKind): string {
   if (kind === "agent_run") {
     return "Agent 运行";
   }
+  if (kind === "world_generation") {
+    return "世界骨架生成";
+  }
   return "图片生成";
 }
 

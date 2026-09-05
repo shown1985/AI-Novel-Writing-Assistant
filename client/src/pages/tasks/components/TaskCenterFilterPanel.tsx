@@ -45,6 +45,7 @@ export default function TaskCenterFilterPanel({
           <option value="image_generation">图片生成</option>
           <option value="style_extraction">写法提取</option>
           <option value="agent_run">Agent 运行</option>
+          <option value="world_generation">世界骨架生成</option>
         </SelectControl>
         <SelectControl
           aria-label="按任务状态筛选"
