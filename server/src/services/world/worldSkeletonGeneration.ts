@@ -25,6 +25,7 @@ import {
   WORLD_STRUCTURE_SCHEMA_VERSION,
 } from "./worldStructure";
 import { buildStructureSectionInstructions, mergeWorldStructureSection } from "./worldServiceShared";
+import { worldStructuredDataSchema } from "./worldSchemas";
 
 const WORLD_SKELETON_GENERATION_TIMEOUT_MS = 120_000;
 const WORLD_SKELETON_GENERATION_MAX_TOKENS = 6_000;
@@ -140,6 +141,10 @@ function assertReferences(
   section: WorldStructureSectionKey,
   options: WorldSkeletonGenerationOptions,
 ): void {
+  const schemaResult = worldStructuredDataSchema.safeParse(structure);
+  if (!schemaResult.success) {
+    throw new Error(`世界骨架 ${section} 阶段的结构未通过 JSON Schema 校验。`);
+  }
   const forceIds = new Set(structure.forces.map((item) => item.id));
   const locationIds = new Set(structure.locations.map((item) => item.id));
   if (section === "profile") {
