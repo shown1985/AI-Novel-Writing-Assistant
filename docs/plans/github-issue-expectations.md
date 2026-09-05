@@ -187,3 +187,14 @@
 - 非目标：不改变前五个世界生成阶段的上下文；不放宽入口引用校验；不在前端把阵营名称转换为势力 ID；不调整数据库或模型协议。
 - 验收：展示阶段上下文不包含完整 relations/factions；提示明确列出具体势力 ID；GLM-5.3-Flash 与 DeepSeek V4 Flash 的 OpenCode Go standard 科幻世界回放均完成全部数量约束并通过入口引用校验。
 - 当前证据：小型展示探针从约 1,600 字符输入在 4.9 秒内完成；压缩上下文后 DeepSeek 入口 ID 仍暴露 faction 引用，补充具体 ID 清单并移除 factions 后，完整回放成功。DeepSeek standard 回放耗时约 64.5 秒，规则 5、阵营 3、势力 5、地点 6、势力关系 6、地点控制 6、故事入口 3，`readyForNovelUse=true`；GLM standard 回放耗时约 54.6 秒同样通过。提交：`55dfd7e8`；个人仓库 PR：[shown1985/AI-Novel-Writing-Assistant#11](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/11)，当前未合并。
+
+### WGR-013：世界骨架完整度评分量纲
+
+- 优先级：P1
+- 状态：本地实现与双模型真实回放完成，待合并与用户验收
+- 关联 Issue：个人仓库 Issues 当前关闭（GitHub API 返回 410），以下编号继续作为本地索引
+- 实施分支：`codex/world-assessment-score-contract`
+- 范围：在世界骨架生成和开局展示 Prompt 中明确 `completenessScore` 使用 0-100 的百分制整数，避免不同模型返回 0-1 或 1-10 量纲后在界面显示失真。
+- 非目标：不重算模型对世界质量的判断；不修改 `readyForNovelUse`、缺口列表或世界结构；不引入固定关键词评分。
+- 验收：Prompt 回归测试覆盖百分制整数要求；GLM-5.3-Flash 与 DeepSeek V4 Flash 的 OpenCode Go standard 回放均返回整数百分制，并完成全部结构和入口校验。
+- 当前证据：服务端构建与根类型检查通过，相关回归测试 52/52 通过；DeepSeek 回放返回 `85`，耗时约 43.2 秒；GLM 回放返回 `92`，耗时约 79.0 秒，均为整数且 `readyForNovelUse=true`。提交与 PR 待本阶段提交后登记。
