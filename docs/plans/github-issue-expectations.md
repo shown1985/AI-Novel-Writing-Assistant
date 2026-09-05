@@ -142,4 +142,4 @@
 - 范围：在统一结构化 LLM Runtime 中识别供应商返回的 413、`context_length_exceeded`、`payload too large`、`too big` 等请求超限错误；世界生成向导给出“减少参考内容或拆分生成”的可执行提示；将思考关闭选项从 Prompt Runner 传递到实际结构化客户端；世界骨架各阶段只向模型发送当前阶段需要的短摘要和稳定 ID，不改变持久化结构、用户输入和跨阶段装配规则。
 - 非目标：不把“Too big: expected array to have <=N items”的 Zod 数组校验误报为请求超限；不伪装 Trae/Claude Code 客户端；不调整数据库结构、不删除或覆盖用户数据；不把所有小说生成任务一次性迁移到新上下文投影。
 - 验收：请求超限能稳定归类为 `request_too_large` 并在结构化策略轮换前停止；世界生成与恢复接口返回明确的缩小上下文/拆分建议；思考关闭重试实际传到 provider adapter；阶段提示保留跨实体引用所需 ID 且不会携带完整历史长文本；已有世界骨架阶段、检查点和 fallback 定向测试保持通过；使用 GLM-5.3 Flash 与 DeepSeek V4 Flash 各完成一次 standard 规模世界生成后再进入用户验收。
-- 当前证据：结构化错误分类、非误报 Zod “Too big”、思考参数传递、世界阶段上下文投影、轻量长输入裁剪和既有世界骨架编排定向测试共 35 项全部通过；服务端构建通过。真实模型重现尚未在本阶段执行。
+- 当前证据：结构化错误分类、非误报 Zod “Too big”、思考参数传递、世界阶段上下文投影、轻量长输入裁剪和既有世界骨架编排定向测试共 35 项全部通过；根 `typecheck`（shared/server/client/desktop）通过。使用全新临时 SQLite 完成 schema push 后，集成套件 136 项中 132 项通过、2 项跳过、2 项失败；失败仍是既有 legacy source 断言与 ComicFactService Prompt 白名单缺口，未涉及本切片。真实模型重现尚未在本阶段执行。
