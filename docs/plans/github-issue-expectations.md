@@ -314,10 +314,11 @@
 ### WGR-023：新建任务使用服务端当前模型选择
 
 - 优先级：P0
-- 状态：待 PR 验收；个人 fork Issues 当前关闭（API 返回 410）
+- 状态：验证通过，待用户验收与 PR 合并；个人 fork Issues 当前关闭（API 返回 410）
 - 关联 Issue：创建失败，个人仓库 API 返回 410
 - 关联 PR：[shown1985/AI-Novel-Writing-Assistant#22](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/22)
 - 实施分支：`codex/server-authoritative-task-selection`
 - 范围：自动导演候选生成、候选修订、候选确认和接管任务在写入任务种子及命令载荷前读取服务端当前模型选择；客户端字段只作为没有服务端选择时的兼容输入。
 - 非目标：不修改数据库结构或已有任务；不覆盖显式重试命令的模型覆盖；不改变 OpenCode 会话头、供应商身份或章节生产链。
 - 验收：服务端当前选择为 `custom_opencode_go + glm-5.3-flash` 时，即使请求携带旧的 Ollama 字段，新任务种子和实际命令载荷仍使用 OpenCode；没有服务端选择时保持现有兼容行为；定向测试、类型检查和 Mac 启动验证通过。
+- 当前证据：真实自动导演请求携带旧 Ollama 字段后，Worker 日志显示资源推荐和候选生成均使用 `custom_opencode_go / glm-5.3-flash`，候选任务成功进入待确认状态；真实中等规模世界骨架的 profile、rules、factions、locations、relations、presentation 六次阶段调用全部返回成功，接口返回 200，未出现 `too big`、413 或空响应。
