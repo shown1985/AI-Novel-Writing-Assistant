@@ -310,3 +310,13 @@
 - 非目标：不修改 API Key、数据库结构或已有任务数据；不改变 OpenCode 会话头；不把供应商身份伪装成 Trae/Claude Code；不处理仍引用旧厂商的历史任务重试。
 - 验收：OpenCode Go 配置成功后 `llm.currentSelection` 与新任务种子均保持 `custom_opencode_go`；刷新期间不向服务端写入首个旧候选；客户端定向竞态测试和根类型检查通过；Mac 包可正常启动。修复后再进行一次真实中等规模世界生成，确认请求实际到达 OpenCode Go，再单独判断是否仍有 `too big`。
 - 当前证据：手工回放显示密钥记录仍存在且 OpenCode Go 已配置，但失败任务种子被写成 `ollama + glm-5.3-flash`，最终在 `127.0.0.1:11434` 产生 `Connection error`；修复加入请求刷新等待与水合保护，定向测试 6/6、客户端类型检查和根 `typecheck` 通过，重新构建的 Mac arm64 `.app` 已启动并保持 OpenCode Go 选择。
+
+### WGR-023：新建任务使用服务端当前模型选择
+
+- 优先级：P0
+- 状态：开发中；个人 fork Issues 当前关闭（API 返回 410）
+- 关联 Issue：创建失败，个人仓库 API 返回 410
+- 实施分支：`codex/server-authoritative-task-selection`
+- 范围：自动导演候选生成、候选修订、候选确认和接管任务在写入任务种子及命令载荷前读取服务端当前模型选择；客户端字段只作为没有服务端选择时的兼容输入。
+- 非目标：不修改数据库结构或已有任务；不覆盖显式重试命令的模型覆盖；不改变 OpenCode 会话头、供应商身份或章节生产链。
+- 验收：服务端当前选择为 `custom_opencode_go + glm-5.3-flash` 时，即使请求携带旧的 Ollama 字段，新任务种子和实际命令载荷仍使用 OpenCode；没有服务端选择时保持现有兼容行为；定向测试、类型检查和 Mac 启动验证通过。
