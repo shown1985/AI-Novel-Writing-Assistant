@@ -314,8 +314,9 @@
 ### WGR-023：新建任务使用服务端当前模型选择
 
 - 优先级：P0
-- 状态：开发中；个人 fork Issues 当前关闭（API 返回 410）
+- 状态：待 PR 验收；个人 fork Issues 当前关闭（API 返回 410）
 - 关联 Issue：创建失败，个人仓库 API 返回 410
+- 关联 PR：[shown1985/AI-Novel-Writing-Assistant#22](https://github.com/shown1985/AI-Novel-Writing-Assistant/pull/22)
 - 实施分支：`codex/server-authoritative-task-selection`
 - 范围：自动导演候选生成、候选修订、候选确认和接管任务在写入任务种子及命令载荷前读取服务端当前模型选择；客户端字段只作为没有服务端选择时的兼容输入。
 - 非目标：不修改数据库结构或已有任务；不覆盖显式重试命令的模型覆盖；不改变 OpenCode 会话头、供应商身份或章节生产链。
