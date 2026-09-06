@@ -212,6 +212,7 @@ export interface AgentRuntimeResult {
 export interface ToolExecutionContext {
   runId: string;
   agentName: AgentName;
+  sessionId?: string;
   contextMode: AgentContextMode;
   novelId?: string;
   worldId?: string;
@@ -239,6 +240,7 @@ export interface PlannedAction {
 }
 
 export interface PlannerInput {
+  sessionId?: string;
   goal: string;
   messages: Array<{
     role: "user" | "assistant" | "system";

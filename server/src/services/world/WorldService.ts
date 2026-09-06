@@ -73,6 +73,7 @@ import {
   uniqueKnowledgeDocumentIds,
 } from "./worldServiceShared";
 import { generateWorldSkeleton, type WorldSkeletonGenerateInput } from "./worldSkeletonGeneration";
+import { worldGenerationCheckpointService } from "./worldGenerationCheckpointService";
 import { exportWorldData, importWorldData } from "./worldTransfer";
 import { ragServices } from "../rag";
 import type { RagOwnerType } from "../rag/types";
@@ -179,7 +180,28 @@ export class WorldService {
   }
 
   async generateSkeleton(input: WorldSkeletonGenerateInput) {
-    return generateWorldSkeleton(input);
+    return generateWorldSkeleton({
+      ...input,
+      checkpointStore: worldGenerationCheckpointService,
+      sourceRoute: input.sourceRoute ?? "/worlds/new",
+    });
+  }
+
+  async resumeSkeleton(runId: string) {
+    return generateWorldSkeleton({
+      idea: "",
+      checkpointRunId: runId,
+      checkpointStore: worldGenerationCheckpointService,
+      sourceRoute: "/worlds/new",
+    });
+  }
+
+  async getSkeletonGenerationSummary(runId: string) {
+    return worldGenerationCheckpointService.getSummary(runId);
+  }
+
+  async getLatestUnfinishedSkeletonGenerationSummary() {
+    return worldGenerationCheckpointService.getLatestUnfinishedSummary();
   }
 
   async createWorld(input: CreateWorldInput) {

@@ -22,6 +22,7 @@ import type {
   WorldReferenceContext,
   WorldReferenceSeedBundle,
   WorldSkeletonGenerationOptions,
+  WorldSkeletonGenerationCheckpointSummary,
   WorldSkeletonGenerationPayload,
 } from "@ai-novel/shared/types/worldWizard";
 import { apiClient } from "./client";
@@ -229,10 +230,34 @@ export async function generateWorldSkeleton(payload: {
   options: WorldSkeletonGenerationOptions;
   provider?: LLMProvider;
   model?: string;
+  generationRunId?: string;
 }) {
   const { data } = await apiClient.post<ApiResponse<WorldSkeletonGenerationPayload>>(
     "/worlds/skeleton/generate",
     payload,
+    { timeout: WORLD_SKELETON_GENERATE_TIMEOUT_MS },
+  );
+  return data;
+}
+
+export async function getWorldSkeletonGenerationSummary(runId: string) {
+  const { data } = await apiClient.get<ApiResponse<WorldSkeletonGenerationCheckpointSummary>>(
+    `/worlds/skeleton/generate/${encodeURIComponent(runId)}`,
+  );
+  return data;
+}
+
+export async function getLatestUnfinishedWorldSkeletonGeneration() {
+  const { data } = await apiClient.get<ApiResponse<WorldSkeletonGenerationCheckpointSummary | null>>(
+    "/worlds/skeleton/generate/latest",
+  );
+  return data;
+}
+
+export async function recoverWorldSkeleton(runId: string) {
+  const { data } = await apiClient.post<ApiResponse<WorldSkeletonGenerationPayload>>(
+    `/worlds/skeleton/generate/${encodeURIComponent(runId)}/recover`,
+    {},
     { timeout: WORLD_SKELETON_GENERATE_TIMEOUT_MS },
   );
   return data;

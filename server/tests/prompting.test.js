@@ -1438,6 +1438,13 @@ test("runStructuredPrompt forwards repair policy and context telemetry", async (
           content: "低优先级补充：".concat("次要背景。".repeat(20)),
         }),
       ],
+      options: {
+        requestBudget: {
+          inputTokenLimit: 20_000,
+          safetyMarginTokens: 512,
+          mode: "observe",
+        },
+      },
     });
 
     assert.equal(captured.maxRepairAttempts, 3);
@@ -1461,9 +1468,85 @@ test("runStructuredPrompt forwards repair policy and context telemetry", async (
     assert.ok(telemetry.totalEstimatedInputTokens > 0);
     assert.ok(telemetry.totalRenderedPromptChars > 0);
     assert.ok(telemetry.totalOutputChars > 0);
+    assert.equal(result.meta.requestBudget.status, "ok");
+    assert.ok(result.meta.requestBudget.estimatedInputTokens > 0);
+    assert.equal(telemetry.budgetObservedCount, 1);
+    assert.equal(telemetry.budgetNearLimitCount, 0);
+    assert.equal(telemetry.budgetExceededCount, 0);
+    assert.ok(telemetry.totalEstimatedRenderedInputTokens > 0);
   } finally {
     genreTreePrompt.repairPolicy = originalRepairPolicy;
     genreTreePrompt.contextPolicy = originalContextPolicy;
+    setPromptRunnerStructuredInvokerForTests();
+  }
+});
+
+test("runStructuredPrompt can reject a request that exceeds an explicit soft budget", async () => {
+  resetPromptQualityTelemetryForTests();
+  let invoked = false;
+  setPromptRunnerStructuredInvokerForTests(async () => {
+    invoked = true;
+    throw new Error("provider should not be called after budget preflight");
+  });
+
+  try {
+    await assert.rejects(() => runStructuredPrompt({
+      asset: genreTreePrompt,
+      promptInput: {
+        prompt: "预算门禁",
+        retry: false,
+        forceJson: true,
+      },
+      options: {
+        requestBudget: {
+          inputTokenLimit: 1,
+          safetyMarginTokens: 0,
+          mode: "reject",
+        },
+      },
+    }), /LLM_BUDGET.*超过本阶段输入预算/);
+    assert.equal(invoked, false);
+    const telemetry = getSinglePromptQualityEntry();
+    assert.equal(telemetry.failedCount, 1);
+    assert.equal(telemetry.failuresByKind.budget_exceeded, 1);
+    assert.equal(telemetry.budgetExceededCount, 1);
+  } finally {
+    setPromptRunnerStructuredInvokerForTests();
+  }
+});
+
+test("runStructuredPrompt keeps provider request-too-large failures distinct from local budget rejection", async () => {
+  resetPromptQualityTelemetryForTests();
+  setPromptRunnerStructuredInvokerForTests(async () => {
+    const error = new Error("gateway rejected payload");
+    error.status = 413;
+    throw error;
+  });
+
+  try {
+    await assert.rejects(() => runStructuredPrompt({
+      asset: genreTreePrompt,
+      promptInput: {
+        prompt: "供应商请求过大",
+        retry: false,
+        forceJson: true,
+      },
+      options: {
+        provider: "openai",
+        model: "test-model",
+        requestBudget: {
+          inputTokenLimit: 20_000,
+          safetyMarginTokens: 0,
+          mode: "observe",
+        },
+      },
+    }), /gateway rejected payload/);
+    const telemetry = getSinglePromptQualityEntry();
+    assert.equal(telemetry.failedCount, 1);
+    assert.equal(telemetry.failuresByKind.request_too_large, 1);
+    assert.equal(telemetry.requestTooLargeCount, 1);
+    assert.equal(telemetry.failuresByKind.budget_exceeded, 0);
+  } finally {
     setPromptRunnerStructuredInvokerForTests();
   }
 });

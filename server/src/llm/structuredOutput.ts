@@ -2,7 +2,9 @@ import { toJSONSchema, type ZodType } from "zod";
 import type { LLMProvider } from "@ai-novel/shared/types/llm";
 import type { ModelRouteRequestProtocol } from "@ai-novel/shared/types/novel";
 import { isBuiltInProvider } from "./providers";
-import { isDeepSeekThinkingModeProvider } from "./reasoning";
+import { isDeepSeekThinkingModeProvider, isGlmReasoningModeProvider } from "./reasoning";
+import { isOpenCodeGoEndpoint } from "./opencode/capabilities";
+import type { LlmTokenUsageSnapshot } from "./usageTracking";
 
 export type StructuredExecutionMode = "plain" | "structured";
 export type StructuredOutputStrategy = "json_schema" | "json_object" | "prompt_json";
@@ -12,6 +14,10 @@ export type StructuredOutputErrorCategory =
   | "incomplete_json"
   | "malformed_json"
   | "schema_mismatch"
+  | "reasoning_budget_exhausted"
+  | "output_truncated"
+  | "empty_content"
+  | "request_too_large"
   | "transport_error";
 
 export interface StructuredOutputProfile {
@@ -159,6 +165,16 @@ export function resolveStructuredOutputProfile(input: {
   const qwenMixedThinkingModel = isQwenMixedThinkingModel(model);
   const qwenThinkingOnlyModel = isQwenThinkingOnlyModel(model);
   const qwenNativeStructuredModel = supportsDashScopeQwenNativeStructuredOutput(model);
+  const isOpenCodeGo = isOpenCodeGoEndpoint(input.baseURL);
+  const isOpenCodeReasoningModel = isDeepSeekThinkingModeProvider(
+    input.provider,
+    input.baseURL,
+    input.model,
+  ) || isGlmReasoningModeProvider(
+    input.provider,
+    input.baseURL,
+    input.model,
+  );
   const isDashScopeQwen = usesOfficialEndpoint("qwen", DASHSCOPE_HOST_PATTERN);
   const isModelScopeQwen = MODELSCOPE_HOST_PATTERN.test(host) || provider.includes("modelscope");
 
@@ -167,6 +183,25 @@ export function resolveStructuredOutputProfile(input: {
       family: "anthropic",
       preferredStructuredStrategy: "prompt_json",
       safeStructuredMaxTokens: 8192,
+    });
+  }
+  if (isOpenCodeGo && isOpenCodeReasoningModel) {
+    const isOpenCodeGlm = isGlmReasoningModeProvider(
+      input.provider,
+      input.baseURL,
+      input.model,
+    );
+    return buildProfile({
+      family: "opencode_go",
+      // OpenCode Go is OpenAI-compatible, but its gateway capability should
+      // not be inferred from the upstream vendor's response_format support.
+      // Keep prompt JSON as the portable strategy and protect the structured
+      // response budget with the gateway's supported reasoning contract.
+      preferredStructuredStrategy: "prompt_json",
+      // OpenCode Go's GLM-5.3-Flash endpoint always thinks and rejects an
+      // explicit disabled toggle; DeepSeek V4 accepts the toggle.
+      requiresNonThinkingForStructured: !isOpenCodeGlm,
+      supportsReasoningToggle: !isOpenCodeGlm,
     });
   }
   if (usesOfficialEndpoint("gemini", GEMINI_HOST_PATTERN)) {
@@ -346,6 +381,9 @@ export function buildStructuredResponseFormat<T>(input: {
 export function classifyStructuredOutputFailure(input: {
   error?: unknown;
   rawContent?: string;
+  tokenUsage?: LlmTokenUsageSnapshot | null;
+  maxTokens?: number;
+  reasoningChars?: number;
 }): StructuredOutputErrorCategory {
   const message = input.error instanceof Error
     ? input.error.message
@@ -356,6 +394,46 @@ export function classifyStructuredOutputFailure(input: {
   const lowerMessage = message.toLowerCase();
   const trimmedRawContent = rawContent.trim().toLowerCase();
   const haystack = `${message}\n${rawContent}`.toLowerCase();
+
+  // Provider gateways use several different error shapes for the same
+  // context/payload limit. Classify these before JSON/schema parsing so the
+  // caller can explain that the request must be reduced or split. Do not
+  // classify Zod's "Too big: expected array ..." validation message here.
+  const errorRecord = input.error && typeof input.error === "object"
+    ? input.error as Record<string, unknown>
+    : null;
+  const responseRecord = errorRecord?.response && typeof errorRecord.response === "object"
+    ? errorRecord.response as Record<string, unknown>
+    : null;
+  const status = errorRecord?.status
+    ?? errorRecord?.statusCode
+    ?? errorRecord?.httpStatus
+    ?? responseRecord?.status;
+  const providerCode = [errorRecord?.code, errorRecord?.type, errorRecord?.error]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
+  let metadataText = "";
+  try {
+    metadataText = JSON.stringify(errorRecord ?? {}) ?? "";
+  } catch {
+    metadataText = "";
+  }
+  const metadataHaystack = `${message}\n${providerCode}\n${metadataText}`;
+  const contextLimitMessage = /(?:context[_ -]?length|maximum context|context window|prompt.{0,20}(?:too long|too large)|input.{0,20}(?:too long|too large)|payload.{0,20}(?:too large|too big)|request.{0,20}(?:too large|too big)|request entity too large|entity too large|content too large|too many tokens|token limit exceeded|tokens exceed|上下文.{0,8}(?:超出|过长|过大)|请求.{0,8}(?:过大|过长|超限)|内容.{0,8}(?:过大|过长|超限))/i;
+  const explicitTooBig = /\btoo\s+big\b/i.test(metadataHaystack)
+    && !/expected\s+array\s+to\s+have/i.test(metadataHaystack);
+  if (
+    String(status) === "413"
+    || providerCode.includes("context_length_exceeded")
+    || providerCode.includes("prompt_is_too_long")
+    || providerCode.includes("request_too_large")
+    || providerCode.includes("payload_too_large")
+    || contextLimitMessage.test(metadataHaystack)
+    || explicitTooBig
+  ) {
+    return "request_too_large";
+  }
 
   if (
     haystack.includes("response_format")
@@ -417,6 +495,18 @@ export function classifyStructuredOutputFailure(input: {
   if (haystack.includes("zod") || haystack.includes("schema") || haystack.includes("校验错误")) {
     return "schema_mismatch";
   }
+  if (!trimmedRawContent) {
+    const exhausted = typeof input.maxTokens === "number"
+      && input.maxTokens > 0
+      && (input.tokenUsage?.completionTokens ?? 0) >= input.maxTokens;
+    if (exhausted && (input.reasoningChars ?? 0) > 0) {
+      return "reasoning_budget_exhausted";
+    }
+    if (exhausted) {
+      return "output_truncated";
+    }
+    return "empty_content";
+  }
   return "transport_error";
 }
 
@@ -432,6 +522,10 @@ export function extractStructuredOutputErrorCategory(message?: string | null): S
     "incomplete_json",
     "malformed_json",
     "schema_mismatch",
+    "reasoning_budget_exhausted",
+    "output_truncated",
+    "empty_content",
+    "request_too_large",
     "transport_error",
   ].includes(category) ? category : null;
 }

@@ -1,9 +1,10 @@
 import type { BaseMessage, BaseMessageChunk } from "@langchain/core/messages";
-import type { LLMProvider } from "@ai-novel/shared/types/llm";
+import type { LLMProvider, ReasoningEffort } from "@ai-novel/shared/types/llm";
 import type { ZodType } from "zod";
 import type { TaskType } from "../../llm/modelRouter";
 import type { LlmTokenUsageSnapshot } from "../../llm/usageTracking";
 import type { PromptSlotDef, ResolvedSlots } from "../slots/slotTypes";
+import type { LlmRequestBudgetSnapshot } from "../../llm/requestBudget";
 
 export type PromptMode = "structured" | "text";
 export type PromptLanguage = "zh" | "en";
@@ -96,6 +97,15 @@ export interface PromptInvocationMeta {
   semanticRetryAttempts: number;
 }
 
+export interface PromptRequestBudgetOptions {
+  /** Soft input-token budget used for observation and optional preflight. */
+  inputTokenLimit?: number;
+  /** Tokens reserved from the soft limit for protocol and formatting overhead. */
+  safetyMarginTokens?: number;
+  /** Observation is the default; reject is opt-in for a proven contract. */
+  mode?: "observe" | "reject";
+}
+
 export interface PromptRunTrace {
   promptId: string;
   promptVersion: string;
@@ -121,10 +131,14 @@ export interface PromptRunTrace {
 }
 
 export interface PromptExecutionOptions {
+  sessionId?: string;
   provider?: LLMProvider;
   model?: string;
+  /** Optional endpoint override used for capability and budget diagnostics. */
+  baseURL?: string;
   temperature?: number;
   reasoningEnabled?: boolean;
+  reasoningEffort?: ReasoningEffort;
   maxTokens?: number;
   timeoutMs?: number;
   signal?: AbortSignal;
@@ -139,6 +153,7 @@ export interface PromptExecutionOptions {
   sceneIndex?: number;
   roundIndex?: number;
   triggerReason?: string;
+  requestBudget?: PromptRequestBudgetOptions;
 }
 
 export interface PromptExecutionMeta {
@@ -147,6 +162,7 @@ export interface PromptExecutionMeta {
   latencyMs: number;
   invocation: PromptInvocationMeta;
   tokenUsage?: LlmTokenUsageSnapshot | null;
+  requestBudget?: LlmRequestBudgetSnapshot;
 }
 
 export interface PromptRunResult<T> {

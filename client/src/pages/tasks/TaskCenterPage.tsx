@@ -260,7 +260,7 @@ export default function TaskCenterPage() {
         icon={ListChecks}
         context="执行历史与状态"
         title="运行记录"
-        description="查看创作、拆书、知识索引和图片任务的状态、错误与来源位置。继续、恢复和重试请回到对应工作页面。"
+        description="查看创作、世界骨架、拆书、知识索引和图片任务的状态、错误与来源位置。继续、恢复和重试请回到对应工作页面。"
         actions={(
           <Button
             type="button"

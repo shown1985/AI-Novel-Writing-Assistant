@@ -15,6 +15,8 @@ const appFileCopierPatched =
   'const pmApproaches = process.env.AI_NOVEL_EB_FORCE_TRAVERSAL === "true" ? [node_module_collector_1.PM.TRAVERSAL] : [await packager.getPackageManager(), node_module_collector_1.PM.TRAVERSAL];';
 const electronBuilderPackageJson = require.resolve("electron-builder/package.json", { paths: [desktopDir, repoRoot] });
 const electronBuilderRequire = createRequire(electronBuilderPackageJson);
+const appBuilderPackageJson = electronBuilderRequire.resolve("app-builder-lib/package.json");
+const appBuilderRequire = createRequire(appBuilderPackageJson);
 
 function resolveModule(request) {
   try {
@@ -46,13 +48,15 @@ function patchFileInPlace(moduleRequest, originalSource, patchedSource, descript
   }
 }
 
-function ensurePatchedElectronBuilder() {
-  patchFileInPlace(
-    "app-builder-lib/out/targets/nsis/nsisUtil.js",
-    nsisUtilOriginal,
-    nsisUtilPatched,
-    "NSIS util",
-  );
+function ensurePatchedElectronBuilder(options) {
+  if (options.includeNsis) {
+    patchFileInPlace(
+      "app-builder-lib/out/targets/nsis/nsisUtil.js",
+      nsisUtilOriginal,
+      nsisUtilPatched,
+      "NSIS util",
+    );
+  }
   patchFileInPlace(
     "app-builder-lib/out/util/appFileCopier.js",
     appFileCopierOriginal,
@@ -87,7 +91,7 @@ function firstNonEmpty(...values) {
   return "";
 }
 
-function normalizeBuildEnvironment(sourceEnv, args) {
+function normalizeBuildEnvironment(sourceEnv, args, options) {
   const env = { ...sourceEnv };
   const releaseChannel = firstNonEmpty(env.AI_NOVEL_RELEASE_CHANNEL, "beta").toLowerCase();
   const isPublishRequested = args.includes("--publish");
@@ -122,7 +126,7 @@ function normalizeBuildEnvironment(sourceEnv, args) {
   }
 
   const hasSigning = Boolean(signingLink);
-  if (!releaseChannel.startsWith("beta") && !hasSigning && !allowUnsignedRelease) {
+  if (options.isWindowsBuild && !releaseChannel.startsWith("beta") && !hasSigning && !allowUnsignedRelease) {
     throw new Error(
       "Public Windows desktop releases require signing material. Provide CSC_LINK/WIN_CSC_LINK first, or explicitly allow an unsigned release.",
     );
@@ -133,31 +137,106 @@ function normalizeBuildEnvironment(sourceEnv, args) {
   }
 
   console.log(
-    `[dist:desktop] releaseChannel=${releaseChannel} publish=${isPublishRequested ? "yes" : "no"} signing=${hasSigning ? "configured" : allowUnsignedRelease ? "unsigned-opt-in" : "unsigned-beta"}`,
+    `[dist:desktop] platform=${options.isWindowsBuild ? "windows" : options.isMacBuild ? "mac" : "default"} releaseChannel=${releaseChannel} publish=${isPublishRequested ? "yes" : "no"} signing=${options.isWindowsBuild ? hasSigning ? "configured" : allowUnsignedRelease ? "unsigned-opt-in" : "unsigned-beta" : "platform-managed"}`,
   );
 
   return env;
 }
 
-function main() {
-  ensurePatchedElectronBuilder();
-
-  const shortNsisTemplatesDir = resolveShortNsisTemplateDir();
-  const electronBuilderCli = resolveModule("electron-builder/cli.js");
-  const args = ["--config", "electron-builder.config.cjs", ...process.argv.slice(2)];
-  const env = normalizeBuildEnvironment(process.env, args);
-
-  console.log(`[dist:desktop] using NSIS templates from ${shortNsisTemplatesDir}`);
-
-  execFileSync(process.execPath, [electronBuilderCli, ...args], {
-    cwd: desktopDir,
+function restoreHostNodeNativeDependencies() {
+  console.log("[dist:desktop] restoring host Node native dependencies after macOS packaging");
+  execFileSync("pnpm", ["--filter", "@ai-novel/server", "rebuild", "better-sqlite3"], {
+    cwd: repoRoot,
     stdio: "inherit",
-    env: {
-      ...env,
-      [nsisEnvOverrideName]: shortNsisTemplatesDir,
-      [traversalEnvOverrideName]: "true",
-    },
+    env: process.env,
   });
+}
+
+function rebuildMacStagedNativeDependencies() {
+  const electronPackageJson = require.resolve("electron/package.json", { paths: [desktopDir, repoRoot] });
+  const electronVersion = JSON.parse(fs.readFileSync(electronPackageJson, "utf8")).version;
+  const electronRebuildMain = appBuilderRequire.resolve("@electron/rebuild");
+  const electronRebuildCli = path.join(path.dirname(electronRebuildMain), "cli.js");
+
+  console.log(
+    `[dist:desktop] rebuilding staged native dependencies for Electron ${electronVersion} arm64`,
+  );
+  execFileSync(
+    process.execPath,
+    [
+      electronRebuildCli,
+      "--version",
+      electronVersion,
+      "--module-dir",
+      path.join(desktopDir, "build", "app"),
+      "--which-module",
+      "better-sqlite3",
+      "--arch",
+      "arm64",
+      "--sequential",
+      "--force",
+    ],
+    {
+      cwd: repoRoot,
+      stdio: "inherit",
+      env: process.env,
+    },
+  );
+}
+
+function main() {
+  const requestedArgs = process.argv.slice(2);
+  const isWindowsBuild = requestedArgs.includes("--win");
+  const isMacBuild = requestedArgs.includes("--mac");
+  ensurePatchedElectronBuilder({ includeNsis: isWindowsBuild });
+
+  const shortNsisTemplatesDir = isWindowsBuild ? resolveShortNsisTemplateDir() : null;
+  const electronBuilderCli = resolveModule("electron-builder/cli.js");
+  const args = ["--config", "electron-builder.config.cjs", ...requestedArgs];
+  const env = normalizeBuildEnvironment(process.env, args, { isWindowsBuild, isMacBuild });
+
+  if (isMacBuild) {
+    rebuildMacStagedNativeDependencies();
+  }
+
+  if (shortNsisTemplatesDir) {
+    console.log(`[dist:desktop] using NSIS templates from ${shortNsisTemplatesDir}`);
+  }
+
+  const buildEnv = {
+    ...env,
+    [traversalEnvOverrideName]: "true",
+  };
+  if (shortNsisTemplatesDir) {
+    buildEnv[nsisEnvOverrideName] = shortNsisTemplatesDir;
+  }
+
+  let buildError;
+  try {
+    execFileSync(process.execPath, [electronBuilderCli, ...args], {
+      cwd: desktopDir,
+      stdio: "inherit",
+      env: buildEnv,
+    });
+  } catch (error) {
+    buildError = error;
+  }
+
+  let restoreError;
+  if (isMacBuild) {
+    try {
+      restoreHostNodeNativeDependencies();
+    } catch (error) {
+      restoreError = error;
+    }
+  }
+
+  if (buildError) {
+    throw buildError;
+  }
+  if (restoreError) {
+    throw restoreError;
+  }
 }
 
 try {

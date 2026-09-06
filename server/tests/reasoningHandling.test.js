@@ -5,8 +5,10 @@ const {
   diffAccumulatedText,
   extractMiniMaxRawStreamData,
   extractReasoningTextFromChunk,
+  isGlmReasoningModeProvider,
   isDeepSeekThinkingModeProvider,
   isMiniMaxCompatibleProvider,
+  supportsReasoningEffort,
   resolveProviderReasoningBehavior,
 } = require("../dist/llm/reasoning.js");
 
@@ -84,6 +86,46 @@ test("deepseek reasoning effort defaults to high and preserves explicit low", ()
 
   assert.equal(defaultBehavior.modelKwargs.reasoning_effort, "high");
   assert.equal(lowBehavior.modelKwargs.reasoning_effort, "low");
+});
+
+test("glm 5.3 flash maps reasoning effort without spoofing provider identity", () => {
+  assert.equal(isGlmReasoningModeProvider("custom_gateway", "https://opencode.ai/zen/go/v1", "glm-5.3-flash"), true);
+  assert.equal(supportsReasoningEffort("custom_gateway", "https://opencode.ai/zen/go/v1", "glm-5.3-flash"), true);
+
+  const low = resolveProviderReasoningBehavior({
+    provider: "custom_gateway",
+    baseURL: "https://opencode.ai/zen/go/v1",
+    model: "glm-5.3-flash",
+    reasoningEnabled: true,
+    reasoningEffort: "low",
+  });
+
+  assert.equal(low.reasoningEnabled, true);
+  assert.equal(low.reasoningEffort, "low");
+  assert.deepEqual(low.modelKwargs, { reasoning_effort: "low" });
+
+  const disabled = resolveProviderReasoningBehavior({
+    provider: "custom_gateway",
+    baseURL: "https://opencode.ai/zen/go/v1",
+    model: "glm-5.3-flash",
+    reasoningEnabled: false,
+    reasoningEffort: "high",
+  });
+  assert.equal(disabled.reasoningEnabled, true);
+  assert.equal(disabled.reasoningEffort, "low");
+  assert.deepEqual(disabled.modelKwargs, { reasoning_effort: "low" });
+
+  const directDisabled = resolveProviderReasoningBehavior({
+    provider: "glm",
+    baseURL: "https://open.bigmodel.cn/api/paas/v4",
+    model: "glm-5.2",
+    reasoningEnabled: false,
+  });
+  assert.equal(directDisabled.reasoningEnabled, false);
+  assert.equal(directDisabled.reasoningEffort, null);
+  assert.deepEqual(directDisabled.modelKwargs, {
+    thinking: { type: "disabled" },
+  });
 });
 
 test("minimax provider behavior enables reasoning_split and raw response parsing", () => {
