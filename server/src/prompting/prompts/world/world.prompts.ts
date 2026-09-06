@@ -1223,6 +1223,10 @@ export const worldStructureSectionPrompt: PromptAsset<
         "2. 若当前 section 涉及实体复用，优先延续现有命名、归属与关系网络。",
         "3. 若当前绑定建议给出了优先连接方向，应尽量沿用，除非与输入文本明显冲突。",
         "",
+        input.stageConstraints?.trim() ? [
+          "本次阶段的硬约束：",
+          input.stageConstraints.trim(),
+        ].join("\n") : "",
         "section 补全规则：",
         "1. 如果 section=factions，必须同时考虑 factions 和 forces 的区分与联动。",
         "2. 禁止把社会压力机制、行业规则、人际法则、默认秩序、普遍代价这类世界默认机制写进 factions / forces；这些内容属于 rules。",

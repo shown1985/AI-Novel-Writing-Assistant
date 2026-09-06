@@ -7,6 +7,7 @@ import type {
   WorldReferenceContext,
   WorldSkeletonGenerationOptions,
 } from "@ai-novel/shared/types/worldWizard";
+import type { WorldBindingSupport } from "@ai-novel/shared/types/world";
 
 const worldDraftFieldSchema = z.string().trim().min(1).optional().nullable();
 
@@ -186,6 +187,32 @@ const worldSkeletonSchema = z.object({
   }).strict(),
 }).strict();
 
+const worldSkeletonPresentationSchema = z.object({
+  concept: z.object({
+    name: z.string().trim().min(1),
+    oneSentence: z.string().trim().min(1),
+    readerImpression: z.string().trim().min(1),
+    genrePromise: z.string().trim().min(1),
+  }).strict(),
+  storyEntrySuggestions: z.array(z.object({
+    title: z.string().trim().min(1),
+    description: z.string().trim().min(1),
+    recommendedLocationIds: stringListSchema,
+    involvedForceIds: stringListSchema,
+    firstConflict: z.string().trim().min(1),
+  }).strict()),
+  assessment: z.object({
+    completenessScore: z.number().min(0).max(100),
+    readyForNovelUse: z.boolean(),
+    missingParts: z.array(z.object({
+      area: z.enum(["rules", "forces", "locations", "relations", "storyEntry"]),
+      issue: z.string().trim().min(1),
+      suggestedAction: z.string().trim().min(1),
+    }).strict()),
+    recommendedNextActions: stringListSchema,
+  }).strict(),
+}).strict();
+
 export interface WorldSkeletonGenerationPromptInput {
   idea: string;
   worldType?: string;
@@ -193,6 +220,19 @@ export interface WorldSkeletonGenerationPromptInput {
   referenceContext?: WorldReferenceContext | null;
   blueprint?: WorldGenerationBlueprint | null;
   options: WorldSkeletonGenerationOptions;
+}
+
+export interface WorldSkeletonPresentationPromptInput {
+  idea: string;
+  worldType?: string;
+  template?: string;
+  storyEntryCount: number;
+  currentStructure: {
+    forces: Array<{ id: string }>;
+    locations: Array<{ id: string }>;
+    [key: string]: unknown;
+  };
+  currentBindingSupport: WorldBindingSupport;
 }
 
 function buildWorldDraftRequirements(input: WorldDraftGenerationPromptInput): string[] {
@@ -230,21 +270,35 @@ function buildWorldDraftRequirements(input: WorldDraftGenerationPromptInput): st
   return requirements;
 }
 
+function compactPromptText(value: unknown, maxChars: number): string {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const normalized = value.trim();
+  if (normalized.length <= maxChars) {
+    return normalized;
+  }
+  const tailLength = Math.min(40, Math.floor(maxChars / 4));
+  return `${normalized.slice(0, maxChars - tailLength - 1)}…${normalized.slice(-tailLength)}`;
+}
+
 function formatBlueprint(input: WorldSkeletonGenerationPromptInput): string {
   const blueprint = input.blueprint;
   if (!blueprint) {
     return "无";
   }
-  const propertyLines = blueprint.propertySelections.map((item) =>
+  const propertyLines = blueprint.propertySelections.slice(0, 12).map((item) =>
     [
-      item.name,
-      item.choiceLabel && `选择：${item.choiceLabel}`,
-      item.description,
-      item.detail && `补充：${item.detail}`,
+      compactPromptText(item.name, 80),
+      item.choiceLabel && `选择：${compactPromptText(item.choiceLabel, 100)}`,
+      compactPromptText(item.description, 180),
+      item.detail && `补充：${compactPromptText(item.detail, 180)}`,
     ].filter(Boolean).join(" | "),
   );
   return [
-    blueprint.classicElements.length > 0 ? `经典元素：${blueprint.classicElements.join("、")}` : "",
+    blueprint.classicElements.length > 0
+      ? `经典元素：${blueprint.classicElements.slice(0, 12).map((item) => compactPromptText(item, 80)).join("、")}`
+      : "",
     propertyLines.length > 0 ? `用户选定属性：\n${propertyLines.map((item, index) => `${index + 1}. ${item}`).join("\n")}` : "",
   ].filter(Boolean).join("\n") || "无";
 }
@@ -256,11 +310,11 @@ function formatReferenceContext(input: WorldSkeletonGenerationPromptInput): stri
   }
   return [
     `参考方式：${context.mode}`,
-    context.preserveElements.length > 0 ? `必须保留：${context.preserveElements.join("、")}` : "",
-    context.allowedChanges.length > 0 ? `允许改造：${context.allowedChanges.join("、")}` : "",
-    context.forbiddenElements.length > 0 ? `禁止偏离：${context.forbiddenElements.join("、")}` : "",
+    context.preserveElements.length > 0 ? `必须保留：${context.preserveElements.slice(0, 12).map((item) => compactPromptText(item, 100)).join("、")}` : "",
+    context.allowedChanges.length > 0 ? `允许改造：${context.allowedChanges.slice(0, 12).map((item) => compactPromptText(item, 100)).join("、")}` : "",
+    context.forbiddenElements.length > 0 ? `禁止偏离：${context.forbiddenElements.slice(0, 12).map((item) => compactPromptText(item, 100)).join("、")}` : "",
     context.anchors.length > 0
-      ? `参考锚点：\n${context.anchors.map((item, index) => `${index + 1}. ${item.label}：${item.content}`).join("\n")}`
+      ? `参考锚点：\n${context.anchors.slice(0, 8).map((item, index) => `${index + 1}. ${compactPromptText(item.label, 100)}：${compactPromptText(item.content, 180)}`).join("\n")}`
       : "",
   ].filter(Boolean).join("\n") || "无";
 }
@@ -340,9 +394,10 @@ export const worldSkeletonGenerationPrompt: PromptAsset<
         "1. completenessScore 反映当前世界是否可直接开始写小说。",
         "2. readyForNovelUse 只有在规则、势力、地点、关系、故事入口都足够清楚时才为 true。",
         "3. missingParts 只列真正缺口；如果无明显缺口，输出空数组。",
+        "4. completenessScore 必须使用 0-100 的百分制整数；不要返回 0-1 或 1-10 的比例。",
       ].join("\n")),
       new HumanMessage([
-        `世界意图：${input.idea}`,
+        `世界意图：${input.idea.length > 6_000 ? `${input.idea.slice(0, 5_900)}…${input.idea.slice(-100)}` : input.idea}`,
         `世界类型：${input.worldType || "自定义"}`,
         `模板：${input.template || "自定义"}`,
         `规模预设：${input.options.preset}`,
@@ -409,6 +464,77 @@ export const worldSkeletonGenerationPrompt: PromptAsset<
     );
     if (invalidLocationConnection) {
       throw new Error("世界骨架生成结果存在无法匹配地点 id 的地点连接。");
+    }
+    return output;
+  },
+};
+
+export const worldSkeletonPresentationPrompt: PromptAsset<
+  WorldSkeletonPresentationPromptInput,
+  z.infer<typeof worldSkeletonPresentationSchema>
+> = {
+  id: "world.skeleton.present",
+  version: "v1",
+  taskType: "planner",
+  mode: "structured",
+  language: "zh",
+  contextPolicy: {
+    maxTokensBudget: 0,
+  },
+  repairPolicy: {
+    maxAttempts: 0,
+  },
+  semanticRetryPolicy: {
+    maxAttempts: 0,
+  },
+  outputSchema: worldSkeletonPresentationSchema,
+  render: (input) => [
+    new SystemMessage([
+      "你是世界骨架的开局整理器。",
+      "当前世界结构已经由多个阶段生成并通过基础结构校验。你只负责整理世界名称、开局入口和完整度判断。",
+      "不要重写或补充 structuredData，不要输出任何未提供的实体 id。",
+      "只输出一个合法 JSON 对象，不要输出 Markdown、解释、注释、代码块或额外文本。",
+      "",
+      "输出对象必须包含 concept、storyEntrySuggestions、assessment，不能包含其他键。",
+      `storyEntrySuggestions 必须正好输出 ${input.storyEntryCount} 个。`,
+      "每个故事入口必须至少引用一个已存在的地点 id 和一个已存在的具体势力 force id，并明确第一冲突。",
+      "involvedForceIds 只能填写下方可用势力 id，不能填写 faction id、势力名称或其他标签。",
+      "名称和说明保持短小具体；不要把完整世界设定或剧情大纲重复到入口中。",
+      "assessment 只评价当前结构是否足以开始写作；如果结构已满足要求，missingParts 输出空数组。",
+      "completenessScore 必须使用 0-100 的百分制整数；不要返回 0-1 或 1-10 的比例。",
+    ].join("\n")),
+    new HumanMessage([
+      `世界意图：${input.idea}`,
+      `世界类型：${input.worldType || "自定义"}`,
+      `模板：${input.template || "自定义"}`,
+      "",
+      `可用地点 id（recommendedLocationIds 只能从这里选择）：${input.currentStructure.locations.map((item) => item.id).join(", ") || "无"}`,
+      `可用势力 id（involvedForceIds 只能从这里选择）：${input.currentStructure.forces.map((item) => item.id).join(", ") || "无"}`,
+      "已生成世界结构摘要（只可引用其中的 id）：",
+      JSON.stringify(input.currentStructure, null, 2),
+      "",
+      "已生成绑定建议：",
+      JSON.stringify(input.currentBindingSupport, null, 2),
+      "",
+      "请整理开局展示信息。",
+    ].join("\n")),
+  ],
+  postValidate: (output, input) => {
+    if (output.storyEntrySuggestions.length !== input.storyEntryCount) {
+      throw new Error(`world.skeleton.present 必须返回 ${input.storyEntryCount} 个故事入口。`);
+    }
+    const forceIds = new Set(input.currentStructure.forces.map((item) => item.id));
+    const locationIds = new Set(input.currentStructure.locations.map((item) => item.id));
+    for (const suggestion of output.storyEntrySuggestions) {
+      if (suggestion.recommendedLocationIds.length === 0 || suggestion.involvedForceIds.length === 0) {
+        throw new Error("world.skeleton.present 的故事入口必须同时引用地点和势力 id。");
+      }
+      if (suggestion.recommendedLocationIds.some((id) => !locationIds.has(id))) {
+        throw new Error("world.skeleton.present 的故事入口引用了不存在的地点 id。");
+      }
+      if (suggestion.involvedForceIds.some((id) => !forceIds.has(id))) {
+        throw new Error("world.skeleton.present 的故事入口引用了不存在的势力 id。");
+      }
     }
     return output;
   },

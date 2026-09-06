@@ -27,6 +27,7 @@
 - 自动导演关键路径优先使用职责单一的小型结构化合同。开篇世界切片、路线窗口和下一章执行合同应分别约束，不要为了减少代码步骤把整本世界、全角色、整卷章节和执行细节塞进一个巨型 JSON。拆分的目标是降低 repair 面积和首章前耗时，不是复制生产链。
 - 自定义高级模板或业务上下文只能影响提示词正文。运行时必须在模板编译后强制追加 JSON skeleton、完整 Schema 和 repair 合同，用户模板不能覆盖这些结构安全边界。
 - 所有通过 registry runner 执行的 PromptAsset 都必须产生 prompt quality telemetry，用于观察 repair 率、semantic retry 率、空输出率、上下文 token 预算、输出长度和耗时。业务服务不得绕过 runner 自行吞掉 postValidate 失败；语义失败应通过 `semanticRetryPolicy` 重试，或通过明确的 `postValidateFailureRecovery` 降级。
+- 供应商拒绝过大的上下文或 payload 时，Prompt Runner 必须把它记录为独立的 `request_too_large` 失败类别，而不是并入笼统的 `llm_error`。聚合遥测可以按 Prompt、Provider、Model 和阶段统计此类次数；记录只保留脱敏能力键与预算快照，不保存 API Key、完整 Prompt 或模型正文。该分类只改善诊断，不改变默认重试和降级策略。
 - 章节列表、卷级拆章这类规划 prompt 可以在结构化输出后增加轻量业务质量闸门，用于拦截空泛摘要、连续被动推进、第一人称长句章名、缺少主角主动行动或缺少阶段兑现 / 钩子的章节段。质量闸门只负责指出结构化结果的问题并触发重试，不能替代 AI 做章节规划，也不能用关键词分支生成章节内容。
 - Prompt 中展示给模型的状态名、枚举名和示例必须与 schema 可接受值一致。上下文里如果存在历史别名或业务口语值，例如 `active` 表示已推进但未兑现，应在 prompt 明确转换规则，并在 schema preprocess 中做确定性归一，不能把同一类别名反复交给 LLM repair。
 - 高频评估类结构化 prompt 必须同时具备完整 JSON skeleton、受限枚举表、非空示例和 schema preprocess。章节接收闸门、章节任务单质量门禁这类 prompt 不能只在自然语言里描述“可用 / 可修 / 阻断”，必须把 `status`、`verdict`、`issues.target`、`confidence` 等字段的合法值写入 system prompt，并在 schema 边界归一常见别名，例如 `acceptable -> accepted`、`pacing -> semantic`、`85 -> 0.85`。

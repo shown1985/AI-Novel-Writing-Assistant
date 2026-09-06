@@ -8,6 +8,7 @@ import {
 } from "../../llm/structuredInvoke";
 import {
   buildStructuredResponseFormat,
+  classifyStructuredOutputFailure,
   resolveStructuredOutputProfile,
   selectStructuredOutputStrategy,
 } from "../../llm/structuredOutput";
@@ -29,6 +30,11 @@ import {
   type PromptQualityFailureKind,
 } from "./promptQualityTelemetry";
 import { appendStructuredOutputHintMessages } from "./structuredOutputHint";
+import {
+  evaluateLlmRequestBudget,
+  LlmRequestBudgetError,
+  type LlmRequestBudgetSnapshot,
+} from "../../llm/requestBudget";
 import type {
   PromptAsset,
   PromptExecutionOptions,
@@ -192,6 +198,9 @@ function markPromptQualityFailure(error: unknown, failureKind: PromptQualityFail
 }
 
 function classifyPromptQualityFailure(error: unknown): PromptQualityFailureKind {
+  if (error instanceof LlmRequestBudgetError) {
+    return "budget_exceeded";
+  }
   const marked = error as { promptQualityFailureKind?: unknown };
   if (
     marked
@@ -205,6 +214,9 @@ function classifyPromptQualityFailure(error: unknown): PromptQualityFailureKind 
     )
   ) {
     return marked.promptQualityFailureKind;
+  }
+  if (classifyStructuredOutputFailure({ error }) === "request_too_large") {
+    return "request_too_large";
   }
   const message = stringifyPromptError(error).toLowerCase();
   if (message.includes("schema") || message.includes("json") || message.includes("zod") || message.includes("structured")) {
@@ -358,6 +370,33 @@ function logPromptEvent(input: {
   );
 }
 
+function logPromptBudget(input: {
+  asset: PromptAsset<unknown, unknown, unknown>;
+  budget: LlmRequestBudgetSnapshot;
+  stage?: string;
+  provider?: LLMProvider;
+  model?: string;
+}): void {
+  console.info(
+    [
+      "[prompt.budget]",
+      `promptId=${input.asset.id}`,
+      `promptVersion=${input.asset.version}`,
+      input.stage ? `stage=${input.stage}` : "",
+      input.provider ? `provider=${input.provider}` : "",
+      input.model ? `model=${input.model}` : "",
+      `estimatedInputTokens=${input.budget.estimatedInputTokens}`,
+      `inputTokenLimit=${input.budget.effectiveInputTokenLimit ?? "unknown"}`,
+      `inputTokenLimitSource=${input.budget.inputTokenLimitSource}`,
+      `requestedOutputTokens=${input.budget.requestedOutputTokens ?? "unknown"}`,
+      `outputTokenLimit=${input.budget.outputTokenLimit ?? "unknown"}`,
+      `outputLimitExceeded=${input.budget.outputLimitExceeded}`,
+      `capabilityKey=${input.budget.capabilityKey ?? "unknown"}`,
+      `status=${input.budget.status}`,
+    ].filter(Boolean).join(" "),
+  );
+}
+
 function recordPromptCompletion(input: {
   asset: PromptAsset<unknown, unknown, unknown>;
   output: unknown;
@@ -369,6 +408,7 @@ function recordPromptCompletion(input: {
   renderedPromptChars?: number;
   tokenUsage?: LlmTokenUsageSnapshot | null;
   postValidateFailureRecovered?: boolean;
+  requestBudget?: LlmRequestBudgetSnapshot;
 }): void {
   recordPromptQualityEvent({
     event: "completed",
@@ -391,6 +431,7 @@ function recordPromptCompletion(input: {
     postValidateFailureRecovered: input.postValidateFailureRecovered,
     emptyOutput: isPromptOutputEmpty(input.output),
     tokenUsage: input.tokenUsage,
+    requestBudget: input.requestBudget,
   });
 }
 
@@ -403,6 +444,7 @@ function recordPromptFailure(input: {
   latencyMs: number;
   renderedPromptChars?: number;
   error: unknown;
+  requestBudget?: LlmRequestBudgetSnapshot;
 }): void {
   recordPromptQualityEvent({
     event: "failed",
@@ -422,6 +464,7 @@ function recordPromptFailure(input: {
     semanticRetryUsed: input.invocation.semanticRetryUsed,
     semanticRetryAttempts: input.invocation.semanticRetryAttempts,
     failureKind: classifyPromptQualityFailure(input.error),
+    requestBudget: input.requestBudget,
   });
 }
 
@@ -486,6 +529,7 @@ function buildPromptRunResult<T>(input: {
   renderedPromptChars?: number;
   tokenUsage?: LlmTokenUsageSnapshot | null;
   postValidateFailureRecovered?: boolean;
+  requestBudget?: LlmRequestBudgetSnapshot;
 }): PromptRunResult<T> {
   const meta = {
     provider: input.provider,
@@ -493,6 +537,7 @@ function buildPromptRunResult<T>(input: {
     latencyMs: input.latencyMs,
     invocation: input.invocation,
     tokenUsage: input.tokenUsage ?? null,
+    requestBudget: input.requestBudget,
   };
   logPromptCompletion({
     meta: input.invocation,
@@ -511,6 +556,7 @@ function buildPromptRunResult<T>(input: {
     renderedPromptChars: input.renderedPromptChars,
     tokenUsage: input.tokenUsage,
     postValidateFailureRecovered: input.postValidateFailureRecovered,
+    requestBudget: input.requestBudget,
   });
   return {
     output: input.output,
@@ -659,10 +705,13 @@ async function resolveStructuredOutput<I, O, R = O>(input: {
         label: `${input.asset.id}@${input.asset.version}#semantic-retry-${semanticRetryAttempts}`,
         provider: input.options?.provider,
         model: input.options?.model,
+        baseURL: input.options?.baseURL,
         temperature: input.options?.temperature,
         maxTokens: input.options?.maxTokens,
         timeoutMs: input.options?.timeoutMs,
         signal: input.options?.signal,
+        sessionId: input.options?.sessionId,
+        reasoningEffort: input.options?.reasoningEffort,
         taskType: input.asset.taskType,
         messages: currentMessages,
         schema: input.outputSchema,
@@ -752,15 +801,41 @@ export async function runStructuredPrompt<I, O, R = O>(input: {
   });
   const startedAt = Date.now();
   const renderedPromptChars = estimateRenderedPromptChars(messages);
+  const requestBudget = evaluateLlmRequestBudget({
+    renderedPromptChars,
+    inputTokenLimit: input.options?.requestBudget?.inputTokenLimit,
+    safetyMarginTokens: input.options?.requestBudget?.safetyMarginTokens,
+    maxTokens: input.options?.maxTokens,
+    provider: input.options?.provider,
+    model: input.options?.model,
+    baseURL: input.options?.baseURL,
+  });
+  logPromptBudget({
+    asset: input.asset as PromptAsset<unknown, unknown, unknown>,
+    budget: requestBudget,
+    stage: input.options?.stage,
+    provider: input.options?.provider,
+    model: input.options?.model,
+  });
   try {
+    if (
+      input.options?.requestBudget?.mode === "reject"
+      && requestBudget.status === "exceeds_limit"
+    ) {
+      throw new LlmRequestBudgetError(requestBudget);
+    }
     const result = await promptRunnerStructuredInvoker<R>({
       label: `${input.asset.id}@${input.asset.version}`,
       provider: input.options?.provider,
       model: input.options?.model,
+      baseURL: input.options?.baseURL,
       temperature: input.options?.temperature,
       maxTokens: input.options?.maxTokens,
       timeoutMs: input.options?.timeoutMs,
       signal: input.options?.signal,
+      sessionId: input.options?.sessionId,
+      reasoningEnabled: input.options?.reasoningEnabled,
+      reasoningEffort: input.options?.reasoningEffort,
       taskType: input.asset.taskType,
       messages,
       schema: outputSchema,
@@ -821,6 +896,7 @@ export async function runStructuredPrompt<I, O, R = O>(input: {
       renderedPromptChars,
       tokenUsage: result.tokenUsage,
       postValidateFailureRecovered: resolved.postValidateFailureRecovered,
+      requestBudget,
     });
   } catch (error) {
     recordPromptFailure({
@@ -832,6 +908,7 @@ export async function runStructuredPrompt<I, O, R = O>(input: {
       latencyMs: Date.now() - startedAt,
       renderedPromptChars,
       error,
+      requestBudget,
     });
     throw error;
   }
@@ -877,10 +954,13 @@ export async function runTextPrompt<I>(input: {
     const llm = await promptRunnerLLMFactory(input.options?.provider, {
       fallbackProvider: "deepseek",
       model: input.options?.model,
+      baseURL: input.options?.baseURL,
       temperature: input.options?.temperature,
       reasoningEnabled: input.options?.reasoningEnabled,
+      reasoningEffort: input.options?.reasoningEffort,
       maxTokens: input.options?.maxTokens,
       timeoutMs: input.options?.timeoutMs,
+      sessionId: input.options?.sessionId,
       taskType: input.asset.taskType,
       promptMeta: prepared.invocation,
     });
@@ -978,10 +1058,13 @@ export async function streamTextPrompt<I>(input: {
     const llm = await promptRunnerLLMFactory(input.options?.provider, {
       fallbackProvider: "deepseek",
       model: input.options?.model,
+      baseURL: input.options?.baseURL,
       temperature: input.options?.temperature,
       reasoningEnabled: input.options?.reasoningEnabled,
+      reasoningEffort: input.options?.reasoningEffort,
       maxTokens: input.options?.maxTokens,
       timeoutMs: input.options?.timeoutMs,
+      sessionId: input.options?.sessionId,
       taskType: input.asset.taskType,
       promptMeta: prepared.invocation,
     });
@@ -1090,6 +1173,7 @@ export async function streamStructuredPrompt<I, O, R = O>(input: {
     const llm = await promptRunnerLLMFactory(input.options?.provider, {
       fallbackProvider: "deepseek",
       model: input.options?.model,
+      baseURL: input.options?.baseURL,
       temperature: input.options?.temperature,
       maxTokens: input.options?.maxTokens,
       timeoutMs: input.options?.timeoutMs,

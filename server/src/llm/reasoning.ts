@@ -1,10 +1,12 @@
 import type { BaseMessageChunk } from "@langchain/core/messages";
 import { REASONING_EFFORTS, type LLMProvider, type ReasoningEffort } from "@ai-novel/shared/types/llm";
 import { isBuiltInProvider } from "./providers";
+import { isOpenCodeGoEndpoint } from "./opencode/capabilities";
 
 const THINK_OPEN_TAG = "<think>";
 const THINK_CLOSE_TAG = "</think>";
 const DEEPSEEK_HOST_PATTERN = /(?:^|:\/\/)(?:api\.)?deepseek\.com(?:\/|$)/i;
+const GLM_MODEL_PATTERN = /^glm-5(?:\.\d+)?(?:-flash)?(?:[-.]|$)/i;
 const MINIMAX_HOST_PATTERN = /(?:^|:\/\/)(?:api\.)?minimax(?:i)?\.(?:io|com)(?:\/|$)/i;
 const MINIMAX_MODEL_PATTERN = /^minimax-m2(?:[.-]|$)/i;
 
@@ -35,6 +37,33 @@ export interface MiniMaxStreamState {
 function normalizeOptionalText(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
+}
+
+function normalizeModelId(value: string | undefined): string | undefined {
+  const normalized = normalizeOptionalText(value)?.toLowerCase();
+  if (!normalized) {
+    return undefined;
+  }
+  const parts = normalized.split("/").filter(Boolean);
+  return parts.at(-1) ?? normalized;
+}
+
+export function isGlmReasoningModeProvider(
+  _provider: LLMProvider,
+  _baseURL: string | undefined,
+  model: string | undefined,
+): boolean {
+  const modelId = normalizeModelId(model);
+  return Boolean(modelId && GLM_MODEL_PATTERN.test(modelId));
+}
+
+export function supportsReasoningEffort(
+  provider: LLMProvider,
+  baseURL?: string,
+  model?: string,
+): boolean {
+  return isDeepSeekThinkingModeProvider(provider, baseURL, model)
+    || isGlmReasoningModeProvider(provider, baseURL, model);
 }
 
 function collectTextArray(value: unknown): string[] {
@@ -128,6 +157,40 @@ export function resolveProviderReasoningBehavior(input: {
     return {
       reasoningEnabled: input.reasoningEnabled,
       reasoningEffort: input.reasoningEnabled ? reasoningEffort : null,
+      modelKwargs: {
+        thinking: {
+          type: input.reasoningEnabled ? "enabled" : "disabled",
+        },
+        ...(input.reasoningEnabled ? { reasoning_effort: reasoningEffort } : {}),
+      },
+      includeRawResponse: false,
+      usesAccumulatedStreamDeltas: false,
+    };
+  }
+
+  if (isGlmReasoningModeProvider(input.provider, input.baseURL, input.model)) {
+    const reasoningEffort = normalizeReasoningEffort(input.reasoningEffort);
+    // OpenCode Go's GLM-5.3 gateway always engages thinking and rejects an
+    // explicit disabled toggle.  Use its supported effort parameter instead;
+    // direct GLM endpoints still receive the documented thinking toggle below.
+    if (isOpenCodeGoEndpoint(input.baseURL)) {
+      const effectiveReasoningEffort = input.reasoningEnabled ? reasoningEffort : "low";
+      return {
+        // The gateway cannot honor a disabled request; report the effective
+        // provider behavior and keep the request valid at the lowest effort.
+        reasoningEnabled: true,
+        reasoningEffort: effectiveReasoningEffort,
+        modelKwargs: { reasoning_effort: effectiveReasoningEffort },
+        includeRawResponse: false,
+        usesAccumulatedStreamDeltas: false,
+      };
+    }
+    return {
+      reasoningEnabled: input.reasoningEnabled,
+      reasoningEffort: input.reasoningEnabled ? reasoningEffort : null,
+      // GLM-5 defaults to thinking on.  Omitting reasoning_effort does not
+      // disable that default, so always send the explicit thinking toggle;
+      // only send reasoning_effort when thinking remains enabled.
       modelKwargs: {
         thinking: {
           type: input.reasoningEnabled ? "enabled" : "disabled",

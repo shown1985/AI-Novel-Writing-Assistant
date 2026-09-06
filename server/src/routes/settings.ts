@@ -7,7 +7,7 @@ import { setProviderSecretCache } from "../llm/factory";
 import { evictSharedLimiters } from "../llm/requestLimiter";
 import { filterHiddenModels, parseHiddenModels, refreshProviderModels, serializeHiddenModels } from "../llm/modelCatalog";
 import { llmProviderSchema } from "../llm/providerSchema";
-import { isDeepSeekThinkingModeProvider, normalizeReasoningEffort } from "../llm/reasoning";
+import { normalizeReasoningEffort, supportsReasoningEffort as supportsModelReasoningEffort } from "../llm/reasoning";
 import {
   getProviderEnvApiKey,
   getProviderEnvBaseUrl,
@@ -230,7 +230,7 @@ function buildBuiltInProviderStatus(
   const models = filterHiddenModels(fallbackModels, hiddenModels, currentModel);
   const currentImageModel = imageModel ?? getDefaultImageModel(provider) ?? null;
   const isConfigured = requiresApiKey ? Boolean(effectiveKey && currentModel) : Boolean(currentModel && currentBaseURL);
-  const supportsReasoningEffort = isDeepSeekThinkingModeProvider(provider, currentBaseURL, currentModel);
+  const supportsReasoningEffort = supportsModelReasoningEffort(provider, currentBaseURL, currentModel);
 
   return {
     provider,
@@ -275,7 +275,7 @@ function buildCustomProviderStatus(item: {
   const currentBaseURL = normalizeOptionalText(item.baseURL) ?? "";
   const hiddenModels = parseHiddenModels(item.hiddenModels);
   const models = filterHiddenModels(currentModel ? [currentModel] : [], hiddenModels, currentModel);
-  const supportsReasoningEffort = isDeepSeekThinkingModeProvider(item.provider, currentBaseURL, currentModel);
+  const supportsReasoningEffort = supportsModelReasoningEffort(item.provider, currentBaseURL, currentModel);
   return {
     provider: item.provider,
     kind: "custom",
@@ -653,10 +653,10 @@ router.put(
           baseURL: data.baseURL,
           isActive: data.isActive,
           reasoningEnabled: data.reasoningEnabled ?? true,
-          reasoningEffort: isDeepSeekThinkingModeProvider(provider, data.baseURL ?? undefined, data.model ?? undefined)
+          reasoningEffort: supportsModelReasoningEffort(provider, data.baseURL ?? undefined, data.model ?? undefined)
             ? normalizeReasoningEffort(data.reasoningEffort)
             : null,
-          supportsReasoningEffort: isDeepSeekThinkingModeProvider(provider, data.baseURL ?? undefined, data.model ?? undefined),
+          supportsReasoningEffort: supportsModelReasoningEffort(provider, data.baseURL ?? undefined, data.model ?? undefined),
           hiddenModels,
           concurrencyLimit: normalizeProviderLimit(data.concurrencyLimit),
           requestIntervalMs: normalizeProviderLimit(data.requestIntervalMs),

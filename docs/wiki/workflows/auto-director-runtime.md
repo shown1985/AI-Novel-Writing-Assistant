@@ -26,6 +26,31 @@ Web API 只接收命令和返回轻量投影；Worker 负责执行重型生产�
 
 ## 当前规则
 
+### Agent Runtime 的复用边界
+
+项目已经具备高层 Agent Runtime 的最小控制平面，不应再并行创建一套“通用 Agent Runtime”来包裹现有导演链。新增 AI 能力必须接入下面这条既有边界：
+
+| 职责 | 当前所有者 | 约束 |
+|---|---|---|
+| 命令、租约与后台唤醒 | `DirectorCommandService`、`DirectorTaskQueue`、`DirectorWorker` | API 只提交命令；长任务不能在 HTTP 请求中直接执行 |
+| 运行状态、检查点与幂等 | `DirectorRuntimeService`、`DirectorRuntimeStore` | 运行事实写入 Runtime 快照和事件，不由模型维护状态 |
+| 步骤编排与执行 | `DirectorNodeRunner`、`WorkflowStepModule`、Pipeline | 每个能力声明输入、输出、产物、进度、恢复与幂等键 |
+| 安全策略与人工门 | `DirectorPolicyEngine`、问题治理 | 模型可以提出结构化建议，但不能绕过保护内容、审批或恢复边界 |
+| 模型调用与预算 | Prompt Registry、Prompt Runner、LLM Provider Adapter | Prompt 只能从注册表进入；端点差异、预算和重试留在适配层 |
+| UI 状态 | `DirectorEventProjectionService` 及 Dashboard View | 前端消费轻量投影，不从模型文本或多个接口自行推断主状态 |
+
+世界准备已经作为 `world_setup` 工作流步骤存在。该步骤通过 `WorldContextGateway` 委托世界服务，随后由现有 Runtime 记录步骤、产物和恢复事实；世界生成不能直接创建第二个队列、第二套检查点或另一条章节生产链。世界向导的独立检查点仍属于世界服务的业务恢复数据，若要由自动导演驱动，只能通过步骤适配器调用，不能让世界服务反向管理导演租约。
+
+因此，Agent Runtime MVP 的完成标准是“现有控制平面能够稳定承载更多结构化 AI 步骤”，而不是新增一个抽象层。后续扩展必须满足：
+
+- 使用 `DirectorRuntimeService.runNode` 或 `runUntilGate` 进入执行边界；
+- 通过 `WorkflowStepModule` 声明依赖、写入产物、完成条件和恢复策略；
+- 将模型能力、预算、结构化输出和供应商错误交给统一 LLM 层；
+- 将事件和事实投影给任务中心与源页面，任务中心保持只读；
+- 保留现有完成优先、局部质量债不阻断全局链的停止规则。
+
+除非现有 Runtime 无法表达新的生命周期，否则不得增加新的队列、状态机、重试计数或“万能 Agent”门面。若确实需要扩展，应先补充本页的边界和状态契约，再实现单一职责的适配器。
+
 ### 统一问题治理与停止边界
 
 自动导演的新任务使用一条统一问题链路：生产阶段报告稳定问题码，治理服务结合任务启动时冻结的全局/本书问题动作，写入 `issue_detected`、执行既有处理入口，再写入 `issue_action_applied`。已带稳定问题码的事件直接使用调用方提供的结构化事实，不再重复调用 AI；只有 `runtime.unclassified` 才调用结构化 AI 补全问题分类。AI 评估不得改变控制流。完整问题记录保存在 `DirectorEvent.metadata`，不另建问题表；相同 fingerprint 必须幂等。旧任务没有 `issueGovernanceVersion: 1` 时继续使用原运行逻辑。

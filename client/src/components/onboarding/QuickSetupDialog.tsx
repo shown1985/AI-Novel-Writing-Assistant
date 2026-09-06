@@ -130,12 +130,18 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
   const completeMutation = useMutation({
     mutationFn: (payload: CompleteQuickSetupRequest) => completeQuickSetup(payload),
     onSuccess: async (response) => {
-      if (response.data) {
-        llmStore.setSelection({
-          provider: response.data.provider,
-          model: response.data.model,
-        });
-      }
+      if (!response.data) return;
+      // The provider list is refreshed before changing the global selection.
+      // Otherwise LLMSelector can briefly see the old provider cache and
+      // persist its fallback (usually Ollama) over the newly configured one.
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: queryKeys.settings.apiKeys, type: "active" }),
+        queryClient.refetchQueries({ queryKey: queryKeys.settings.llmSelection, type: "active" }),
+      ]);
+      llmStore.setSelection({
+        provider: response.data.provider,
+        model: response.data.model,
+      });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.settings.quickSetup }),
         queryClient.invalidateQueries({ queryKey: queryKeys.settings.apiKeys }),

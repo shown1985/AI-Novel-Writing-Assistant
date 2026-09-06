@@ -1615,6 +1615,38 @@ model WorldSnapshot {
   @@index([worldId, createdAt])
 }
 
+model WorldGenerationRun {
+  id               String   @id @default(cuid())
+  requestHash      String
+  requestJson      String
+  sourceRoute      String   @default("/worlds/new")
+  status           String   @default("running")
+  currentStage     String?
+  nextStageIndex   Int      @default(0)
+  lastError        String?
+  finalPayloadJson String?
+  checkpoints     WorldGenerationCheckpoint[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([requestHash, status])
+  @@index([status, updatedAt])
+}
+
+model WorldGenerationCheckpoint {
+  id          String              @id @default(cuid())
+  runId       String
+  sequence    Int
+  stage       String
+  structureJson String
+  summary     String?
+  run         WorldGenerationRun   @relation(fields: [runId], references: [id], onDelete: Cascade)
+  createdAt   DateTime             @default(now())
+
+  @@unique([runId, sequence])
+  @@index([runId, createdAt])
+}
+
 model WorldDeepeningQA {
   id               String   @id @default(cuid())
   worldId          String
