@@ -1,3 +1,4 @@
+const fs = require("node:fs");
 const path = require("node:path");
 
 function firstNonEmpty(...values) {
@@ -29,6 +30,44 @@ const isMacOnlyBuild = process.argv.includes("--mac") && !process.argv.includes(
 const isLocalDesktopBuild = firstNonEmpty(process.env.AI_NOVEL_LOCAL_DESKTOP_BUILD).toLowerCase() === "true";
 const windowsIconPath = path.join("builder", "app-icon.ico");
 const macIconPath = path.join("builder", "app-icon.png");
+
+function copyMacElectronNativeBinding(context) {
+  const appBundleDir = path.join(
+    context.appOutDir,
+    `${context.packager.appInfo.productFilename}.app`,
+  );
+  const sourcePath = path.join(
+    __dirname,
+    "build",
+    "app",
+    "node_modules",
+    "better-sqlite3",
+    "build",
+    "Release",
+    "better_sqlite3.node",
+  );
+  const targetPath = path.join(
+    appBundleDir,
+    "Contents",
+    "Resources",
+    "app.asar.unpacked",
+    "node_modules",
+    "better-sqlite3",
+    "build",
+    "Release",
+    "better_sqlite3.node",
+  );
+
+  if (!fs.existsSync(sourcePath)) {
+    throw new Error(`Electron arm64 better-sqlite3 binding was not staged at ${sourcePath}.`);
+  }
+  if (!fs.existsSync(targetPath)) {
+    throw new Error(`Packaged better-sqlite3 binding was not unpacked at ${targetPath}.`);
+  }
+
+  fs.copyFileSync(sourcePath, targetPath);
+  console.log(`[dist:desktop] copied Electron ABI better-sqlite3 binding into ${appBundleDir}`);
+}
 
 if (!isMacOnlyBuild && !isBetaRelease && !hasWindowsSigningMaterial && !allowUnsignedRelease) {
   throw new Error(
@@ -72,8 +111,16 @@ module.exports = {
   asarUnpack: [
     "node_modules/**/*.node",
   ],
-  npmRebuild: true,
+  // Mac staging is rebuilt explicitly for the Electron ABI by the desktop wrapper.
+  // Keep electron-builder's automatic rebuild for Windows, where the existing
+  // NSIS/portable chain owns native dependency preparation.
+  npmRebuild: !isMacOnlyBuild,
   nativeRebuilder: "sequential",
+  afterPack: async (context) => {
+    if (isMacOnlyBuild) {
+      copyMacElectronNativeBinding(context);
+    }
+  },
   extraMetadata: {
     main: "dist/main.js",
     aiNovelLocalBuild: isLocalDesktopBuild,

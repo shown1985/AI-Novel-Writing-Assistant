@@ -4,6 +4,7 @@ const { createRequire } = require("node:module");
 const path = require("node:path");
 
 const desktopDir = path.resolve(__dirname, "..");
+const repoRoot = path.resolve(desktopDir, "..");
 const electronBuilderPackageJson = require.resolve("electron-builder/package.json", { paths: [desktopDir] });
 const electronBuilderRequire = createRequire(electronBuilderPackageJson);
 const asar = electronBuilderRequire("@electron/asar");
@@ -186,6 +187,24 @@ function verifyMacArtifacts(arch) {
   assertExists(path.join(distDir, "latest-mac.yml"), "macOS updater metadata");
 }
 
+function verifyHostNodeNativeBinding() {
+  if (process.platform !== "darwin") {
+    return;
+  }
+  const serverDir = path.join(repoRoot, "server");
+  const betterSqlite3Path = require.resolve("better-sqlite3", { paths: [serverDir] });
+  const Database = require(betterSqlite3Path);
+  const database = new Database(":memory:");
+  try {
+    const result = database.prepare("select 1 as value").get();
+    if (result?.value !== 1) {
+      throw new Error("host better-sqlite3 binding returned an unexpected probe result");
+    }
+  } finally {
+    database.close();
+  }
+}
+
 function main() {
   const options = parseArgs(process.argv.slice(2));
   const layout = resolvePackagedLayout(options.platform, options.arch);
@@ -255,6 +274,7 @@ function main() {
 
   if (options.platform === "darwin") {
     verifyMacNativeFiles(layout, packagedEntries, options.arch);
+    verifyHostNodeNativeBinding();
     if (options.requireArtifacts) {
       verifyMacArtifacts(options.arch);
     }
