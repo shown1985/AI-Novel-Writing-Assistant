@@ -70,7 +70,7 @@ function createCandidatesRequest(overrides = {}) {
   };
 }
 
-function createHarness(task = createTask()) {
+function createHarness(task = createTask(), currentLlmSelection = null) {
   const commands = [];
   const bootstraps = [];
   const requeued = [];
@@ -302,7 +302,7 @@ function createHarness(task = createTask()) {
     jobUpdates,
     directorEvents,
     taskUpdates,
-    service: new DirectorCommandService(workflowService),
+    service: new DirectorCommandService(workflowService, async () => currentLlmSelection),
     restore() {
       Object.assign(prisma.directorRunCommand, originalDirectorRunCommand);
       Object.assign(prisma.novelWorkflowTask, originalNovelWorkflowTask);
@@ -442,6 +442,38 @@ test("director command service queues candidate generation as a serialized comma
     assert.equal(payload.candidatesRequest.workflowTaskId, "task-1");
     assert.equal(payload.candidatesRequest.idea, "A college girl accidentally enters a supernatural organization.");
     assert.equal(harness.task.currentItemLabel, "AI 正在生成书级方向候选");
+  } finally {
+    harness.restore();
+  }
+});
+
+test("director command service uses the server selection for candidate task payloads", async () => {
+  const harness = createHarness(
+    createTask({
+      novelId: null,
+      status: "queued",
+    }),
+    {
+      provider: "custom_opencode_go",
+      model: "glm-5.3-flash",
+      temperature: 0.4,
+    },
+  );
+  try {
+    const accepted = await harness.service.enqueueGenerateCandidatesCommand(createCandidatesRequest({
+      provider: "ollama",
+      model: "glm-5.3-flash",
+      temperature: 0.7,
+    }));
+
+    assert.equal(accepted.status, "queued");
+    const commandPayload = JSON.parse(harness.commands[0].payloadJson).candidatesRequest;
+    assert.equal(commandPayload.provider, "custom_opencode_go");
+    assert.equal(commandPayload.model, "glm-5.3-flash");
+    assert.equal(commandPayload.temperature, 0.7);
+    const seedPayload = harness.bootstraps[0].seedPayload;
+    assert.equal(seedPayload.provider, "custom_opencode_go");
+    assert.equal(seedPayload.model, "glm-5.3-flash");
   } finally {
     harness.restore();
   }
