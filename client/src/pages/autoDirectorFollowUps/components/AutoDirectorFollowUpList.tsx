@@ -115,7 +115,7 @@ export function AutoDirectorFollowUpListPanel(props: AutoDirectorFollowUpListPan
         <div className={AUTO_DIRECTOR_MOBILE_CLASSES.followUpFilterGrid}>
           <Select value={props.activeReason || "__all__"} onValueChange={(value) => props.onFilterChange("reason", value === "__all__" ? "" : value)}>
             <SelectTrigger aria-label="按跟进原因筛选" className={AUTO_DIRECTOR_MOBILE_CLASSES.followUpFilterTrigger}>
-              <SelectValue placeholder="全部原因" />
+              <SelectValue className="min-w-0 flex-1 truncate" placeholder="全部原因" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__all__">全部原因</SelectItem>
@@ -127,7 +127,7 @@ export function AutoDirectorFollowUpListPanel(props: AutoDirectorFollowUpListPan
 
           <Select value={props.activeStatus || "__all__"} onValueChange={(value) => props.onFilterChange("status", value === "__all__" ? "" : value)}>
             <SelectTrigger aria-label="按任务状态筛选" className={AUTO_DIRECTOR_MOBILE_CLASSES.followUpFilterTrigger}>
-              <SelectValue placeholder="全部状态" />
+              <SelectValue className="min-w-0 flex-1 truncate" placeholder="全部状态" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__all__">全部状态</SelectItem>
@@ -139,7 +139,7 @@ export function AutoDirectorFollowUpListPanel(props: AutoDirectorFollowUpListPan
 
           <Select value={props.activeSupportsBatch || "__all__"} onValueChange={(value) => props.onFilterChange("supportsBatch", value === "__all__" ? "" : value)}>
             <SelectTrigger aria-label="按批量操作能力筛选" className={AUTO_DIRECTOR_MOBILE_CLASSES.followUpFilterTrigger}>
-              <SelectValue placeholder="批量能力" />
+              <SelectValue className="min-w-0 flex-1 truncate" placeholder="批量能力" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__all__">全部</SelectItem>
