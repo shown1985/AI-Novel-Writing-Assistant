@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -111,6 +111,15 @@ export default function WorldGenerator() {
   const [checkpointSummary, setCheckpointSummary] = useState<WorldSkeletonGenerationCheckpointSummary | null>(null);
   const [generationError, setGenerationError] = useState<string | null>(null);
 
+  const showSkeletonPreview = useCallback((payload: WorldSkeletonGenerationPayload | null | undefined) => {
+    setSkeleton(payload ?? null);
+    setGenerationError(null);
+    setCheckpointSummary(null);
+    setGenerationRunId(null);
+    window.localStorage.removeItem(WORLD_GENERATION_RUN_STORAGE_KEY);
+    setStep(3);
+  }, []);
+
   const clearCheckpoint = () => {
     setGenerationRunId(null);
     setCheckpointSummary(null);
@@ -124,10 +133,15 @@ export default function WorldGenerator() {
       ? getWorldSkeletonGenerationSummary(storedRunId).catch(() => getLatestUnfinishedWorldSkeletonGeneration())
       : getLatestUnfinishedWorldSkeletonGeneration();
     void summaryRequest
-      .then((response) => {
+      .then(async (response) => {
         const summary = response.data;
-        if (!summary || summary.status === "succeeded") {
+        if (!summary) {
           window.localStorage.removeItem(WORLD_GENERATION_RUN_STORAGE_KEY);
+          return;
+        }
+        if (summary.status === "succeeded") {
+          const completed = await recoverWorldSkeleton(summary.runId);
+          showSkeletonPreview(completed.data);
           return;
         }
         setGenerationRunId(summary.runId);
@@ -141,7 +155,7 @@ export default function WorldGenerator() {
           setStep(2);
         }
       });
-  }, []);
+  }, [showSkeletonPreview]);
 
   const {
     genreTreeQuery,
@@ -307,12 +321,7 @@ export default function WorldGenerator() {
       return response.data;
     },
     onSuccess: (payload) => {
-      setSkeleton(payload ?? null);
-      setGenerationError(null);
-      setCheckpointSummary(null);
-      setGenerationRunId(null);
-      window.localStorage.removeItem(WORLD_GENERATION_RUN_STORAGE_KEY);
-      setStep(3);
+      showSkeletonPreview(payload);
     },
     onError: (error) => {
       const checkpoint = readCheckpointDetails(error);
@@ -334,12 +343,7 @@ export default function WorldGenerator() {
       return recoverWorldSkeleton(generationRunId);
     },
     onSuccess: (response) => {
-      setSkeleton(response.data ?? null);
-      setGenerationRunId(null);
-      setGenerationError(null);
-      setCheckpointSummary(null);
-      window.localStorage.removeItem(WORLD_GENERATION_RUN_STORAGE_KEY);
-      setStep(3);
+      showSkeletonPreview(response.data);
     },
     onError: (error) => {
       const checkpoint = readCheckpointDetails(error);

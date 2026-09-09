@@ -179,6 +179,46 @@ export class WorldGenerationCheckpointService implements WorldSkeletonCheckpoint
     ]);
   }
 
+  async saveStageProgress(input: {
+    runId: string;
+    sequence: number;
+    stage: string;
+    structure: ReturnType<typeof normalizeWorldStructuredData>;
+    summary: string;
+  }): Promise<void> {
+    await prisma.$transaction([
+      prisma.worldGenerationCheckpoint.upsert({
+        where: {
+          runId_sequence: {
+            runId: input.runId,
+            sequence: input.sequence,
+          },
+        },
+        create: {
+          runId: input.runId,
+          sequence: input.sequence,
+          stage: input.stage,
+          structureJson: JSON.stringify(input.structure),
+          summary: input.summary,
+        },
+        update: {
+          stage: input.stage,
+          structureJson: JSON.stringify(input.structure),
+          summary: input.summary,
+        },
+      }),
+      prisma.worldGenerationRun.update({
+        where: { id: input.runId },
+        data: {
+          status: "running",
+          currentStage: input.stage,
+          nextStageIndex: Math.max(0, input.sequence - 1),
+          lastError: null,
+        },
+      }),
+    ]);
+  }
+
   async complete(input: {
     runId: string;
     sequence: number;

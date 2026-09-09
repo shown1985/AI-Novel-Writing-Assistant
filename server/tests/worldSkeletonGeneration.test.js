@@ -347,6 +347,82 @@ test("a failed stage is retried in place without regenerating prior stages", asy
   }
 });
 
+test("an incomplete location stage splits into checkpointed batches and continues automatically", async () => {
+  const original = promptRunner.runStructuredPrompt;
+  const calls = [];
+  const fixture = buildStageFixture();
+  const savedProgress = [];
+  const checkpointStore = {
+    async startOrResume(input) {
+      return {
+        runId: "run-location-batches",
+        request: input.request,
+        structure: createEmptyWorldStructure(),
+        nextStageIndex: 0,
+        status: "running",
+      };
+    },
+    async saveStage() {},
+    async saveStageProgress(input) {
+      savedProgress.push(input);
+    },
+    async complete() {},
+    async fail() {},
+    async getSummary() {
+      return null;
+    },
+  };
+  let fullLocationAttempts = 0;
+  promptRunner.runStructuredPrompt = async (request) => {
+    calls.push(request);
+    if (request.asset.id === "world.structure.generate") {
+      const section = request.promptInput.section;
+      if (section === "locations") {
+        const batchMatch = request.promptInput.stageConstraints.match(/本批只生成 (\d+) 个地点/);
+        if (!batchMatch) {
+          fullLocationAttempts += 1;
+          return {
+            output: fixture.locations.map((location, index) => index === 0
+              ? { ...location, entryConstraint: "" }
+              : location),
+          };
+        }
+        const batchCount = Number(batchMatch[1]);
+        const offset = request.promptInput.currentStructure.locations.length;
+        return { output: fixture.locations.slice(offset, offset + batchCount) };
+      }
+      const output = section === "factions"
+        ? { factions: fixture.factions, forces: fixture.forces }
+        : fixture[section] ?? fixture.relations;
+      return { output };
+    }
+    return { output: buildPresentationFixture(fixture) };
+  };
+
+  try {
+    const result = await generateWorldSkeleton({
+      idea: "地点整批不完整时应自动分段继续。",
+      options: { preset: "standard" },
+      provider: "deepseek",
+      checkpointStore,
+    });
+    const locationCalls = calls.filter((request) => request.promptInput?.section === "locations");
+    assert.equal(fullLocationAttempts, 2);
+    assert.equal(locationCalls.length, 4);
+    assert.match(locationCalls[2].promptInput.stageConstraints, /本批只生成 3 个地点/);
+    assert.match(locationCalls[2].promptInput.stageConstraints, /location-1 到 location-3/);
+    assert.match(locationCalls[3].promptInput.stageConstraints, /location-4 到 location-6/);
+    assert.deepEqual(savedProgress.map((item) => item.structure.locations.length), [3, 6]);
+    assert.equal(result.structuredData.locations.length, 6);
+    assert.deepEqual(
+      result.structuredData.locations.map((location) => location.id),
+      ["location-1", "location-2", "location-3", "location-4", "location-5", "location-6"],
+    );
+  } finally {
+    promptRunner.runStructuredPrompt = original;
+  }
+});
+
 test("reasoning budget exhaustion retries the same stage with reasoning disabled", async () => {
   const original = promptRunner.runStructuredPrompt;
   const calls = [];
@@ -470,6 +546,56 @@ test("presentation request-too-large retry keeps only the minimal entry context"
       < JSON.stringify(presentationCalls[0].promptInput.currentStructure).length,
     );
     assert.ok(presentationCalls[1].options.maxTokens < presentationCalls[0].options.maxTokens);
+  } finally {
+    promptRunner.runStructuredPrompt = original;
+  }
+});
+
+test("repeated presentation truncation generates story entries in automatic batches", async () => {
+  const original = promptRunner.runStructuredPrompt;
+  const calls = [];
+  const fixture = buildStageFixture();
+  let fullPresentationAttempts = 0;
+  promptRunner.runStructuredPrompt = async (request) => {
+    calls.push(request);
+    if (request.asset.id === "world.structure.generate") {
+      const section = request.promptInput.section;
+      const output = section === "factions"
+        ? { factions: fixture.factions, forces: fixture.forces }
+        : fixture[section] ?? fixture.relations;
+      return { output };
+    }
+    if (request.promptInput.storyEntryCount > 1) {
+      fullPresentationAttempts += 1;
+      const error = new Error("[STRUCTURED_OUTPUT:output_truncated] presentation truncated");
+      error.category = "output_truncated";
+      throw error;
+    }
+    const position = request.promptInput.storyEntryBatch.position;
+    const output = buildPresentationFixture(fixture);
+    return {
+      output: {
+        ...output,
+        storyEntrySuggestions: [output.storyEntrySuggestions[position - 1]],
+      },
+    };
+  };
+
+  try {
+    const result = await generateWorldSkeleton({
+      idea: "展示输出过长时逐个整理故事入口。",
+      options: { preset: "standard" },
+      provider: "deepseek",
+    });
+    const presentationCalls = calls.filter((request) => request.asset.id === "world.skeleton.present");
+    assert.equal(fullPresentationAttempts, 2);
+    assert.equal(presentationCalls.length, 5);
+    assert.deepEqual(
+      presentationCalls.slice(2).map((request) => request.promptInput.storyEntryBatch.position),
+      [1, 2, 3],
+    );
+    assert.ok(presentationCalls.slice(2).every((request) => request.options.reasoningEnabled === false));
+    assert.deepEqual(result.storyEntrySuggestions.map((item) => item.title), ["入口1", "入口2", "入口3"]);
   } finally {
     promptRunner.runStructuredPrompt = original;
   }

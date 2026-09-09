@@ -88,6 +88,13 @@ export interface WorldSkeletonCheckpointStore {
     stage: WorldStructureSectionKey | "presentation";
     structure: WorldStructuredData;
   }): Promise<void>;
+  saveStageProgress?(input: {
+    runId: string;
+    sequence: number;
+    stage: WorldStructureSectionKey;
+    structure: WorldStructuredData;
+    summary: string;
+  }): Promise<void>;
   complete(input: {
     runId: string;
     sequence: number;
@@ -99,6 +106,19 @@ export interface WorldSkeletonCheckpointStore {
     error: unknown;
   }): Promise<void>;
   getSummary(runId: string): Promise<WorldSkeletonGenerationCheckpointSummary | null>;
+}
+
+interface WorldStageBatch {
+  offset: number;
+  count: number;
+  total: number;
+}
+
+class WorldSkeletonAssemblyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "WorldSkeletonAssemblyError";
+  }
 }
 
 interface WorldSkeletonPromptStructureContext {
@@ -125,6 +145,12 @@ interface WorldSkeletonPresentationPromptStructureContext {
     narrativeFunction: string;
   }>;
   [key: string]: unknown;
+}
+
+interface WorldSkeletonPresentationOutput {
+  concept: WorldSkeletonGenerationPayload["concept"];
+  storyEntrySuggestions: WorldSkeletonGenerationPayload["storyEntrySuggestions"];
+  assessment: WorldSkeletonGenerationPayload["assessment"];
 }
 
 export interface WorldSkeletonGenerateInput {
@@ -356,7 +382,11 @@ function buildWorldSkeletonBindingPromptContext(
   };
 }
 
-function stageConstraints(section: WorldStructureSectionKey, options: WorldSkeletonGenerationOptions): string {
+function stageConstraints(
+  section: WorldStructureSectionKey,
+  options: WorldSkeletonGenerationOptions,
+  batch?: WorldStageBatch,
+): string {
   const { counts } = options;
   switch (section) {
     case "profile":
@@ -370,6 +400,16 @@ function stageConstraints(section: WorldStructureSectionKey, options: WorldSkele
         "faction 的 representativeForceIds 只能引用本阶段生成的 force id。",
       ].join("\n");
     case "locations":
+      if (batch) {
+        const firstId = batch.offset + 1;
+        const lastId = batch.offset + batch.count;
+        return [
+          `本批只生成 ${batch.count} 个地点；完整阶段共 ${batch.total} 个地点。`,
+          `本批地点 id 必须依次使用 location-${firstId} 到 location-${lastId}，不得重复已有地点。`,
+          "每个地点都必须提供 0-100 的 x/y、directionHint、terrain、narrativeFunction、risk、entryConstraint、exitCost。",
+          "controllingForceIds 只能引用当前结构中已经存在的 force id。",
+        ].join("\n");
+      }
       return [
         `locations 必须正好 ${counts.locations} 个。`,
         "每个地点都必须提供 0-100 的 x/y、directionHint、terrain、narrativeFunction、risk、entryConstraint、exitCost。",
@@ -392,6 +432,7 @@ function buildStagePromptSource(
   section: WorldStructureSectionKey,
   compressionLevel: WorldPromptCompressionLevel = "normal",
   retryReason?: string,
+  batch?: WorldStageBatch,
 ): string {
   const { counts } = options;
   const inputLimits = resolveWorldPromptInputLimits(compressionLevel);
@@ -406,7 +447,7 @@ function buildStagePromptSource(
     input.blueprint ? `用户蓝图：${compactJson(input.blueprint, inputLimits.blueprintMaxChars)}` : "用户蓝图：无",
     input.referenceContext ? `参考约束：${compactJson(input.referenceContext, inputLimits.referenceMaxChars)}` : "参考约束：无",
     "文本约束：短字段不超过 16 个汉字，说明不超过 28 个汉字；总输出保持紧凑。",
-    `阶段硬约束：\n${stageConstraints(section, options)}`,
+    `阶段硬约束：\n${stageConstraints(section, options, batch)}`,
     retryReason ? `上一次本阶段结果未通过装配校验，请只修正以下问题：${retryReason}` : "",
   ].join("\n");
 }
@@ -453,6 +494,24 @@ function isRequestTooLarge(error: unknown): boolean {
     || message.includes("[LLM_BUDGET]");
 }
 
+function isRecoverableStructuredStageFailure(error: unknown): boolean {
+  if (error instanceof WorldSkeletonAssemblyError) {
+    return true;
+  }
+  const category = error && typeof error === "object" && "category" in error
+    ? (error as { category?: unknown }).category
+    : extractStructuredOutputErrorCategory(errorMessage(error));
+  return [
+    "incomplete_json",
+    "malformed_json",
+    "schema_mismatch",
+    "reasoning_budget_exhausted",
+    "output_truncated",
+    "empty_content",
+    "request_too_large",
+  ].includes(String(category));
+}
+
 function annotateCheckpointError(
   error: unknown,
   runId: string,
@@ -471,7 +530,7 @@ function annotateCheckpointError(
 function uniqueIds(items: Array<{ id: string }>, label: string): void {
   const ids = items.map((item) => item.id).filter(Boolean);
   if (ids.length !== new Set(ids).size) {
-    throw new Error(`世界骨架 ${label} 存在重复 id。`);
+    throw new WorldSkeletonAssemblyError(`世界骨架 ${label} 存在重复 id。`);
   }
 }
 
@@ -482,21 +541,21 @@ function assertReferences(
 ): void {
   const schemaResult = worldStructuredDataSchema.safeParse(structure);
   if (!schemaResult.success) {
-    throw new Error(`世界骨架 ${section} 阶段的结构未通过 JSON Schema 校验。`);
+    throw new WorldSkeletonAssemblyError(`世界骨架 ${section} 阶段的结构未通过 JSON Schema 校验。`);
   }
   const forceIds = new Set(structure.forces.map((item) => item.id));
   const locationIds = new Set(structure.locations.map((item) => item.id));
   if (section === "profile") {
     const fields = [structure.profile.summary, structure.profile.identity, structure.profile.tone, structure.profile.coreConflict];
     if (fields.some((value) => !value.trim())) {
-      throw new Error("世界骨架 profile 阶段缺少必要字段。");
+      throw new WorldSkeletonAssemblyError("世界骨架 profile 阶段缺少必要字段。");
     }
     return;
   }
   if (section === "rules") {
     uniqueIds(structure.rules.axioms, "核心规则");
     if (structure.rules.axioms.length !== options.counts.rules) {
-      throw new Error(`世界骨架核心规则数量不符合要求，期望 ${options.counts.rules} 条。`);
+      throw new WorldSkeletonAssemblyError(`世界骨架核心规则数量不符合要求，期望 ${options.counts.rules} 条。`);
     }
     return;
   }
@@ -504,25 +563,25 @@ function assertReferences(
     uniqueIds(structure.factions, "阵营");
     uniqueIds(structure.forces, "势力");
     if (structure.factions.length !== options.counts.factionGroups || structure.forces.length !== options.counts.forces) {
-      throw new Error("世界骨架势力阶段的阵营或势力数量不符合要求。");
+      throw new WorldSkeletonAssemblyError("世界骨架势力阶段的阵营或势力数量不符合要求。");
     }
     for (const faction of structure.factions) {
       if (faction.representativeForceIds.some((id) => !forceIds.has(id))) {
-        throw new Error(`世界骨架阵营 ${faction.name} 引用了不存在的势力 id。`);
+        throw new WorldSkeletonAssemblyError(`世界骨架阵营 ${faction.name} 引用了不存在的势力 id。`);
       }
     }
     const weakForce = structure.forces.find((force) =>
       (force.resources ?? []).length === 0 || !force.currentObjective.trim() || !force.pressure.trim(),
     );
     if (weakForce) {
-      throw new Error(`世界骨架势力 ${weakForce.name} 缺少资源、目标或施压方式。`);
+      throw new WorldSkeletonAssemblyError(`世界骨架势力 ${weakForce.name} 缺少资源、目标或施压方式。`);
     }
     return;
   }
   if (section === "locations") {
     uniqueIds(structure.locations, "地点");
     if (structure.locations.length !== options.counts.locations) {
-      throw new Error(`世界骨架地点数量不符合要求，期望 ${options.counts.locations} 个。`);
+      throw new WorldSkeletonAssemblyError(`世界骨架地点数量不符合要求，期望 ${options.counts.locations} 个。`);
     }
     const missingMapData = structure.locations.find((location) =>
       typeof location.x !== "number"
@@ -533,13 +592,13 @@ function assertReferences(
       || !location.exitCost.trim(),
     );
     if (missingMapData) {
-      throw new Error(`世界骨架地点 ${missingMapData.name} 缺少地图或行动字段。`);
+      throw new WorldSkeletonAssemblyError(`世界骨架地点 ${missingMapData.name} 缺少地图或行动字段。`);
     }
     const invalidController = structure.locations
       .flatMap((location) => location.controllingForceIds)
       .find((id) => !forceIds.has(id));
     if (invalidController) {
-      throw new Error(`世界骨架地点引用了不存在的势力 id：${invalidController}。`);
+      throw new WorldSkeletonAssemblyError(`世界骨架地点引用了不存在的势力 id：${invalidController}。`);
     }
     return;
   }
@@ -547,31 +606,31 @@ function assertReferences(
   uniqueIds(structure.relations.locationControls, "地点控制关系");
   uniqueIds(structure.relations.locationConnections ?? [], "地点连接关系");
   if (structure.relations.forceRelations.length < Math.max(1, options.counts.conflicts)) {
-    throw new Error(`世界骨架势力关系不足，至少需要 ${Math.max(1, options.counts.conflicts)} 条。`);
+    throw new WorldSkeletonAssemblyError(`世界骨架势力关系不足，至少需要 ${Math.max(1, options.counts.conflicts)} 条。`);
   }
   const invalidForceRelation = structure.relations.forceRelations.find(
     (item) => !forceIds.has(item.sourceForceId) || !forceIds.has(item.targetForceId),
   );
   if (invalidForceRelation) {
-    throw new Error("世界骨架势力关系引用了不存在的势力 id。");
+    throw new WorldSkeletonAssemblyError("世界骨架势力关系引用了不存在的势力 id。");
   }
   const invalidLocationRelation = structure.relations.locationControls.find(
     (item) => !forceIds.has(item.forceId) || !locationIds.has(item.locationId),
   );
   if (invalidLocationRelation) {
-    throw new Error("世界骨架地点控制关系引用了不存在的实体 id。");
+    throw new WorldSkeletonAssemblyError("世界骨架地点控制关系引用了不存在的实体 id。");
   }
   const invalidForceLocation = structure.forces
     .flatMap((force) => force.controlledLocationIds ?? [])
     .find((id) => !locationIds.has(id));
   if (invalidForceLocation) {
-    throw new Error(`世界骨架势力引用了不存在的地点 id：${invalidForceLocation}。`);
+    throw new WorldSkeletonAssemblyError(`世界骨架势力引用了不存在的地点 id：${invalidForceLocation}。`);
   }
   const invalidConnection = (structure.relations.locationConnections ?? []).find(
     (item) => !locationIds.has(item.sourceLocationId) || !locationIds.has(item.targetLocationId),
   );
   if (invalidConnection) {
-    throw new Error("世界骨架地点连接关系引用了不存在的地点 id。");
+    throw new WorldSkeletonAssemblyError("世界骨架地点连接关系引用了不存在的地点 id。");
   }
 }
 
@@ -594,13 +653,49 @@ function synchronizeForceLocationLinks(structure: WorldStructuredData): WorldStr
   return normalizeWorldStructuredData({ ...structure, forces }, structure);
 }
 
-async function runWorldStructureStage(
+function mergeWorldLocationBatch(
+  current: WorldStructuredData,
+  raw: unknown,
+  batch: WorldStageBatch,
+): WorldStructuredData {
+  const normalizedBatch = mergeWorldStructureSection(current, "locations", raw).locations;
+  if (normalizedBatch.length !== batch.count) {
+    throw new WorldSkeletonAssemblyError(
+      `世界骨架地点分批数量不符合要求，本批期望 ${batch.count} 个。`,
+    );
+  }
+  const locations = [
+    ...current.locations.slice(0, batch.offset),
+    ...normalizedBatch.map((location, index) => ({
+      ...location,
+      id: `location-${batch.offset + index + 1}`,
+    })),
+  ];
+  return normalizeWorldStructuredData({ ...current, locations }, current);
+}
+
+function locationBatchValidationOptions(
+  options: WorldSkeletonGenerationOptions,
+  completedCount: number,
+): WorldSkeletonGenerationOptions {
+  return {
+    ...options,
+    counts: {
+      ...options.counts,
+      locations: completedCount,
+    },
+  };
+}
+
+async function runWorldStructureStageAttempts(
   input: WorldSkeletonGenerateInput,
   options: WorldSkeletonGenerationOptions,
   section: WorldStructureSectionKey,
   current: WorldStructuredData,
+  batch?: WorldStageBatch,
+  initialRetryReason = "",
 ): Promise<WorldStructuredData> {
-  let retryReason = "";
+  let retryReason = initialRetryReason;
   let disableReasoningOnRetry = false;
   let compressionLevel: WorldPromptCompressionLevel = "normal";
   for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -609,10 +704,10 @@ async function runWorldStructureStage(
         asset: worldStructureSectionPrompt,
         promptInput: {
           section,
-          promptSource: buildStagePromptSource(input, options, section, compressionLevel, retryReason),
+          promptSource: buildStagePromptSource(input, options, section, compressionLevel, retryReason, batch),
           currentStructure: buildWorldSkeletonPromptContext(current, section, compressionLevel),
           currentBindingSupport: buildWorldSkeletonBindingPromptContext(buildWorldBindingSupport(current)),
-          stageConstraints: stageConstraints(section, options),
+          stageConstraints: stageConstraints(section, options, batch),
         },
         options: {
           provider: input.provider ?? "deepseek",
@@ -628,11 +723,16 @@ async function runWorldStructureStage(
           requestBudget: WORLD_SKELETON_REQUEST_BUDGET,
         },
       });
-      let next = mergeWorldStructureSection(current, section, result.output);
+      let next = section === "locations" && batch
+        ? mergeWorldLocationBatch(current, result.output, batch)
+        : mergeWorldStructureSection(current, section, result.output);
       if (section === "locations") {
         next = synchronizeForceLocationLinks(next);
       }
-      assertReferences(next, section, options);
+      const validationOptions = section === "locations" && batch
+        ? locationBatchValidationOptions(options, batch.offset + batch.count)
+        : options;
+      assertReferences(next, section, validationOptions);
       return next;
     } catch (error) {
       if (attempt === 1) {
@@ -648,6 +748,114 @@ async function runWorldStructureStage(
   throw new Error(`世界骨架阶段 ${section} 未完成。`);
 }
 
+async function runLocationBatchRange(
+  input: WorldSkeletonGenerateInput,
+  options: WorldSkeletonGenerationOptions,
+  current: WorldStructuredData,
+  batch: WorldStageBatch,
+  retryReason: string,
+  onProgress?: (structure: WorldStructuredData) => Promise<void>,
+): Promise<WorldStructuredData> {
+  try {
+    const next = await runWorldStructureStageAttempts(
+      input,
+      options,
+      "locations",
+      current,
+      batch,
+      retryReason,
+    );
+    await onProgress?.(next);
+    return next;
+  } catch (error) {
+    if (!isRecoverableStructuredStageFailure(error) || batch.count <= 1) {
+      throw error;
+    }
+    const firstCount = Math.ceil(batch.count / 2);
+    const first = await runLocationBatchRange(
+      input,
+      options,
+      current,
+      { ...batch, count: firstCount },
+      errorMessage(error),
+      onProgress,
+    );
+    return runLocationBatchRange(
+      input,
+      options,
+      first,
+      {
+        offset: batch.offset + firstCount,
+        count: batch.count - firstCount,
+        total: batch.total,
+      },
+      errorMessage(error),
+      onProgress,
+    );
+  }
+}
+
+async function runWorldStructureStage(
+  input: WorldSkeletonGenerateInput,
+  options: WorldSkeletonGenerationOptions,
+  section: WorldStructureSectionKey,
+  current: WorldStructuredData,
+  onProgress?: (structure: WorldStructuredData) => Promise<void>,
+): Promise<WorldStructuredData> {
+  if (section !== "locations") {
+    return runWorldStructureStageAttempts(input, options, section, current);
+  }
+
+  const targetCount = options.counts.locations;
+  if (current.locations.length > targetCount) {
+    throw new WorldSkeletonAssemblyError("世界骨架地点检查点数量超过当前生成目标。");
+  }
+  if (current.locations.length === targetCount) {
+    assertReferences(current, section, options);
+    return current;
+  }
+
+  if (current.locations.length > 0) {
+    return runLocationBatchRange(
+      input,
+      options,
+      current,
+      {
+        offset: current.locations.length,
+        count: targetCount - current.locations.length,
+        total: targetCount,
+      },
+      "从已保存的地点分批检查点继续生成。",
+      onProgress,
+    );
+  }
+
+  try {
+    return await runWorldStructureStageAttempts(input, options, section, current);
+  } catch (error) {
+    if (!isRecoverableStructuredStageFailure(error) || targetCount <= 1) {
+      throw error;
+    }
+    const firstCount = Math.ceil(targetCount / 2);
+    const first = await runLocationBatchRange(
+      input,
+      options,
+      current,
+      { offset: 0, count: firstCount, total: targetCount },
+      errorMessage(error),
+      onProgress,
+    );
+    return runLocationBatchRange(
+      input,
+      options,
+      first,
+      { offset: firstCount, count: targetCount - firstCount, total: targetCount },
+      errorMessage(error),
+      onProgress,
+    );
+  }
+}
+
 async function startCheckpoint(
   input: WorldSkeletonGenerateInput,
 ): Promise<WorldSkeletonCheckpointResumeState | null> {
@@ -659,6 +867,125 @@ async function startCheckpoint(
     request: input,
     sourceRoute: input.sourceRoute ?? "/worlds/new",
   });
+}
+
+async function invokeWorldSkeletonPresentation(input: {
+  generationInput: WorldSkeletonGenerateInput;
+  structure: WorldStructuredData;
+  bindingSupport: ReturnType<typeof buildWorldBindingSupport>;
+  storyEntryCount: number;
+  compressionLevel: WorldPromptCompressionLevel;
+  reasoningEnabled?: boolean;
+  storyEntryBatch?: {
+    position: number;
+    total: number;
+    excludedTitles: string[];
+  };
+}): Promise<WorldSkeletonPresentationOutput> {
+  const result = await runStructuredPrompt({
+    asset: worldSkeletonPresentationPrompt,
+    promptInput: {
+      idea: buildPresentationPromptIdea(input.generationInput, input.compressionLevel),
+      worldType: input.generationInput.worldType,
+      template: input.generationInput.template,
+      storyEntryCount: input.storyEntryCount,
+      storyEntryBatch: input.storyEntryBatch,
+      currentStructure: buildWorldSkeletonPresentationPromptContext(input.structure, input.compressionLevel),
+      currentBindingSupport: buildWorldSkeletonBindingPromptContext(input.bindingSupport),
+    },
+    options: {
+      provider: input.generationInput.provider ?? "deepseek",
+      model: input.generationInput.model,
+      sessionId: input.generationInput.sessionId,
+      stage: "presentation",
+      entrypoint: input.generationInput.sourceRoute ?? "/worlds/new",
+      temperature: 0.3,
+      ...(input.reasoningEnabled === false ? { reasoningEnabled: false } : {}),
+      reasoningEffort: "low",
+      maxTokens: resolveWorldStageOutputTokens(
+        input.storyEntryCount === 1 ? 1_600 : WORLD_SKELETON_STAGE_MAX_TOKENS.presentation,
+        input.compressionLevel,
+      ),
+      timeoutMs: WORLD_SKELETON_GENERATION_TIMEOUT_MS,
+      requestBudget: WORLD_SKELETON_REQUEST_BUDGET,
+    },
+  });
+  return result.output;
+}
+
+async function generateWorldSkeletonPresentation(input: {
+  generationInput: WorldSkeletonGenerateInput;
+  options: WorldSkeletonGenerationOptions;
+  structure: WorldStructuredData;
+  bindingSupport: ReturnType<typeof buildWorldBindingSupport>;
+}): Promise<WorldSkeletonPresentationOutput> {
+  let compressionLevel: WorldPromptCompressionLevel = "normal";
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await invokeWorldSkeletonPresentation({
+        generationInput: input.generationInput,
+        structure: input.structure,
+        bindingSupport: input.bindingSupport,
+        storyEntryCount: input.options.counts.storyEntrySuggestions,
+        compressionLevel,
+        reasoningEnabled: attempt === 0 ? undefined : false,
+      });
+    } catch (error) {
+      lastError = error;
+      if (attempt === 1 || !isRecoverableStructuredStageFailure(error)) {
+        break;
+      }
+      compressionLevel = "minimal";
+    }
+  }
+
+  if (!isRecoverableStructuredStageFailure(lastError)) {
+    throw lastError;
+  }
+
+  const storyEntrySuggestions: WorldSkeletonGenerationPayload["storyEntrySuggestions"] = [];
+  let concept: WorldSkeletonGenerationPayload["concept"] | undefined;
+  let assessment: WorldSkeletonGenerationPayload["assessment"] | undefined;
+  const total = input.options.counts.storyEntrySuggestions;
+  for (let position = 1; position <= total; position += 1) {
+    let batchOutput: WorldSkeletonPresentationOutput | undefined;
+    let batchError: unknown;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        batchOutput = await invokeWorldSkeletonPresentation({
+          generationInput: input.generationInput,
+          structure: input.structure,
+          bindingSupport: input.bindingSupport,
+          storyEntryCount: 1,
+          compressionLevel: "minimal",
+          reasoningEnabled: false,
+          storyEntryBatch: {
+            position,
+            total,
+            excludedTitles: storyEntrySuggestions.map((item) => item.title),
+          },
+        });
+        break;
+      } catch (error) {
+        batchError = error;
+        if (!isRecoverableStructuredStageFailure(error)) {
+          throw error;
+        }
+      }
+    }
+    if (!batchOutput) {
+      throw batchError ?? new WorldSkeletonAssemblyError(`世界骨架开局整理第 ${position} 批未返回结果。`);
+    }
+    concept ??= batchOutput.concept;
+    assessment = batchOutput.assessment;
+    storyEntrySuggestions.push(batchOutput.storyEntrySuggestions[0]);
+  }
+
+  if (!concept || !assessment || storyEntrySuggestions.length !== total) {
+    throw new WorldSkeletonAssemblyError("世界骨架开局整理分批结果不完整。");
+  }
+  return { concept, storyEntrySuggestions, assessment };
 }
 
 async function generateWorldSkeletonOneShot(
@@ -763,7 +1090,23 @@ async function generateWorldSkeletonStaged(
   for (let index = startIndex; index < WORLD_SKELETON_STAGE_ORDER.length; index += 1) {
     const section = WORLD_SKELETON_STAGE_ORDER[index];
     try {
-      structure = await runWorldStructureStage(effectiveInput, effectiveOptions, section, structure);
+      structure = await runWorldStructureStage(
+        effectiveInput,
+        effectiveOptions,
+        section,
+        structure,
+        runId && input.checkpointStore?.saveStageProgress
+          ? async (partialStructure) => {
+            await input.checkpointStore?.saveStageProgress?.({
+              runId,
+              sequence: index + 1,
+              stage: section,
+              structure: partialStructure,
+              summary: `世界骨架阶段 ${section} 已完成 ${partialStructure.locations.length}/${effectiveOptions.counts.locations}`,
+            });
+          }
+          : undefined,
+      );
       if (runId && input.checkpointStore) {
         await input.checkpointStore.saveStage({
           runId,
@@ -783,45 +1126,12 @@ async function generateWorldSkeletonStaged(
 
   const bindingSupport = buildWorldBindingSupport(structure);
   try {
-    let presentationCompression: WorldPromptCompressionLevel = "normal";
-    let presentation;
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      try {
-        presentation = await runStructuredPrompt({
-          asset: worldSkeletonPresentationPrompt,
-          promptInput: {
-            idea: buildPresentationPromptIdea(effectiveInput, presentationCompression),
-            worldType: effectiveInput.worldType,
-            template: effectiveInput.template,
-            storyEntryCount: effectiveOptions.counts.storyEntrySuggestions,
-            currentStructure: buildWorldSkeletonPresentationPromptContext(structure, presentationCompression),
-            currentBindingSupport: buildWorldSkeletonBindingPromptContext(bindingSupport),
-          },
-          options: {
-            provider: effectiveInput.provider ?? "deepseek",
-            model: effectiveInput.model,
-            sessionId: effectiveInput.sessionId,
-            stage: "presentation",
-            entrypoint: effectiveInput.sourceRoute ?? "/worlds/new",
-            temperature: 0.3,
-            reasoningEffort: "low",
-            maxTokens: resolveWorldStageOutputTokens(WORLD_SKELETON_STAGE_MAX_TOKENS.presentation, presentationCompression),
-            timeoutMs: WORLD_SKELETON_GENERATION_TIMEOUT_MS,
-            requestBudget: WORLD_SKELETON_REQUEST_BUDGET,
-          },
-        });
-        break;
-      } catch (error) {
-        if (attempt === 1 || !isRequestTooLarge(error)) {
-          throw error;
-        }
-        presentationCompression = "minimal";
-      }
-    }
-    if (!presentation) {
-      throw new Error("世界骨架开局整理未返回结果。");
-    }
-    const output = presentation.output;
+    const output = await generateWorldSkeletonPresentation({
+      generationInput: effectiveInput,
+      options: effectiveOptions,
+      structure,
+      bindingSupport,
+    });
     const finalStructure = normalizeWorldStructuredData({
       ...structure,
       metadata: {
