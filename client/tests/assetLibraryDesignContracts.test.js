@@ -43,12 +43,21 @@ const characterPage = readClientFile("src/pages/characters/CharacterLibrary.tsx"
 const writingFormulaLanding = readClientFile("src/pages/writingFormula/components/WritingFormulaLanding.tsx");
 const writingFormulaWorkbench = readClientFile("src/pages/writingFormula/components/WritingFormulaWorkbenchPanel.tsx");
 const writingFormulaCreateDialog = readClientFile("src/pages/writingFormula/components/WritingFormulaCreateDialog.tsx");
+const visualAssetApi = readClientFile("src/api/visualAssets.ts");
+const visualAssetLibrary = readClientFile("src/components/visualAssets/VisualAssetLibrary.tsx");
 
 test("asset library semantic status colors are registered as theme tokens", () => {
   for (const token of ["success", "warning", "info"]) {
     assert.match(css, new RegExp(`--${token}:`));
     assert.match(tailwindConfig, new RegExp(`${token}:\\s*\\{`));
   }
+});
+
+test("visual asset library owns its loading errors without duplicate global toasts", () => {
+  assert.match(visualAssetApi, /suppressErrorToast:\s*true/g);
+  assert.match(visualAssetLibrary, /catalogQuery\.isError/);
+  assert.match(visualAssetLibrary, /detailQuery\.isError/);
+  assert.match(visualAssetLibrary, /重新加载/);
 });
 
 test("asset library shared shells stay restrained and token based", () => {

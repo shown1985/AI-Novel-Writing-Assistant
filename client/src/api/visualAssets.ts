@@ -35,6 +35,7 @@ function toCatalogParams(request: VisualAssetCatalogRequest) {
 export async function listVisualAssets(request: VisualAssetCatalogRequest = {}) {
   const { data } = await apiClient.get<ApiResponse<VisualAssetCatalogPage>>("/visual-assets", {
     params: toCatalogParams(request),
+    suppressErrorToast: true,
   });
   return data;
 }
@@ -42,12 +43,15 @@ export async function listVisualAssets(request: VisualAssetCatalogRequest = {}) 
 export async function getVisualAssetFacets(request: Omit<VisualAssetCatalogRequest, "cursor" | "limit"> = {}) {
   const { data } = await apiClient.get<ApiResponse<VisualAssetCatalogFacets>>("/visual-assets/facets", {
     params: toCatalogParams(request),
+    suppressErrorToast: true,
   });
   return data;
 }
 
 export async function getVisualAsset(assetId: string) {
-  const { data } = await apiClient.get<ApiResponse<VisualAssetSelection>>(`/visual-assets/${assetId}`);
+  const { data } = await apiClient.get<ApiResponse<VisualAssetSelection>>(`/visual-assets/${assetId}`, {
+    suppressErrorToast: true,
+  });
   return data;
 }
 

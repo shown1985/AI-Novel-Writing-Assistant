@@ -18,6 +18,7 @@ const allMigrationNames = fs.readdirSync(migrationsDir, { withFileTypes: true })
 
 const targetMigration = "20260318233000_book_analysis_source_cache";
 const novelFactMigration = "20260812120000_novel_fact_ledger";
+const visualAssetCompatibilityMigration = "20260910140000_visual_asset_source_compatibility";
 
 function createMigrationTable(database) {
   database.exec(`
@@ -261,6 +262,93 @@ test("ensureRuntimeDatabaseReady creates the novel fact ledger for existing desk
       assert.ok(verifyDb.prepare(
         `SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'NovelFactEntry_novelId_chapterOrder_idx'`,
       ).get());
+    } finally {
+      verifyDb.close();
+    }
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("ensureRuntimeDatabaseReady adds visual source fields without replacing existing records", async () => {
+  const { tempDir, databasePath } = createTempDatabaseFile();
+  const database = new Database(databasePath);
+
+  try {
+    createMigrationTable(database);
+    database.exec(`
+      CREATE TABLE "ComicProject" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "title" TEXT NOT NULL
+      );
+      CREATE TABLE "ComicCharacter" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "projectId" TEXT NOT NULL,
+        "name" TEXT NOT NULL
+      );
+      CREATE TABLE "ComicEpisode" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "projectId" TEXT NOT NULL
+      );
+      CREATE TABLE "ComicPanel" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "episodeId" TEXT NOT NULL,
+        "order" INTEGER NOT NULL,
+        "action" TEXT NOT NULL
+      );
+      CREATE TABLE "DramaProject" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "title" TEXT NOT NULL
+      );
+      CREATE TABLE "DramaCharacter" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "projectId" TEXT NOT NULL,
+        "name" TEXT NOT NULL
+      );
+
+      INSERT INTO "ComicProject" ("id", "title") VALUES ('comic-project', '保留的漫画');
+      INSERT INTO "ComicCharacter" ("id", "projectId", "name") VALUES ('comic-character', 'comic-project', '保留的角色');
+      INSERT INTO "ComicEpisode" ("id", "projectId") VALUES ('comic-episode', 'comic-project');
+      INSERT INTO "ComicPanel" ("id", "episodeId", "order", "action") VALUES ('comic-panel', 'comic-episode', 1, '保留的动作');
+      INSERT INTO "DramaProject" ("id", "title") VALUES ('drama-project', '保留的短剧');
+      INSERT INTO "DramaCharacter" ("id", "projectId", "name") VALUES ('drama-character', 'drama-project', '保留的短剧角色');
+    `);
+    for (const migrationName of allMigrationNames) {
+      if (migrationName !== visualAssetCompatibilityMigration) {
+        insertMigrationRecord(database, migrationName);
+      }
+    }
+  } finally {
+    database.close();
+  }
+
+  try {
+    await withDesktopRuntime(databasePath, () => ensureRuntimeDatabaseReady());
+
+    const verifyDb = new Database(databasePath, { readonly: true });
+    try {
+      const comicColumns = verifyDb.prepare('PRAGMA table_info("ComicCharacter")').all().map((row) => row.name);
+      const panelColumns = verifyDb.prepare('PRAGMA table_info("ComicPanel")').all().map((row) => row.name);
+      const dramaColumns = verifyDb.prepare('PRAGMA table_info("DramaCharacter")').all().map((row) => row.name);
+
+      assert.ok(comicColumns.includes("gender"));
+      assert.ok(panelColumns.includes("sceneRef"));
+      assert.ok(dramaColumns.includes("portraitData"));
+      assert.ok(dramaColumns.includes("threeViewData"));
+      assert.ok(verifyDb.prepare('SELECT name FROM sqlite_master WHERE type = \'table\' AND name = \'ComicCharacterAsset\'').get());
+      assert.ok(verifyDb.prepare('SELECT name FROM sqlite_master WHERE type = \'table\' AND name = \'ComicScene\'').get());
+      assert.deepEqual(
+        verifyDb.prepare('SELECT name, gender FROM "ComicCharacter" WHERE id = ?').get("comic-character"),
+        { name: "保留的角色", gender: "unknown" },
+      );
+      assert.deepEqual(
+        verifyDb.prepare('SELECT action, sceneRef FROM "ComicPanel" WHERE id = ?').get("comic-panel"),
+        { action: "保留的动作", sceneRef: null },
+      );
+      assert.equal(
+        verifyDb.prepare('SELECT name FROM "DramaCharacter" WHERE id = ?').get("drama-character").name,
+        "保留的短剧角色",
+      );
     } finally {
       verifyDb.close();
     }
