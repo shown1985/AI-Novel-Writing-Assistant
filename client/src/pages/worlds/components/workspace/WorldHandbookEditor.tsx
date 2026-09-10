@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, BookOpen, Castle, GitBranch, MapPinned, Pencil, Save, ScrollText, WandSparkles } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowLeft, BookOpen, Castle, GitBranch, MapPinned, Pencil, Save, ScrollText, WandSparkles } from "lucide-react";
 import type {
   WorldBindingSupport,
   WorldStructuredData,
@@ -83,7 +83,7 @@ export default function WorldHandbookEditor(props: {
   );
   const [activeAiSection, setActiveAiSection] = useState<WorldStructureSectionKey>("profile");
   const [editingSection, setEditingSection] = useState<EditableHandbookSection | null>(null);
-  const editingPanelRef = useRef<HTMLDivElement>(null);
+  const [editingSnapshot, setEditingSnapshot] = useState<WorldStructuredData | null>(null);
 
   useEffect(() => {
     if (!initialPayload) {
@@ -92,19 +92,6 @@ export default function WorldHandbookEditor(props: {
     setDraftStructure(initialPayload.structure);
     setDraftBindingSupport(initialPayload.bindingSupport);
   }, [initialPayload]);
-
-  useEffect(() => {
-    if (!editingSection) {
-      return;
-    }
-
-    const frame = window.requestAnimationFrame(() => {
-      editingPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      editingPanelRef.current?.focus({ preventScroll: true });
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [editingSection]);
 
   if (!draftStructure || !draftBindingSupport) {
     return (
@@ -141,6 +128,166 @@ export default function WorldHandbookEditor(props: {
       setDraftBindingSupport(result.bindingSupport);
     }
   };
+
+  const openEditor = (section: EditableHandbookSection) => {
+    setEditingSnapshot(structuredClone(draftStructure));
+    setEditingSection(section);
+  };
+
+  const cancelEditing = () => {
+    if (editingSnapshot) {
+      setDraftStructure(editingSnapshot);
+    }
+    setEditingSnapshot(null);
+    setEditingSection(null);
+  };
+
+  const saveEditingAndReturn = async () => {
+    await saveDraft();
+    setEditingSnapshot(null);
+    setEditingSection(null);
+  };
+
+  const renderEditingFields = () => {
+    if (editingSection === "profile") {
+      return (
+        <div className="grid gap-3 lg:grid-cols-[0.8fr_1.4fr]">
+          <div className="space-y-3">
+            <HandbookField title="一句话世界印象" hint="让作者和 AI 一眼知道这个世界的类型、时代感和核心奇观。">
+              <Input
+                value={draftStructure.profile.identity}
+                onChange={(event) =>
+                  setDraftStructure((prev) =>
+                    prev ? { ...prev, profile: { ...prev.profile, identity: event.target.value } } : prev,
+                  )
+                }
+                placeholder="例如：星核枯竭的仙侠王朝"
+              />
+            </HandbookField>
+            <HandbookField title="阅读气质" hint="决定故事是黑暗、热血、轻喜、权谋，还是冒险探索。">
+              <Input
+                value={draftStructure.profile.tone}
+                onChange={(event) =>
+                  setDraftStructure((prev) =>
+                    prev ? { ...prev, profile: { ...prev.profile, tone: event.target.value } } : prev,
+                  )
+                }
+                placeholder="黑暗史诗、轻喜冒险、权谋争霸..."
+              />
+            </HandbookField>
+            <HandbookField title="主题关键词" hint="用顿号分隔，帮助后续角色、地点和冲突保持同一种题材方向。">
+              <Input
+                value={draftStructure.profile.themes.join("、")}
+                onChange={(event) =>
+                  setDraftStructure((prev) =>
+                    prev
+                      ? {
+                        ...prev,
+                        profile: {
+                          ...prev.profile,
+                          themes: event.target.value.split(/[、,，]/).map((item) => item.trim()).filter(Boolean),
+                        },
+                      }
+                      : prev,
+                  )
+                }
+                placeholder="复仇、王朝更替、异能觉醒"
+              />
+            </HandbookField>
+          </div>
+          <div className="space-y-3">
+            <HandbookField title="世界给读者的第一眼" hint="写成作者能直接复述的短段落，不需要拆成地理、文化、历史字段。">
+              <HandbookTextarea
+                value={draftStructure.profile.summary}
+                onChange={(value) =>
+                  setDraftStructure((prev) => (prev ? { ...prev, profile: { ...prev.profile, summary: value } } : prev))
+                }
+                placeholder="用一段话让作者知道这个世界长什么样、故事会从哪里开始。"
+              />
+            </HandbookField>
+            <HandbookField title="能持续推动剧情的矛盾" hint="这不是背景介绍，而是角色行动、势力冲突和章节事件反复围绕的问题。">
+              <HandbookTextarea
+                value={draftStructure.profile.coreConflict}
+                onChange={(value) =>
+                  setDraftStructure((prev) =>
+                    prev ? { ...prev, profile: { ...prev.profile, coreConflict: value } } : prev,
+                  )
+                }
+                placeholder="例如：星核枯竭让修行者争夺寿命，朝廷想封锁真相，边境异魔趁机入侵。"
+                minRows={3}
+              />
+            </HandbookField>
+          </div>
+        </div>
+      );
+    }
+
+    if (editingSection === "rules") {
+      return <WorldHandbookRuleSection draftStructure={draftStructure} setDraftStructure={setDraftStructure} />;
+    }
+    if (editingSection === "forces") {
+      return <WorldHandbookForceSection draftStructure={draftStructure} setDraftStructure={setDraftStructure} />;
+    }
+    if (editingSection === "locations") {
+      return <WorldHandbookLocationSection draftStructure={draftStructure} setDraftStructure={setDraftStructure} />;
+    }
+    if (editingSection === "relations") {
+      return (
+        <WorldHandbookTensionSection
+          draftStructure={draftStructure}
+          setDraftStructure={setDraftStructure}
+          onOpenDeepening={onOpenDeepening}
+          onOpenLayers={onOpenLayers}
+          onOpenAdvanced={onOpenAdvanced}
+        />
+      );
+    }
+
+    return null;
+  };
+
+  if (editingSection) {
+    return (
+      <section className="space-y-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <Button type="button" size="sm" variant="ghost" className="-ml-2 rounded-full" onClick={cancelEditing}>
+              <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />
+              返回世界手册
+            </Button>
+            <h2 className="mt-3 text-xl font-semibold tracking-tight">编辑{EDITING_SECTION_LABELS[editingSection]}</h2>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              只调整这一部分；保存后回到手册概览，取消则放弃本次编辑内容。
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" variant="ghost" className="rounded-full" onClick={cancelEditing} disabled={savePending}>
+              取消返回
+            </Button>
+            <Button type="button" size="sm" className="rounded-full" onClick={saveEditingAndReturn} disabled={savePending}>
+              <Save className="mr-2 h-4 w-4" aria-hidden="true" />
+              {savePending ? "保存中..." : "保存并返回"}
+            </Button>
+          </div>
+        </div>
+
+        <div className="rounded-3xl bg-muted/20 p-5 sm:p-6">{renderEditingFields()}</div>
+
+        <div className="sticky bottom-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-background/95 p-3 shadow-lg backdrop-blur">
+          <span className="text-sm text-muted-foreground">确认无误后保存，手册概览会同步更新。</span>
+          <div className="flex gap-2">
+            <Button type="button" size="sm" variant="ghost" className="rounded-full" onClick={cancelEditing} disabled={savePending}>
+              取消返回
+            </Button>
+            <Button type="button" size="sm" className="rounded-full" onClick={saveEditingAndReturn} disabled={savePending}>
+              <Save className="mr-2 h-4 w-4" aria-hidden="true" />
+              {savePending ? "保存中..." : "保存并返回"}
+            </Button>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="space-y-6">
@@ -195,81 +342,11 @@ export default function WorldHandbookEditor(props: {
             />
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="ghost" className="rounded-full" onClick={() => setEditingSection("profile")}>
+            <Button type="button" size="sm" variant="ghost" className="rounded-full" onClick={() => openEditor("profile")}>
               <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
               编辑世界概要
             </Button>
           </div>
-          {editingSection === "profile" ? (
-            <div className="mt-4 grid gap-3 lg:grid-cols-[0.8fr_1.4fr]">
-            <div className="space-y-3">
-              <HandbookField title="一句话世界印象" hint="让作者和 AI 一眼知道这个世界的类型、时代感和核心奇观。">
-                <Input
-                  value={draftStructure.profile.identity}
-                  onChange={(event) =>
-                    setDraftStructure((prev) =>
-                      prev ? { ...prev, profile: { ...prev.profile, identity: event.target.value } } : prev,
-                    )
-                  }
-                  placeholder="例如：星核枯竭的仙侠王朝"
-                />
-              </HandbookField>
-              <HandbookField title="阅读气质" hint="决定故事是黑暗、热血、轻喜、权谋，还是冒险探索。">
-                <Input
-                  value={draftStructure.profile.tone}
-                  onChange={(event) =>
-                    setDraftStructure((prev) =>
-                      prev ? { ...prev, profile: { ...prev.profile, tone: event.target.value } } : prev,
-                    )
-                  }
-                  placeholder="黑暗史诗、轻喜冒险、权谋争霸..."
-                />
-              </HandbookField>
-              <HandbookField title="主题关键词" hint="用顿号分隔，帮助后续角色、地点和冲突保持同一种题材方向。">
-                <Input
-                  value={draftStructure.profile.themes.join("、")}
-                  onChange={(event) =>
-                    setDraftStructure((prev) =>
-                      prev
-                        ? {
-                          ...prev,
-                          profile: {
-                            ...prev.profile,
-                            themes: event.target.value.split(/[、,，]/).map((item) => item.trim()).filter(Boolean),
-                          },
-                        }
-                        : prev,
-                    )
-                  }
-                  placeholder="复仇、王朝更替、异能觉醒"
-                />
-              </HandbookField>
-            </div>
-            <div className="space-y-3">
-              <HandbookField title="世界给读者的第一眼" hint="写成作者能直接复述的短段落，不需要拆成地理、文化、历史字段。">
-                <HandbookTextarea
-                  value={draftStructure.profile.summary}
-                  onChange={(value) =>
-                    setDraftStructure((prev) => (prev ? { ...prev, profile: { ...prev.profile, summary: value } } : prev))
-                  }
-                  placeholder="用一段话让作者知道这个世界长什么样、故事会从哪里开始。"
-                />
-              </HandbookField>
-              <HandbookField title="能持续推动剧情的矛盾" hint="这不是背景介绍，而是角色行动、势力冲突和章节事件反复围绕的问题。">
-                <HandbookTextarea
-                  value={draftStructure.profile.coreConflict}
-                  onChange={(value) =>
-                    setDraftStructure((prev) =>
-                      prev ? { ...prev, profile: { ...prev.profile, coreConflict: value } } : prev,
-                    )
-                  }
-                  placeholder="例如：星核枯竭让修行者争夺寿命，朝廷想封锁真相，边境异魔趁机入侵。"
-                  minRows={3}
-                />
-              </HandbookField>
-            </div>
-            </div>
-          ) : null}
         </div>
 
         <div className="rounded-2xl border border-border/35 bg-card/70 p-4">
@@ -313,7 +390,7 @@ export default function WorldHandbookEditor(props: {
             title="核心规则"
             description={`${draftStructure.rules.axioms.length} 条规则会限制力量、资源、禁忌和代价。`}
             action={
-              <Button type="button" size="sm" variant="outline" onClick={() => setEditingSection("rules")}>
+              <Button type="button" size="sm" variant="outline" onClick={() => openEditor("rules")}>
                 编辑规则
               </Button>
             }
@@ -340,7 +417,7 @@ export default function WorldHandbookEditor(props: {
             title="主要势力"
             description={`${draftStructure.forces.length} 个势力决定角色归属、阵营压力和资源争夺。`}
             action={
-              <Button type="button" size="sm" variant="outline" onClick={() => setEditingSection("forces")}>
+              <Button type="button" size="sm" variant="outline" onClick={() => openEditor("forces")}>
                 编辑势力
               </Button>
             }
@@ -370,7 +447,7 @@ export default function WorldHandbookEditor(props: {
             title="故事舞台"
             description={`${draftStructure.locations.length} 个地点承载开局、升级、转折、决战和地图资产。`}
             action={
-              <Button type="button" size="sm" variant="outline" onClick={() => setEditingSection("locations")}>
+              <Button type="button" size="sm" variant="outline" onClick={() => openEditor("locations")}>
                 编辑地点
               </Button>
             }
@@ -402,7 +479,7 @@ export default function WorldHandbookEditor(props: {
             title="冲突张力"
             description="记录势力关系、地点控制、共同后果和禁忌组合，帮助世界保持可写性。"
             action={
-              <Button type="button" size="sm" variant="outline" onClick={() => setEditingSection("relations")}>
+              <Button type="button" size="sm" variant="outline" onClick={() => openEditor("relations")}>
                 编辑张力
               </Button>
             }
@@ -430,43 +507,6 @@ export default function WorldHandbookEditor(props: {
           </HandbookPreviewCard>
         </div>
 
-        {editingSection ? (
-          <div
-            ref={editingPanelRef}
-            tabIndex={-1}
-            aria-label={`编辑${EDITING_SECTION_LABELS[editingSection]}`}
-            className="scroll-mt-6 rounded-2xl bg-primary/[0.055] p-4 outline-none"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <AlertTriangle className="h-4 w-4 text-primary" aria-hidden="true" />
-                正在编辑{EDITING_SECTION_LABELS[editingSection]}，完成后保存手册即可更新上方概览。
-              </div>
-              <Button type="button" size="sm" variant="ghost" className="rounded-full" onClick={() => setEditingSection(null)}>
-                收起编辑
-              </Button>
-            </div>
-          </div>
-        ) : null}
-
-        {editingSection === "rules" ? (
-          <WorldHandbookRuleSection draftStructure={draftStructure} setDraftStructure={setDraftStructure} />
-        ) : null}
-        {editingSection === "forces" ? (
-          <WorldHandbookForceSection draftStructure={draftStructure} setDraftStructure={setDraftStructure} />
-        ) : null}
-        {editingSection === "locations" ? (
-          <WorldHandbookLocationSection draftStructure={draftStructure} setDraftStructure={setDraftStructure} />
-        ) : null}
-        {editingSection === "relations" ? (
-          <WorldHandbookTensionSection
-            draftStructure={draftStructure}
-            setDraftStructure={setDraftStructure}
-            onOpenDeepening={onOpenDeepening}
-            onOpenLayers={onOpenLayers}
-            onOpenAdvanced={onOpenAdvanced}
-          />
-        ) : null}
     </section>
   );
 }
