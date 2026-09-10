@@ -116,7 +116,12 @@ export default function WorldGenerator() {
     setGenerationError(null);
     setCheckpointSummary(null);
     setGenerationRunId(null);
-    window.localStorage.removeItem(WORLD_GENERATION_RUN_STORAGE_KEY);
+    const completedRunId = payload?.generationRunId?.trim();
+    if (completedRunId) {
+      window.localStorage.setItem(WORLD_GENERATION_RUN_STORAGE_KEY, completedRunId);
+    } else {
+      window.localStorage.removeItem(WORLD_GENERATION_RUN_STORAGE_KEY);
+    }
     setStep(3);
   }, []);
 
@@ -374,6 +379,7 @@ export default function WorldGenerator() {
     },
     onSuccess: async (response) => {
       const createdId = response.data?.id;
+      clearCheckpoint();
       await queryClient.invalidateQueries({ queryKey: queryKeys.worlds.all });
       if (createdId) {
         await queryClient.invalidateQueries({ queryKey: queryKeys.worlds.detail(createdId) });
