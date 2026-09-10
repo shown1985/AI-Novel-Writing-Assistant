@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, BookOpen, Castle, GitBranch, MapPinned, Pencil, Save, ScrollText, WandSparkles } from "lucide-react";
 import type {
   WorldBindingSupport,
@@ -21,6 +21,14 @@ import WorldHandbookRuleSection from "./handbook/WorldHandbookRuleSection";
 import WorldHandbookTensionSection from "./handbook/WorldHandbookTensionSection";
 
 type EditableHandbookSection = "profile" | "rules" | "forces" | "locations" | "relations";
+
+const EDITING_SECTION_LABELS: Record<EditableHandbookSection, string> = {
+  profile: "世界概要",
+  rules: "核心规则",
+  forces: "主要势力",
+  locations: "故事舞台",
+  relations: "冲突张力",
+};
 
 function compactText(value: string | null | undefined, fallback: string, limit = 120): string {
   const text = value?.replace(/\s+/g, " ").trim();
@@ -75,6 +83,7 @@ export default function WorldHandbookEditor(props: {
   );
   const [activeAiSection, setActiveAiSection] = useState<WorldStructureSectionKey>("profile");
   const [editingSection, setEditingSection] = useState<EditableHandbookSection | null>(null);
+  const editingPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!initialPayload) {
@@ -83,6 +92,19 @@ export default function WorldHandbookEditor(props: {
     setDraftStructure(initialPayload.structure);
     setDraftBindingSupport(initialPayload.bindingSupport);
   }, [initialPayload]);
+
+  useEffect(() => {
+    if (!editingSection) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      editingPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      editingPanelRef.current?.focus({ preventScroll: true });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [editingSection]);
 
   if (!draftStructure || !draftBindingSupport) {
     return (
@@ -175,7 +197,7 @@ export default function WorldHandbookEditor(props: {
           <div className="mt-3 flex flex-wrap gap-2">
             <Button type="button" size="sm" variant="ghost" className="rounded-full" onClick={() => setEditingSection("profile")}>
               <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
-              整理世界概要
+              编辑世界概要
             </Button>
           </div>
           {editingSection === "profile" ? (
@@ -292,7 +314,7 @@ export default function WorldHandbookEditor(props: {
             description={`${draftStructure.rules.axioms.length} 条规则会限制力量、资源、禁忌和代价。`}
             action={
               <Button type="button" size="sm" variant="outline" onClick={() => setEditingSection("rules")}>
-                整理规则
+                编辑规则
               </Button>
             }
           >
@@ -319,7 +341,7 @@ export default function WorldHandbookEditor(props: {
             description={`${draftStructure.forces.length} 个势力决定角色归属、阵营压力和资源争夺。`}
             action={
               <Button type="button" size="sm" variant="outline" onClick={() => setEditingSection("forces")}>
-                整理势力
+                编辑势力
               </Button>
             }
           >
@@ -349,7 +371,7 @@ export default function WorldHandbookEditor(props: {
             description={`${draftStructure.locations.length} 个地点承载开局、升级、转折、决战和地图资产。`}
             action={
               <Button type="button" size="sm" variant="outline" onClick={() => setEditingSection("locations")}>
-                整理地点
+                编辑地点
               </Button>
             }
           >
@@ -381,7 +403,7 @@ export default function WorldHandbookEditor(props: {
             description="记录势力关系、地点控制、共同后果和禁忌组合，帮助世界保持可写性。"
             action={
               <Button type="button" size="sm" variant="outline" onClick={() => setEditingSection("relations")}>
-                整理张力
+                编辑张力
               </Button>
             }
           >
@@ -409,11 +431,16 @@ export default function WorldHandbookEditor(props: {
         </div>
 
         {editingSection ? (
-          <div className="rounded-2xl bg-primary/[0.055] p-4">
+          <div
+            ref={editingPanelRef}
+            tabIndex={-1}
+            aria-label={`编辑${EDITING_SECTION_LABELS[editingSection]}`}
+            className="scroll-mt-6 rounded-2xl bg-primary/[0.055] p-4 outline-none"
+          >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <AlertTriangle className="h-4 w-4 text-primary" aria-hidden="true" />
-                正在整理选中区块，保存后会更新上方手册概览。
+                正在编辑{EDITING_SECTION_LABELS[editingSection]}，完成后保存手册即可更新上方概览。
               </div>
               <Button type="button" size="sm" variant="ghost" className="rounded-full" onClick={() => setEditingSection(null)}>
                 收起编辑
