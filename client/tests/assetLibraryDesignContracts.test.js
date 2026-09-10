@@ -209,16 +209,23 @@ test("story mode library reuses the tree navigator and keeps mode contracts in t
   assert.doesNotMatch(storyModeTreeBrowser, /shadow-(?:sm|md|lg|xl|2xl)/);
 });
 
-test("writing formula keeps a compact asset list and reveals the selected profile in place", () => {
-  assert.match(writingFormulaLanding, /先选一套写法，再决定要编辑、应用还是去 AI 味/);
-  assert.match(writingFormulaLanding, /isSelected \? \(/);
-  assert.match(writingFormulaLanding, /读感与定位/);
-  assert.match(writingFormulaLanding, /规则摘要/);
-  assert.match(writingFormulaLanding, /资产概览/);
+test("writing formula uses a compact master-detail browser for the selected profile", () => {
+  assert.match(writingFormulaLanding, /先选写法，再让 AI 按这套方式创作/);
+  assert.match(writingFormulaLanding, /lg:grid-cols-\[320px_minmax\(0,1fr\)\]/);
+  assert.match(writingFormulaLanding, /官方起步写法/);
+  assert.match(writingFormulaLanding, /这套写法会带来什么读感/);
+  assert.match(writingFormulaLanding, /资产状态/);
+  assert.match(writingFormulaLanding, /TabsTrigger/);
+  assert.match(writingFormulaLanding, /剧情推进/);
+  assert.match(writingFormulaLanding, /人物表达/);
+  assert.match(writingFormulaLanding, /语言质感/);
+  assert.match(writingFormulaLanding, /节奏控制/);
+  assert.match(writingFormulaLanding, /反 AI 约束/);
   assert.match(writingFormulaLanding, /编辑设定/);
   assert.match(writingFormulaLanding, /应用与测试/);
   assert.match(writingFormulaLanding, /去 AI 味/);
-  assert.doesNotMatch(writingFormulaLanding, /xl:sticky xl:top-4/);
+  assert.doesNotMatch(writingFormulaLanding, /xl:grid-cols-\[minmax\(0,1.15fr\)_minmax\(0,1fr\)_280px\]/);
+  assert.doesNotMatch(writingFormulaLanding, /shadow-(?:sm|md|lg|xl|2xl)/);
   assert.match(writingFormulaCreateDialog, /从一种读感开始/);
   assert.match(writingFormulaCreateDialog, /用模板开始/);
   assert.match(writingFormulaCreateDialog, /说一句想法/);

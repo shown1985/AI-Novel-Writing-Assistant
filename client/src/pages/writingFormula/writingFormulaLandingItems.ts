@@ -4,7 +4,6 @@ import {
   type StyleProfile,
 } from "@ai-novel/shared/types/styleEngine";
 import {
-  buildReadableRuleEntries,
   buildReadableRuleSummary,
 } from "./writingFormulaRulePresentation";
 import { getStyleProfileOriginLabel, isStarterStyleProfile } from "./writingFormulaV2.shared";
@@ -14,7 +13,6 @@ export interface LandingProfileItem {
   name: string;
   originLabel: string;
   summaryLine: string;
-  detailLines: string[];
   description: string;
   recentNovelTitle?: string | null;
   category?: string | null;
@@ -150,20 +148,7 @@ export function buildLandingProfileItems(params: BuildLandingProfileItemsParams)
     })
     .map((profile) => {
       const profileSummary = buildStyleIntentSummary({ styleProfile: profile });
-      const characterEntries = buildReadableRuleEntries("characterRules", profile.characterRules);
-      const dialogueEntry = characterEntries.find((entry) => entry.key === "dialogueStyle");
-      const emotionEntry = characterEntries.find((entry) => entry.key === "emotionExpression");
-      const detailLines = [
-        firstNonEmptyText(profile.description, profileSummary?.readingFeel)
-          ? `读感承诺：${firstNonEmptyText(profile.description, profileSummary?.readingFeel)}`
-          : "",
-        `语言质感：${buildLanguageSummary(profile)}`,
-        dialogueEntry ? `对白风格：${dialogueEntry.value}` : "",
-        emotionEntry ? `情绪外显：${emotionEntry.value}` : "",
-        profileSummary?.antiAiFocus.length
-          ? `反 AI 约束：${profileSummary.antiAiFocus.join("；")}`
-          : "",
-      ].filter(Boolean);
+      const readingFeel = firstNonEmptyText(profile.description, profileSummary?.readingFeel);
       const recentNovelBinding = recentNovelBindingsByProfileId.get(profile.id);
       const selectedPresetLabel = profile.selectedExtractionPresetKey
         ? (
@@ -176,8 +161,7 @@ export function buildLandingProfileItems(params: BuildLandingProfileItemsParams)
         id: profile.id,
         name: profile.name,
         originLabel: getStyleProfileOriginLabel(profile),
-        summaryLine: detailLines[0] ?? profile.description ?? "暂无写法摘要。",
-        detailLines,
+        summaryLine: readingFeel ? `读感承诺：${readingFeel}` : "暂无写法摘要。",
         description: firstNonEmptyText(profile.description, profileSummary?.readingFeel, "这套写法还没有写清楚读感定位。"),
         recentNovelTitle: recentNovelBinding
           ? (novelTitleMap[recentNovelBinding.targetId] ?? recentNovelBinding.targetId)
@@ -191,7 +175,7 @@ export function buildLandingProfileItems(params: BuildLandingProfileItemsParams)
         rhythmSummary: buildRhythmSummary(profile),
         antiAiFocus: profileSummary?.antiAiFocus ?? [],
         antiAiRuleNames: profile.antiAiRules.map((rule) => rule.name).slice(0, 6),
-        sourceTypeLabel: formatSourceTypeLabel(profile.sourceType),
+        sourceTypeLabel: isStarterStyleProfile(profile) ? "官方预置" : formatSourceTypeLabel(profile.sourceType),
         sourceContentPreview: buildSourceContentPreview(profile.sourceContent),
         extractedFeatureCount: profile.extractedFeatures.filter((feature) => feature.enabled).length,
         highRiskFeatureCount: profile.extractedFeatures.filter((feature) => feature.fingerprintRisk >= 0.7).length,
