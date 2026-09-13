@@ -4,9 +4,9 @@
 
 本页是 [交互与 AI Sprint 路线图](./agent-collaboration-sprints.md) 的首轮任务卡。状态为开发准备，代码尚未实施。
 
-目标是可信的 AI 配置状态、可恢复的阅读现场和世界问题安全更新。核心 19 点，三个执行 Agent 与一个根集成人；S1-X 为可移出的 Stretch。
+目标是可信的 AI 配置状态、可恢复的阅读现场和世界问题安全更新。完整 refinement 后候选核心 22 点：显式补计共享接线门2点，将原 S1-02 的5点概要拆成后端3点和前端3点。点数不是单窗口承诺；可分 S1-A 配置/安全/契约、S1-B 诊断/阅读验收。三个执行 Agent 与一个根集成人；S1-X 为可移出的 Stretch。
 
-## 冻结的首轮接口行为
+## 拟定的首轮接口行为
 
 以下是新增/调整合同，不是当前已实现的接口。
 
@@ -66,13 +66,28 @@
 - 检查：新增配置边界行为测试，mock Prisma或隔离数据库；构建对应 server/dist 后运行定向测试；复用 ragCompatibilityBootstrap.test.js 的隔离方法，严禁桌面库测试。
 - 完成证据：输入矩阵及生效值、用户保存值未变、没有索引任务或配置更新副作用。
 
+## S1-00：诊断共享接线与存储契约门
+
+作为开发团队，我们希望诊断、页面与应用设置共享同一合同，避免并发开发各造一套状态。
+
+- Owner：根集成人；点数2；P0；状态 Ready（契约准备），依赖 PREP-02/03。
+- Owned：共享诊断类型、client/src/api/settings.ts、knowledge.ts、queryKeys.ts；Prisma schema/增量迁移设计由根集成人独占；diagnostics 业务实现仍由 B 承接。
+- 子任务：固定目标级 checkState、nullable结果与读取错误；定义诊断记录、索引和保留策略；固定指纹/credential版本与持久化密钥合同；扩展现有保存命令的 expectedFingerprint、诊断 ID 与整批事务语义；生成 mock DTO 供前端消费。
+- 验收：共享类型能表达未知/成功/失败/过期而不依赖 ok 布尔值；接口没有密钥或凭证摘要。
+- 验收：存储模型覆盖重启、旧指纹结果和目标级历史；SQLite/PostgreSQL迁移方案为增量，不 reset 或覆盖桌面库。
+- 验收：建议应用409与零写入条件明确；批量提交与重放结果固定；旧手动保存行为单独列出。
+- 验收：A/B/C 确认 ownership，B 收到固定DTO、存储及 CAS合同后才生产实现；未完成明确为接线门未通过。
+- 检查：共享类型构建/接口合同测试按实际改动执行；纯设计仅核对源码和链接。迁移仅在隔离库验证，不在本卡对用户库执行。
+- 非范围：探测 transport、设置 UI、用户数据库迁移执行、模型策略重排。
+- 完成证据：签认合同、兼容矩阵、迁移演练方案、共享接线差异；不得将设计签认写成数据库能力已实现。
+
 ## S1-02：被动 AI 状态与显式检测
 
 作为作者，我希望打开设置或资料页只查看状态，明确点击检测时才产生模型请求。
 
 - Owner：Agent B；共享类型/API/queryKeys由根集成人接线。
-- 点数：5（允许 refinement 后拆后端3+前端3）；优先级 P0。
-- Owned：server/src/llm/connectivity.ts、server/src/routes/llm.ts、server/src/routes/rag.ts；新增 owned diagnostics 模块；client/src/pages/settings/views/SettingsOverviewPage.tsx、ModelRoutesPage.tsx、components/SettingsReadinessCard.tsx；client/src/pages/knowledge/KnowledgePage.tsx、components/KnowledgeOpsTab.tsx。
+- 本节为原 Story 的共用验收合同，不单独计点；实际派发 S1-02a、S1-02b，优先级 P0。
+- Owned：server/src/llm/connectivity.ts、server/src/routes/llm.ts、server/src/routes/rag.ts；拟建 owned diagnostics 模块；client/src/pages/settings/views/SettingsOverviewPage.tsx、client/src/pages/settings/ModelRoutesPage.tsx、client/src/pages/settings/components/SettingsReadinessCard.tsx；client/src/pages/knowledge/KnowledgePage.tsx、client/src/pages/knowledge/components/KnowledgeOpsTab.tsx。
 - 共享接线：client/src/api/settings.ts、client/src/api/knowledge.ts、client/src/api/queryKeys.ts及共享诊断类型由根集成人单一管理。项目没有 client/src/api/rag.ts，禁止按审计草案虚构路径。
 - 验收：页面首次进入、刷新、聚焦和自动查询零模型/embedding调用；被动 GET 零路由写入。
 - 验收：未检测、最近成功、最近失败、配置已变分别显示；未知不是失败，读取错误不是空数据；readiness不会永久 pending。
@@ -81,6 +96,27 @@
 - 验收：最近诊断持久化，重启可读；存储与日志脱敏；缓存不证明未知模型质量。
 - 检查：mock transport计数与route upsert spy；读取零请求零配置写入、检测去重、仅换凭证/鉴权/地址失效、缓存重启与环境变化测试；有效配置零诊断仍可开书；client typecheck；用户做 UI 验收。
 - 完成证据：接口响应样例、调用计数、缓存失效行为、客户端 Loading/Error/Unknown 反馈。
+
+### S1-02a：诊断读取、显式探测与持久化
+
+- 用户价值：查看状态不消耗模型调用，检测结果跨重启可追溯。
+- Owner：Agent B 后端；3点；状态待 S1-00。Owned 为上文 connectivity、LLM/RAG routes 与拟建 owned diagnostics application/infrastructure；共享 schema 由根集成人接线。
+- 子任务：提取无副作用读取；将模型与 embedding探测收敛到显式命令；保存目标级诊断；指纹失效与同指纹并发合并；迁移旧 health投影并与 S1-03 分离配置写入。
+- 验收：被动GET transport调用和路由upsert均为0；显式POST只保存诊断建议；同指纹同时扫描只一次；改凭证/地址后旧响应不变新配置健康；重启可读已完成结果且脱敏。
+- 检查：mock transport/persistence计数、故障/重启/失效行为测试；只在隔离库演练增量迁移。
+- 非范围：路由自动应用、前端展示、本次委托模型优先级。
+- 完成证据：响应样例、调用计数、存储重启证据和错误脱敏；失败探测保留上次报告并标最新失败，不冒充配置读取失败。
+
+### S1-02b：设置与知识库诊断状态消费
+
+- 用户价值：清楚知道哪些配置可运行、哪些连接尚未检测，并主动决定检测。
+- Owner：Agent B 前端，与02a同 owner串行或消费根集成人固定 mock DTO；3点；状态待 S1-00，真实验收依赖02a。
+- Owned：上文 SettingsOverviewPage、ModelRoutesPage、SettingsReadinessCard、KnowledgePage、KnowledgeOpsTab；API/queryKeys由根集成人接线。
+- 子任务：自动查询改被动接口；显式按钮绑定检测；未知/过期/失败/读取错误分别呈现；取消旧 Boolean(ok)与错误伪健康投影；基础配置与检测健康解耦。
+- 验收：进入/聚焦/刷新零探测；点击检测有pending且防重复；有效配置未检测仍可开始创作；读取错误可重试而非未配置；切换目标不会展示旧指纹健康；知识库未知不是红色连接失败。
+- 检查：状态消费/命令调用行为测试、client typecheck；UI由用户验收。
+- 非范围：改变开书流程、RAG自动启用、默认模型替换。
+- 完成证据：各状态样例与事件调用计数；mock UI只能算联调，02a未完成时本卡不是业务Done。
 
 ## S1-03：检测建议与应用分开
 
@@ -139,16 +175,16 @@
 作为作者，我希望正文有足够空间，需要时再打开目录或AI协作。
 
 - Owner：Agent C；点数3；Stretch，核心完成后才进入。
-- Owned：components/chapterEditor/ChapterEditorShell.tsx、ChapterEditorSidebar.tsx、ChapterEditorDirectorPanel.tsx。
+- Owned：client/src/pages/novels/components/chapterEditor/ChapterEditorShell.tsx、ChapterEditorSidebar.tsx、ChapterEditorDirectorPanel.tsx（后三项同属 chapterEditor 目录）。
 - 验收：正文优先；两个辅助区独立开关；窄屏不套抽屉；选区可以唤起协作；关闭不丢候选/草稿/选区。
 - 检查：client typecheck与既有修改行为回归；不为className写镜像测试，UI交用户验收。
 - 风险：检查 NovelChapterEdit 的组件 key/remount 是否会清草稿；需要改外部入口时先由根集成人评审接线。
 
 ## 多 Agent 派发顺序
 
-1. 根集成人固定分支与基线，接线诊断共享类型/API/queryKeys，明确诊断持久化迁移。
-2. 并发派发 Agent A:S1-01、Agent B:S1-02、Agent C:S1-04；根集成人执行S1-05及S1-06。
-3. Agent B完成S1-02后执行S1-03；Agent C容量允许再执行S1-X。
+1. 根集成人固定分支与基线，完成S1-00接线门；A:S1-01、C:S1-04可先并行。
+2. 门通过后派发 Agent B:S1-02a；根集成人执行S1-05及S1-06；总并发不超过三个子Agent加根。
+3. Agent B依次完成S1-02b、S1-03；Agent C容量允许再执行S1-X。
 4. 各Agent提交变更说明、定向测试结果和残余风险；不自行switch/commit/merge，不修改共享保留文件。
 5. 根集成人review diff，统一构建/检查，补Wiki与适用发布记录，按完整阶段提交。不得把Ready当Done。
 
