@@ -286,6 +286,7 @@ export function buildStructuredError(input: {
   category: StructuredOutputErrorCategory;
   strategy: StructuredOutputStrategy;
   profile: StructuredOutputProfile;
+  retryWithNextStrategy?: boolean;
   reasoningForcedOff?: boolean;
   fallbackAvailable?: boolean;
   fallbackUsed?: boolean;
@@ -293,6 +294,7 @@ export function buildStructuredError(input: {
   return new StructuredOutputError({
     message: input.message,
     category: input.category,
+    retryWithNextStrategy: input.retryWithNextStrategy,
     diagnostics: buildDiagnostics({
       strategy: input.strategy,
       profile: input.profile,
@@ -388,6 +390,10 @@ export async function parseStructuredLlmRawContentDetailed<T>(
     throw buildStructuredError({
       message,
       category,
+      // A native JSON response may occasionally arrive empty even when the
+      // request itself succeeded. Retry the portable prompt-JSON strategy
+      // before escalating to the configured fallback model.
+      retryWithNextStrategy: category === "empty_content" && input.strategy !== "prompt_json",
       strategy: input.strategy,
       profile: input.profile,
       reasoningForcedOff: input.reasoningForcedOff,

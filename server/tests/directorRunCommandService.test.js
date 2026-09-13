@@ -70,7 +70,7 @@ function createCandidatesRequest(overrides = {}) {
   };
 }
 
-function createHarness(task = createTask(), currentLlmSelection = null) {
+function createHarness(task = createTask(), currentLlmSelection = null, pipelineJob = null) {
   const commands = [];
   const bootstraps = [];
   const requeued = [];
@@ -93,6 +93,7 @@ function createHarness(task = createTask(), currentLlmSelection = null) {
     updateMany: prisma.directorStepRun.updateMany,
   };
   const originalGenerationJob = {
+    findUnique: prisma.generationJob.findUnique,
     updateMany: prisma.generationJob.updateMany,
   };
   const originalDirectorRun = {
@@ -279,6 +280,9 @@ function createHarness(task = createTask(), currentLlmSelection = null) {
     jobUpdates.push(args);
     return { count: 1 };
   };
+  prisma.generationJob.findUnique = async ({ where }) => (
+    pipelineJob && where.id === pipelineJob.id ? pipelineJob : null
+  );
   prisma.directorRun.findUnique = async ({ where }) => (
     where.taskId === task.id
       ? { id: "run-1", novelId: task.novelId }
