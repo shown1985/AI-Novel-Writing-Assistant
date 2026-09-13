@@ -139,9 +139,12 @@ export default function WorldWorkspace() {
   );
   const visibleDeepeningQuestions = useMemo(() => {
     const list = world?.deepeningQA ?? [];
-    const actionable = list.filter((question) => question.status !== "integrated");
-    return (actionable.length > 0 ? actionable : list).slice(0, 3);
+    return list.filter((question) => question.status !== "integrated").slice(0, 3);
   }, [world?.deepeningQA]);
+  const integratedDeepeningQuestionCount = useMemo(
+    () => (world?.deepeningQA ?? []).filter((question) => question.status === "integrated").length,
+    [world?.deepeningQA],
+  );
 
   const invalidateWorld = async () => {
     await Promise.all([
@@ -509,6 +512,7 @@ export default function WorldWorkspace() {
         <TabsContent value="deepening">
           <WorldDeepeningTab
             questions={visibleDeepeningQuestions}
+            integratedQuestionCount={integratedDeepeningQuestionCount}
             answerDrafts={answerDrafts}
             setAnswerDrafts={setAnswerDrafts}
             llmQuickOptions={llmQuickOptions}
