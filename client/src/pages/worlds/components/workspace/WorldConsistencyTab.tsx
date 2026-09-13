@@ -98,11 +98,11 @@ export default function WorldConsistencyTab(props: WorldConsistencyTabProps) {
                     ].join(" ")}
                     onClick={() => setActiveIssueId(issue.id)}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium text-foreground">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="min-w-0 flex-1 truncate font-medium text-foreground">
                         {localizeConsistencyIssueTitle(issue.code)}
                       </span>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="shrink-0 whitespace-nowrap rounded-full bg-muted/70 px-2 py-0.5 text-[11px] leading-4 text-muted-foreground">
                         {localizeConsistencyStatus(issue.status)}
                       </span>
                     </div>
