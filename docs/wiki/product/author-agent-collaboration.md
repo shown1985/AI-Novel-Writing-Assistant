@@ -38,6 +38,8 @@
 
 个人桌面作品保留本地模式。协作作品由中心服务作为权威事实源；不得通过复制 SQLite 数据库在多台电脑之间实现协作。异步评论、建议和冲突保护先于实时逐字编辑；实时章节共编必须证明文档算法、AI patch桥接、撤销、离线和发布锁定边界。
 
+本地模式不等于匿名无保护。首次启动可在没有既有账号时进入设置，但必须持有安装主机交付的一次性凭证；首位Owner在密码、TOTP验证器和恢复方式确认后才原子激活。局域网地址、请求来源IP、Host、Origin和CORS不能授予管理员权限。首期多账号共享同一实例内容，只有完成工作区/资源归属迁移后才可宣称作品级私有隔离。
+
 ## 作者决定与委托
 
 一次委托说明目标、资源/章节范围、允许修改、必须保留、完成标准及执行边界。普通内部步骤不逐项询问，重要方向改变或保护冲突回来源现场说明。
@@ -86,6 +88,7 @@
 - [Sprint路线图](../../plans/agent-collaboration-sprints.md)
 - [Sprint 1实施卡](../../plans/agent-collaboration-sprint-1.md)
 - [真人多人协作实施卡](../../plans/human-collaboration-sprints.md)
+- [本地管理员与MFA实施卡](../../plans/local-auth-bootstrap-sprints.md)
 - [新手优先原则](./beginner-first-novel-completion.md)
 - [简易创作权限](./simple-creation-mode.md)
 - [工作台状态合同](./workspace-status-expression.md)
