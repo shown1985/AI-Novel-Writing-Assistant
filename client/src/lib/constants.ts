@@ -1,4 +1,3 @@
-const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 type AppRuntimeMode = "web" | "desktop";
 type ViteRuntimeEnv = Partial<ImportMetaEnv> & {
   DEV?: boolean;
@@ -16,10 +15,6 @@ interface ClientRuntimeConfig {
   appVersion?: string;
   isPortable?: boolean;
   updateChannel?: string;
-}
-
-function isLoopbackHost(hostname: string | null | undefined): boolean {
-  return Boolean(hostname) && LOOPBACK_HOSTS.has(String(hostname).toLowerCase());
 }
 
 function trimTrailingSlash(value: string): string {
@@ -86,15 +81,7 @@ export function resolveApiBaseUrlForEnvironment({
   }
 
   try {
-    const parsed = new URL(configuredBaseUrl, windowLocation.origin);
-    if (!isLoopbackHost(parsed.hostname) || isLoopbackHost(windowLocation.hostname)) {
-      return trimTrailingSlash(parsed.toString());
-    }
-    parsed.hostname = windowLocation.hostname;
-    if (!parsed.port) {
-      parsed.port = "3000";
-    }
-    return trimTrailingSlash(parsed.toString());
+    return trimTrailingSlash(new URL(configuredBaseUrl, windowLocation.origin).toString());
   } catch {
     return configuredBaseUrl;
   }
@@ -108,7 +95,7 @@ function resolveApiBaseUrl(): string {
   });
 }
 
-// 开发环境优先把 API 指向当前页面所在主机，避免局域网访问时仍被锁到 localhost。
+// Release 1 仅允许本机访问；开发代理和桌面运行时都固定在回环地址。
 export const API_BASE_URL = resolveApiBaseUrl();
 
 const DEFAULT_API_TIMEOUT_MS = 10 * 60 * 1000;

@@ -71,13 +71,13 @@ test("development web without configured API base uses the Vite proxy path", () 
   );
 });
 
-test("development loopback API base adapts to the page host for LAN testing", () => {
+test("development loopback API base remains local even with a non-loopback page location", () => {
   assert.equal(
     resolveApiBaseUrlForEnvironment({
       runtimeConfig: { mode: "web" },
       viteEnv: { ...developmentEnv, VITE_API_BASE_URL: "http://localhost:3000/api" },
       windowLocation: lanDevLocation,
     }),
-    "http://192.168.1.88:3000/api",
+    "http://localhost:3000/api",
   );
 });

@@ -1,6 +1,5 @@
 import "dotenv/config";
 import type { Server } from "node:http";
-import os from "node:os";
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";
@@ -84,19 +83,20 @@ function parseEnvFlag(value: string | undefined, defaultValue: boolean): boolean
   return value === "true" || value === "1";
 }
 
+function resolveCorsAllowList(): string[] {
+  return (process.env.CORS_ORIGIN ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export function createApp() {
+  const corsAllowList = resolveCorsAllowList();
+  validateReleaseOneCorsOrigins(corsAllowList);
   getSharedNovelServices();
   const app = express();
   const jsonBodyLimit = process.env.API_JSON_LIMIT ?? "20mb";
-  const corsOriginEnv = process.env.CORS_ORIGIN;
-  const corsAllowList = corsOriginEnv
-    ? corsOriginEnv
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean)
-    : [];
 
-  const allowLan = parseEnvFlag(process.env.ALLOW_LAN, process.env.NODE_ENV !== "production");
   app.use(
     cors({
       origin: (origin, callback) => {
@@ -106,8 +106,7 @@ export function createApp() {
         }
         const isListedOrigin = corsAllowList.includes(origin);
         const isLocalhostDevOrigin = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);
-        const isLanOrigin = allowLan && /^https?:\/\/(?:\d{1,3}\.){3}\d{1,3}:\d+$/.test(origin);
-        callback(null, isListedOrigin || isLocalhostDevOrigin || isLanOrigin);
+        callback(null, isListedOrigin || isLocalhostDevOrigin);
       },
       credentials: true,
     }),
@@ -176,23 +175,7 @@ export function createApp() {
   return app;
 }
 
-function getLanIp(): string | null {
-  const ifaces = os.networkInterfaces();
-  for (const list of Object.values(ifaces)) {
-    if (!list) continue;
-    for (const info of list) {
-      if (info.family === "IPv4" && !info.internal) {
-        return info.address;
-      }
-    }
-  }
-  return null;
-}
-
 function createServerUrl(host: string, port: number): string {
-  if (host === "0.0.0.0" || host === "::") {
-    return `http://localhost:${port}`;
-  }
   return host.includes(":") ? `http://[${host}]:${port}` : `http://${host}:${port}`;
 }
 
@@ -216,27 +199,46 @@ interface BackgroundServicesHandle {
   stop: () => Promise<void>;
 }
 
-function resolveServerStartOptions(options?: ServerStartOptions): {
+function isLoopbackHost(host: string): boolean {
+  return host === "127.0.0.1" || host === "localhost" || host === "::1";
+}
+
+function validateReleaseOneCorsOrigins(origins: string[]): void {
+  for (const origin of origins) {
+    let hostname: string;
+    try {
+      hostname = new URL(origin).hostname;
+    } catch {
+      throw new Error(`Release 1 CORS_ORIGIN must contain valid loopback origins, got: ${origin}`);
+    }
+    if (!isLoopbackHost(hostname)) {
+      throw new Error(`Release 1 CORS_ORIGIN must stay on loopback, got: ${origin}`);
+    }
+  }
+}
+
+export function resolveServerStartOptions(options?: ServerStartOptions): {
   host: string;
   port: number;
   allowLan: boolean;
 } {
-  const allowLan = options?.allowLan ?? parseEnvFlag(process.env.ALLOW_LAN, process.env.NODE_ENV !== "production");
+  const allowLan = options?.allowLan ?? parseEnvFlag(process.env.ALLOW_LAN, false);
+  const host = options?.host ?? process.env.HOST ?? "127.0.0.1";
+  validateReleaseOneCorsOrigins(resolveCorsAllowList());
+  if (allowLan || !isLoopbackHost(host)) {
+    throw new Error(
+      "Release 1 only supports loopback access. Set ALLOW_LAN=false and HOST=127.0.0.1; LAN access requires the Release 2 authentication boundary.",
+    );
+  }
   return {
-    allowLan,
+    allowLan: false,
     port: options?.port ?? Number(process.env.PORT ?? 3000),
-    host: options?.host ?? process.env.HOST ?? (allowLan ? "0.0.0.0" : "localhost"),
+    host,
   };
 }
 
 function logServerReady(host: string, port: number): void {
-  console.log(`[server] listening on http://localhost:${port}`);
-  if (host === "0.0.0.0" || host === "::") {
-    const lanIp = getLanIp();
-    if (lanIp) {
-      console.log(`[server] LAN: http://${lanIp}:${port}`);
-    }
-  }
+  console.log(`[server] listening on ${createServerUrl(host, port)}`);
 }
 
 function scheduleLogRetentionCleanup(): void {
@@ -317,6 +319,7 @@ function initializeBackgroundServices(): BackgroundServicesHandle {
 }
 
 export async function startServer(options?: ServerStartOptions): Promise<StartedServer> {
+  const { host, port, allowLan } = resolveServerStartOptions(options);
   scheduleLogRetentionCleanup();
   await ensureRuntimeDatabaseReady();
 
@@ -332,7 +335,6 @@ export async function startServer(options?: ServerStartOptions): Promise<Started
   });
 
   const app = createApp();
-  const { host, port, allowLan } = resolveServerStartOptions(options);
 
   const server = await new Promise<Server>((resolve, reject) => {
     const listeningServer = app.listen(port, host, () => resolve(listeningServer));
