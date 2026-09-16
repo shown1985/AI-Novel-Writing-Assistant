@@ -21,6 +21,7 @@ Wiki 不记录单次提交改了什么，也不替代 release notes。它只记�
 
 ### Workflows
 
+- [Agent 敏捷开发与交付规范](./workflows/agent-agile-delivery.md)
 - [自动导演 Runtime 与恢复边界](./workflows/auto-director-runtime.md)
 - [简易创作模式](./product/simple-creation-mode.md)
 - [章节生产链路](./workflows/chapter-production-chain.md)

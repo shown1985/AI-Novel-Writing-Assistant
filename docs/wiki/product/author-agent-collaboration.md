@@ -36,9 +36,9 @@
 
 评论、讨论和修改建议不是正式故事事实。只有具备采用权限的成员通过版本安全提交后，变更才进入正文、世界、人物或规划。采用记录同时保留建议者、发起 AI 的成员、执行模型和最终采用者。
 
-个人桌面作品保留本地模式。协作作品由中心服务作为权威事实源；不得通过复制 SQLite 数据库在多台电脑之间实现协作。异步评论、建议和冲突保护先于实时逐字编辑；实时章节共编必须证明文档算法、AI patch桥接、撤销、离线和发布锁定边界。
+Release 1只交付个人桌面和本机浏览器：SQLite是事实源，无账号，服务默认仅监听回环地址。协作账号、LAN访问和中心数据库不得成为Release 1启动或创作前置。
 
-本地模式不等于匿名无保护。首次启动可在没有既有账号时进入设置，但必须持有安装主机交付的一次性凭证；首位Owner在密码、TOTP验证器和恢复方式确认后才原子激活。局域网地址、请求来源IP、Host、Origin和CORS不能授予管理员权限。首期多账号共享同一实例内容，只有完成工作区/资源归属迁移后才可宣称作品级私有隔离。
+Release 2的协作作品以中心MySQL为权威事实源；不得通过复制SQLite数据库在多台电脑之间实现协作。首次启用LAN或协作服务时必须持有安装主机交付的一次性凭证；首位Owner在密码、TOTP验证器和恢复方式确认后才原子激活。局域网地址、请求来源IP、Host、Origin和CORS不能授予管理员权限。异步评论、建议和冲突保护先于实时逐字编辑；实时章节共编必须证明文档算法、AI patch桥接、撤销、离线和发布锁定边界。
 
 ## 作者决定与委托
 
@@ -89,6 +89,9 @@
 - [Sprint 1实施卡](../../plans/agent-collaboration-sprint-1.md)
 - [真人多人协作实施卡](../../plans/human-collaboration-sprints.md)
 - [本地管理员与MFA实施卡](../../plans/local-auth-bootstrap-sprints.md)
+- [MySQL中央主库存储实施卡](../../plans/mysql-primary-storage-sprints.md)
+- [项目Release Roadmap](../../plans/project-release-roadmap.md)
+- [Agent敏捷开发规范](../workflows/agent-agile-delivery.md)
 - [新手优先原则](./beginner-first-novel-completion.md)
 - [简易创作权限](./simple-creation-mode.md)
 - [工作台状态合同](./workspace-status-expression.md)

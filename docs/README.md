@@ -38,6 +38,8 @@
 - [Payoff Ledger 基础加固：第二阶段实施方案](./plans/payoff-ledger-foundation-phase-two.md)
 - [P0 基础安全闭环：幽灵承诺与重规划闸门](./plans/payoff-ledger-safety-phase-three.md)
 - [GitHub Issue 修改预期台账](./plans/github-issue-expectations.md)
+- [项目 Release Roadmap](./plans/project-release-roadmap.md)
+- [MySQL 中央主库存储 Sprint](./plans/mysql-primary-storage-sprints.md)
 
 ### `docs/design`
 
@@ -73,6 +75,7 @@ Wiki 不替代计划、检查点或发布说明：
 - [Module Boundaries](./wiki/architecture/module-boundaries.md)
 - [Auto Director Runtime](./wiki/workflows/auto-director-runtime.md)
 - [Chapter Production Chain](./wiki/workflows/chapter-production-chain.md)
+- [Agent 敏捷开发与交付规范](./wiki/workflows/agent-agile-delivery.md)
 - [Prompt Registry and Structured Output](./wiki/prompts/prompt-registry-and-structured-output.md)
 
 ### `docs/releases`

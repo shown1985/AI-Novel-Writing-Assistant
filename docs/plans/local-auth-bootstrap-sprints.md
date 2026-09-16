@@ -1,5 +1,7 @@
 # 本地首次管理员、MFA 与账号权限：Sprint 实施卡
 
+> Release归属：**Release 2**。Release 1个人桌面保持SQLite、无需账号且仅允许回环访问；只有启用Release 2的LAN或协作服务时才执行本计划。
+
 ## 目标与安全解释
 
 本计划实现以下体验：本地回环地址或显式开启的局域网服务首次启动时，不要求已有账号即可进入管理员设置；设置完成后持久化首位管理员并强制绑定 MFA 验证器；该管理员后续可以创建账号并选择权限。
@@ -26,7 +28,7 @@
 - `server/src/middleware/auth.ts` 只有 `next()`，不是有效鉴权。
 - 开发服务器默认可启用 LAN 并监听 `0.0.0.0`；当前 CORS 对数字 IPv4 Origin 和无 Origin 请求较宽松。
 - 打包桌面服务固定 `127.0.0.1` 且关闭 LAN，这一默认边界保留。
-- PostgreSQL/SQLite schema 均没有 User、Session、MFA、恢复码或安全审计模型。
+- MySQL/SQLite目标schema尚没有统一的 User、Session、MFA、恢复码或安全审计模型；当前PostgreSQL路径只是迁移期兼容来源。
 - 客户端请求尚未统一携带 HttpOnly Cookie，SSE/raw fetch 也需盘点。
 - 后台导演/工作流任务没有完整 actorUserId 与授权来源。仅保护 HTTP 请求不足以保护异步执行。
 
@@ -86,10 +88,10 @@ uninitialized
 ### AUTH-02 身份、MFA、会话与双数据库增量模型（5 点）
 
 - 用户价值：账号、验证器和登录状态跨重启保存，升级不删除已有小说。
-- 状态/Owner：待 AUTH-00；身份数据 Agent；Prisma schema/migration由根独占接线。
-- 任务：`AuthSystemState / AuthBootstrapCeremony / User / MfaAuthenticator / MfaRecoveryCode / AuthSession / SecurityAuditEvent`；固定角色/capability catalog；PostgreSQL与SQLite唯一约束、条件更新和索引；secret encryption key版本。
+- 状态/Owner：待 DB-04/06与AUTH-00；身份数据 Agent；Prisma schema/migration由根独占接线。
+- 任务：`AuthSystemState / AuthBootstrapCeremony / User / MfaAuthenticator / MfaRecoveryCode / AuthSession / SecurityAuditEvent`；固定角色/capability catalog；MySQL与SQLite唯一约束、条件更新和索引；secret encryption key版本。
 - AC：双schema同步；claim单例和用户名唯一由数据库保证；session/recovery/setup token只存hash；TOTP secret只存带keyId的密文；旧内容零删除/零owner伪造；临时库迁移可回滚到原应用版本或明确只前进策略。
-- 检查/证据：临时SQLite与隔离PostgreSQL迁移、并发条件更新、历史库读取和密钥缺失fail-closed测试。
+- 检查/证据：临时SQLite与隔离MySQL迁移、并发条件更新、历史库读取和密钥缺失fail-closed测试。
 - 非范围：在用户桌面库执行迁移、实现页面、创建真实管理员。
 
 ## AUTH-B：首次设置、MFA 与登录
@@ -176,7 +178,7 @@ uninitialized
 - 状态/Owner：待 AUTH-01～10；迁移/桌面/运维 owner，真实执行前必须备份并验证。
 - 任务：旧库增量升级；bootstrap完成后归入实例共享工作区，不伪造逐条作者；开发默认LAN显式开启；具体私网/ULA绑定；TLS或受信反向代理；本机显示setup code；桌面loopback保持。
 - AC：升级前备份门明确；未初始化业务fail-closed但数据不删除；接管事务失败可继续setup；原数据计数/引用一致；LAN明文认证拒绝；`HOST/ALLOW_LAN/TLS/trust proxy`矛盾启动失败；不自动上传桌面库。
-- 检查/证据：临时旧SQLite与隔离PostgreSQL升级/恢复、桌面启动、LAN配置矩阵和数据对账。
+- 检查/证据：临时旧SQLite与隔离MySQL升级/恢复、桌面启动、LAN配置矩阵和数据对账。
 - 非范围：多主SQLite同步、作品私有分配、未经授权实际迁移。
 
 ### AUTH-12 全路由、双数据库与多角色安全验收（5 点）
@@ -184,8 +186,8 @@ uninitialized
 - 用户价值：证明管理员设置、普通登录和不同权限账号可用且没有匿名旁路。
 - 状态/Owner：待 AUTH-01～11；验证 Agent；UI由用户验收。
 - 任务：匿名路由inventory、两客户端claim、MFA/恢复、四角色、SSE/文件/设置/密钥/任务、worker撤权、LAN TLS、重启和旧库升级长链。
-- AC：匿名仅命中白名单；并发claim仅一人成功；无MFA Owner不存在；恢复码只用一次；前端改role/localStorage不能越权；四预设矩阵正确；登出不取消任务且重登不重复执行；日志零secret；SQLite/PostgreSQL均通过关键行为。
-- 检查/证据：mock transport、临时SQLite、隔离PostgreSQL、fake clock和受控HTTPS fixture；不使用用户库或真实模型。
+- AC：匿名仅命中白名单；并发claim仅一人成功；无MFA Owner不存在；恢复码只用一次；前端改role/localStorage不能越权；四预设矩阵正确；登出不取消任务且重登不重复执行；日志零secret；SQLite/MySQL均通过关键行为。
+- 检查/证据：mock transport、临时SQLite、隔离MySQL、fake clock和受控HTTPS fixture；不使用用户库或真实模型。
 - 非范围：公网容量证明、专业渗透测试、直接晋级main。
 
 ## 多 Agent Wave 与文件所有权
@@ -207,4 +209,4 @@ uninitialized
 
 ## Done 与安全红线
 
-每卡必须验证失败路径、并发、重放、secret脱敏和SQLite/PostgreSQL差异。UI隐藏、CORS通过、类型检查或“请求来自内网”都不算鉴权。开发/测试不写用户数据库；真实旧库升级前必须获得明确授权、创建可验证备份。AUTH安全门未通过前，不得将服务器暴露给LAN用户使用账号和密码。
+每卡必须验证失败路径、并发、重放、secret脱敏和SQLite/MySQL差异。UI隐藏、CORS通过、类型检查或“请求来自内网”都不算鉴权。开发/测试不写用户数据库；真实旧库升级前必须获得明确授权、创建可验证备份。AUTH安全门未通过前，不得将服务器暴露给LAN用户使用账号和密码。
