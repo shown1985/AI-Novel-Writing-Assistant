@@ -1,5 +1,9 @@
-# AI 小说创作工作台 / AI Novel Production Engine
-一个面向长篇小说创作的 AI Native 开源项目。
+# AI 小说创作工作台 / Biz Novel Studio
+一个帮助新手从灵感走到完整长篇的 AI Native 开源小说创作工作台；英文名由 **AI Novel Production Engine** 更新为 **Biz Novel Studio**。
+
+Open-source AI novel writing assistant and long-form production studio.
+
+> 中文名仍为 **AI 小说创作工作台**；`AI Novel Writing Assistant` 仓库地址和既有下载入口保持不变。
 
 当前开发主线：
 `Creative Hub + 自动导演开书 + 本书世界上下文 + 整本生产主链 + 写法引擎`
@@ -19,7 +23,7 @@
 
 ## ✨ 项目简介
 
-这是一个**面向长篇小说完成度的 AI 生产系统**，不是普通的"你写一句、AI 补一句"聊天壳子。
+**AI 小说创作工作台 / Biz Novel Studio** 是一个**面向长篇小说完成度的 AI 生产系统**。
 
 它的核心做法是：
 
@@ -148,6 +152,13 @@
 - 角色、世界观、写法、知识库和质量控制一起托住单章生成，让每一章都尽量还在同一本书里。
 - 每写完一章，系统都会把新状态回灌回去，继续影响后续章节、卷级节奏和必要时的重规划。
 
+## 自动导演交互架构图
+
+[![自动导演：从想法到完整小说](./docs/architecture/diagram.webp)](https://explosivecoderflome.github.io/AI-Novel-Writing-Assistant/architecture/auto-director-idea-to-novel.detailed.workflow.html)
+
+- [打开交互架构图](https://explosivecoderflome.github.io/AI-Novel-Writing-Assistant/architecture/auto-director-idea-to-novel.detailed.workflow.html)，查看从想法、全书规划、写法与反 AI 契约到逐章生产和写后同步的完整链路。
+- 图表使用 [Archify](https://github.com/tt-a1i/archify) 生成；仓库内保留[图表源数据](./docs/architecture/auto-director-idea-to-novel.detailed.workflow.json)与[自包含 HTML](./docs/architecture/auto-director-idea-to-novel.detailed.workflow.html)。
+
 ## 最新更新
 
 ### 2026-09-16
@@ -155,6 +166,12 @@
 #### 优化
 
 - 产品路线明确分为两个阶段：先完成以本机数据为基础、无需账号的单机成书体验，再建设以 MySQL 为中央存储的账号安全与多人协作能力；个人作品不会因后续协作功能被自动上传。
+- README 和公开文档站新增自动导演交互架构图，可从静态预览进入完整交互视图，查看写法引擎、反 AI 规则、章节生成和写后同步之间的关系。
+- Windows 桌面版更新至 `0.4.25`，统一展示 Biz Novel Studio 品牌，并在发布前校验安装包内的数据库升级内容，降低旧作品升级后进入素材库或视觉资产页面失败的风险。
+
+#### 修复
+
+- 修复 Windows 桌面版升级后打开素材库或视觉资产页面可能报错的问题；应用启动时会自动补齐漫画角色资产、场景资料和短剧角色图片所需的数据结构，保留已有项目与角色内容，无需删除数据库或手工迁移。
 
 完整历史更新见 [docs/releases/release-notes.md](./docs/releases/release-notes.md)。
 
