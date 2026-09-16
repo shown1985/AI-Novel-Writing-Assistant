@@ -1,7 +1,7 @@
 # 当前项目看板：Release 1 单机成书版
 
-更新时间：2026-09-16
-当前分支：`codex/agent-collaboration-plan`
+更新时间：2026-09-17
+当前分支：`codex/r1-s0-release-readiness`
 当前里程碑：Release 1（单机成书版）
 当前状态：R1-S0 路线重整与Backlog refinement
 
@@ -33,7 +33,7 @@ Release 2只允许做不抢占R1产能的只读Spike/Refinement。账号、LAN�
 
 | Story | 点数 | 状态 | Owner | 结果 |
 | --- | --- | --- | --- | --- |
-| R1-00 上游实现与计划重对账 | 3 | Ready | 根集成人 | 每张候选卡有证据状态，不重复开发 |
+| R1-00 上游实现与计划重对账 | 3 | Done | 根集成人 | [69张独立候选卡已按 v0.4.25 证据对账](./docs/plans/r1-00-implementation-reconciliation.md) |
 | R1-01 单机运行与数据边界冻结 | 3 | Ready | Runtime审计owner | loopback/SQLite/文件/Qdrant边界明确 |
 | R1-02 第一本书与十章连续创作基线 | 5 | Ready | 验收owner | 固定成功、失败和恢复fixture |
 | R1-03 Release 1验证矩阵 | 3 | Ready | 桌面/验证owner | 平台、升级、主链和包装门明确 |
@@ -66,3 +66,9 @@ Release 2只允许做不抢占R1产能的只读Spike/Refinement。账号、LAN�
 - Sprint中新增范围先进入Backlog，由PO明确换入/换出，不能“顺手做”。
 - 通过DoD只代表Story完成；beta组合验证和Release gate通过后才代表可发布。
 - 每个完成阶段必须提交；提交前检查Wiki与用户可见发布记录。
+
+## R1-S0 当前证据
+
+- R1-00 对账结果：69张独立候选卡中 `Done 0 / Partial 23 / Ready 6 / Not Ready 40`；另有不重复计点的 `S1-X` 已由 `S2-02` 接管。
+- 已识别发布阻断：当前分支与 v0.4.25 存在重叠的视觉资产迁移历史；空库全迁移和新增部分迁移 fixture 均失败，须在 R1-03 验证矩阵和后续明确 Story 中处理。
+- 下一张可领取卡为 R1-01；R1-02/03 可在 ownership 明确后并行，但根集成人仍保持单 Story WIP。
