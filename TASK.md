@@ -1,7 +1,7 @@
 # 当前项目看板：Release 1 单机成书版
 
 更新时间：2026-09-17
-当前分支：`codex/r1-s0-release-readiness`
+当前分支：`codex/r1-s1-config-safety`
 当前里程碑：Release 1（单机成书版）
 当前状态：R1-S1 配置、安全阅读与升级兼容
 
@@ -59,13 +59,15 @@ Release 2只允许做不抢占R1产能的只读Spike/Refinement。账号、LAN�
 
 | Story | 点数 | 状态 | Owner | 依赖 / 结果 |
 | --- | ---: | --- | --- | --- |
-| R1-MIG01 视觉资产双迁移历史兼容 | 5 | Ready | 根数据集成人 | R1-00/03；解除 R1-D01/D02 |
-| S1-00 诊断共享接线与存储契约门 | 2 | Ready | 根集成人 | 等待 R1-MIG01 |
-| S1-04 简易书架阅读现场恢复 | 3 | Ready | 阅读体验 Agent | 可独立开始 |
-| S1-05 世界问题归属校验 | 2 | Ready | 世界安全 Agent | 可独立开始 |
+| R1-MIG01 视觉资产双迁移历史兼容 | 5 | Done | 根数据集成人 | [空库、双历史、部分 schema 与 pending record 已通过](./docs/plans/r1-mig01-visual-asset-migration-compatibility.md) |
+| S1-00 诊断共享接线与存储契约门 | 2 | Ready | 根集成人 | R1-MIG01 已解除迁移前置门 |
+| S1-04 简易书架阅读现场恢复 | 3 | In Progress | 阅读体验 Agent | 独占 simpleCreation 阅读状态模块 |
+| S1-05 世界问题归属校验 | 2 | In Progress | 世界安全 Agent | 独占 worldImprovement 更新入口 |
 | S1-06 世界维护与恢复契约 Spike | 3 | Ready | 世界契约 Agent | 等待 S1-05 |
 
 承诺容量：15 点。Stretch：无。权威合同见 [R1-S1 Sprint 承诺](./docs/plans/r1-s1-sprint-commitment.md)。
+
+当前 Release 静态门：`PASS=9 / BLOCKED=2 / REVIEW=1`；迁移历史共存已由行为测试保护，剩余静态阻断为公开发布触发和 macOS 工作流。
 
 ## Release 1 后续队列
 

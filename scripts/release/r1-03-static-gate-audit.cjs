@@ -57,11 +57,28 @@ function auditMigrationOverlap() {
   ].map((name) => `server/src/prisma/migrations.sqlite/${name}/migration.sql`);
 
   if (exists(compatibilityMigration) && repairMigrations.every(exists)) {
-    record(
-      "BLOCKED",
-      "SQLITE-MIGRATIONS",
-      "the broad visual-asset compatibility migration and all six later repair migrations coexist; run the isolated migration tests before any release claim",
-    );
+    const runtimeSource = read("server/src/db/runtimeMigrations.ts");
+    const completenessTest = read("server/tests/prismaMigrationCompleteness.test.js");
+    const historyTest = read("server/tests/runtimeMigrations.test.js");
+    const hasRuntimeCompatibility = runtimeSource.includes("MIGRATIONS_SUPERSEDED_BY_GRANULAR_REPAIRS")
+      && runtimeSource.includes("applyRuntimeMigrationsToDatabase");
+    const hasSharedCompletenessPath = completenessTest.includes("applyRuntimeMigrationsToDatabase");
+    const hasBothHistoryFixtures = historyTest.includes("preserves the broad visual migration history")
+      && historyTest.includes("accepts granular visual repair history");
+
+    if (hasRuntimeCompatibility && hasSharedCompletenessPath && hasBothHistoryFixtures) {
+      record(
+        "PASS",
+        "SQLITE-MIGRATIONS",
+        "the intentional broad and granular visual-asset histories share the runtime migration path and have both-history fixtures; behavior tests still remain mandatory",
+      );
+    } else {
+      record(
+        "BLOCKED",
+        "SQLITE-MIGRATIONS",
+        "overlapping visual-asset migration histories are present without the runtime compatibility guard and both-history fixtures",
+      );
+    }
     return;
   }
   record("PASS", "SQLITE-MIGRATIONS", "the known overlapping visual-asset migration layout is absent");

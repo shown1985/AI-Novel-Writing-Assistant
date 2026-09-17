@@ -19,6 +19,10 @@ const KNOWN_APPLICATION_TABLES = [
   "KnowledgeDocument",
 ];
 
+const MIGRATIONS_SUPERSEDED_BY_GRANULAR_REPAIRS = new Set([
+  "20260910140000_visual_asset_source_compatibility",
+]);
+
 const REQUIRED_COLUMN_BACKFILLS = [
   { tableName: "Character", columnName: "arcClimax", columnDefinition: `"arcClimax" TEXT` },
   { tableName: "Character", columnName: "arcEnd", columnDefinition: `"arcEnd" TEXT` },
@@ -282,6 +286,18 @@ function isMigrationAlreadySatisfied(database: Database.Database, migrationSql: 
   return tablesSatisfied && indexesSatisfied && columnsSatisfied;
 }
 
+function isMigrationPartiallySatisfied(database: Database.Database, migrationSql: string): boolean {
+  const expectations = parseMigrationExpectations(migrationSql);
+  const hasCompleteTable = expectations.tables.some((table) =>
+    tableExists(database, table.tableName)
+    && table.columnNames.every((columnName) => columnExists(database, table.tableName, columnName)));
+  const hasIndex = expectations.indexes.some((indexName) => indexExists(database, indexName));
+  const hasColumn = expectations.addedColumns.some((column) =>
+    columnExists(database, column.tableName, column.columnName));
+
+  return hasCompleteTable || hasIndex || hasColumn;
+}
+
 function recordAppliedMigration(database: Database.Database, migrationName: string, checksum: string): void {
   database.prepare(
     `INSERT INTO "_prisma_migrations" (
@@ -349,6 +365,37 @@ function ensureSchemaColumnBackfills(database: Database.Database): void {
   }
 }
 
+export function applyRuntimeMigrationsToDatabase(
+  database: Database.Database,
+  migrationsDir: string,
+): void {
+  createMigrationsTable(database);
+
+  for (const migrationName of listMigrationNames(migrationsDir)) {
+    if (isMigrationRecorded(database, migrationName)) {
+      continue;
+    }
+
+    const migrationFilePath = path.join(migrationsDir, migrationName, "migration.sql");
+    const migrationSql = fs.readFileSync(migrationFilePath, "utf8");
+    const checksum = crypto.createHash("sha256").update(migrationSql).digest("hex");
+    const hasExistingApplication = hasLegacyApplicationTables(database);
+    const isSatisfied = hasExistingApplication && isMigrationAlreadySatisfied(database, migrationSql);
+    const isSupersededPartial = hasExistingApplication
+      && MIGRATIONS_SUPERSEDED_BY_GRANULAR_REPAIRS.has(migrationName)
+      && isMigrationPartiallySatisfied(database, migrationSql);
+
+    if (isSatisfied || isSupersededPartial) {
+      markMigrationFinished(database, migrationName, checksum);
+      continue;
+    }
+
+    applyMigration(database, migrationsDir, migrationName);
+  }
+
+  ensureSchemaColumnBackfills(database);
+}
+
 export async function ensureRuntimeDatabaseReady(): Promise<void> {
   if (resolveAppRuntimeMode() !== "desktop") {
     return;
@@ -368,26 +415,7 @@ export async function ensureRuntimeDatabaseReady(): Promise<void> {
   const database = new Database(databasePath);
 
   try {
-    createMigrationsTable(database);
-
-    for (const migrationName of listMigrationNames(migrationsDir)) {
-      if (isMigrationRecorded(database, migrationName)) {
-        continue;
-      }
-
-      const migrationFilePath = path.join(migrationsDir, migrationName, "migration.sql");
-      const migrationSql = fs.readFileSync(migrationFilePath, "utf8");
-      const checksum = crypto.createHash("sha256").update(migrationSql).digest("hex");
-
-      if (hasLegacyApplicationTables(database) && isMigrationAlreadySatisfied(database, migrationSql)) {
-        markMigrationFinished(database, migrationName, checksum);
-        continue;
-      }
-
-      applyMigration(database, migrationsDir, migrationName);
-    }
-
-    ensureSchemaColumnBackfills(database);
+    applyRuntimeMigrationsToDatabase(database, migrationsDir);
   } finally {
     database.close();
   }

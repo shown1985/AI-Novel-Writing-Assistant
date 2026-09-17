@@ -28,8 +28,8 @@
 | 门 ID | 场景与最低行为 | 平台 | 证据类型 | 当前入口 / 最窄命令 | Owner | 当前状态 | 失败处理 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | R1-P01 | 服务端、Vite、桌面 API 默认仅 `127.0.0.1`；LAN、wildcard、私网 host 和非回环 CORS 在迁移/worker 前拒绝 | 共通 + 本机网页 | 自动化 | `pnpm --filter @ai-novel/server build`；`node --test server/tests/serverRuntimeBoundary.test.js server/tests/databaseConfig.test.js server/tests/imageStorage.test.js`；`pnpm --filter @ai-novel/client typecheck`；`node --experimental-strip-types --test client/tests/runtimeBoundary.test.js client/src/lib/constants.test.mjs` | R1-01 / 平台 owner | 可执行；R1-01 已留证 | 任一失败即停止启动/包装；回到 R1-01，不以账号或宽松 CORS 绕过 |
-| R1-D01 | 空 SQLite 从零按序应用全部迁移，最终 schema、索引、完整性和外键一致 | 共通 | 自动化 | `node --test server/tests/prismaMigrationCompleteness.test.js` | R1-RC01 数据升级 owner | **阻断**：v0.4.25 双迁移历史会重复建列 | 建独立缺陷 Story 修复迁移兼容；禁止 reset、删用户库或忽略失败 |
-| R1-D02 | 支持的历史 SQLite 副本自动升级；部分满足、pending record 和重启均不丢作品/章节/世界/任务 | 桌面共通 | 自动化 | 现有刻画：先 `pnpm --filter @ai-novel/server build`，再 `node --test server/tests/runtimeMigrations.test.js`；完整历史 fixture 命令由 R1-RC01 owner 接入 | R1-RC01 数据升级 owner | **阻断**：部分视觉 schema fixture 当前失败，且支持版本清单/关键计数 fixture 未冻结 | 在隔离临时目录复制历史库后修复；原件只读；失败停止启动写入并保留副本与日志 |
+| R1-D01 | 空 SQLite 从零按序应用全部迁移，最终 schema、索引、完整性和外键一致 | 共通 | 自动化 | 先构建 server；`node --test server/tests/prismaMigrationCompleteness.test.js` | R1-MIG01 / R1-RC01 数据升级 owner | **R1-MIG01 已通过**：空库走真实运行时迁移入口并记录全部迁移 | 任一回归即阻断；禁止 reset、删用户库或忽略失败 |
+| R1-D02 | 支持的历史 SQLite 副本自动升级；部分满足、pending record 和重启均不丢作品/章节/世界/任务 | 桌面共通 | 自动化 | 先构建 server；`node --test server/tests/runtimeMigrations.test.js`；完整历史版本 fixture 仍由 R1-RC01 owner 接入 | R1-RC01 数据升级 owner | **部分**：宽迁移、六个细分迁移、部分 schema 与 pending record 共 10 项已通过；正式支持版本清单/完整关键计数 fixture 待 R1-RC01 | 在隔离临时目录复制历史库；原件只读；失败停止启动写入并保留副本与日志 |
 | R1-D03 | 升级前生成具体备份并校验存在/大小；故障后恢复副本，关键计数和引用一致 | Windows x64 / macOS arm64 | 自动化 + 平台 | 由 R1-RC01 owner 提供 owned fixture/命令；未接入前不得通过 | R1-RC01 数据升级 owner | 待接入，阻断 R1-RC01 | 不得对用户库演练；无已验证备份不得执行破坏性恢复 |
 | R1-C01 | 固定想法和已验收导演产物进入真实 pipeline/executor，连续保存 10 章；每章顺序、正文、任务状态和来源路由可核对 | 共通 | 自动化 mock | 先构建 shared/server；`node --test server/tests/r1FirstBookTenChapterBaseline.test.js` | R1-02 fixture owner / R1-RC03 产品验收 owner | **可执行且 R1-S0 已通过 2/2**；公共 idea→导演交接与真实资产生成器不在此证据内 | 失败留存临时 SQLite、任务快照和 mock 调用账本；按首个错误阶段开缺陷 Story |
 | R1-C02 | 局部质量债按 completion-first 继续；明确 `replan_required` 才停；quality-first 的 `pause_for_manual` 保持等待显式恢复 | 共通 | 自动化 mock | 长链：`node --test server/tests/r1FirstBookTenChapterBaseline.test.js`；分层：先构建 server，再运行 `server/tests/novelProduction/reliabilityBaseline.test.js` 与 `server/tests/novelDirectorAutoExecutionRuntime.test.js` | 章节生产 / 导演 owner | 十章 fixture 已证明第 8 章 `defer_and_continue` 后完成第 10 章；其他策略分层检查仍可执行 | 若误停整书或后台清除人工暂停，阻断主链；不得把 warning 改写成成功 |
@@ -49,9 +49,9 @@
 
 | 平台 | 自动化最低门 | 用户 UI 最低门 | 当前缺口 |
 | --- | --- | --- | --- |
-| 本机网页 | R1-P01、R1-C01/C02、R1-R01、R1-E01 | 开书、十章结果、来源页恢复、TXT 下载；确认无 LAN 使用说明 | 十章 fixture 未接入；浏览器 UI 未验收 |
-| Windows x64 桌面 | 共通门 + R1-D01～03、R1-W01/W02 | 安装、首次配置、完整主链、关闭/重开、导出、卸载/重装数据保留 | SQLite 门阻断；候选包装/UI 未运行 |
-| macOS arm64 桌面 | 共通门 + R1-D01～03、R1-M01/M02 | DMG 安装、首次配置、完整主链、关闭/重开、导出 | SQLite 门阻断；公开 CI 无 macOS job；候选包装/UI 未运行 |
+| 本机网页 | R1-P01、R1-C01/C02、R1-R01、R1-E01 | 开书、十章结果、来源页恢复、TXT 下载；确认无 LAN 使用说明 | 公共 idea→导演交接和浏览器 UI 未验收 |
+| Windows x64 桌面 | 共通门 + R1-D01～03、R1-W01/W02 | 安装、首次配置、完整主链、关闭/重开、导出、卸载/重装数据保留 | 完整历史版本/备份恢复与候选包装/UI 未运行 |
+| macOS arm64 桌面 | 共通门 + R1-D01～03、R1-M01/M02 | DMG 安装、首次配置、完整主链、关闭/重开、导出 | 完整历史版本/备份恢复待接入；公开 CI 无 macOS job；候选包装/UI 未运行 |
 | macOS x64 | 无 | 无 | 当前 `electron-builder` 只声明 arm64。发布范围必须明确限定 arm64，或另建 Story 增加并验证 x64；不得泛称已支持全部 macOS |
 
 ## 用户 UI 验收清单
@@ -90,7 +90,6 @@
 
 | 阻断 | 证据 | 影响 | 解锁条件 |
 | --- | --- | --- | --- |
-| 视觉资产迁移历史重叠 | `20260910140000_visual_asset_source_compatibility` 与六个 `20260916090*` SQLite 迁移并存；R1-00 已记录空库/部分 fixture 失败 | R1-D01/D02、R1-RC01、所有桌面升级与发布 | 独立迁移兼容 Story 通过空库、历史副本、部分满足、失败重启和关键计数检查 |
 | 公共 idea→导演准备交接缺少自动化长链 | R1-02 已固定想法与已验收导演产物，但明确不调用公共交接入口和真实资产生成器 | R1-RC03 的来源页 UI 验收与后续公共入口回归 | 用隔离作品验证来源页真实交接；不得把 R1-02 的固定产物证据扩大解释 |
 | 公开发布触发不符合版本规则 | `.github/workflows/desktop-release.yml` 接受 `desktop-v*` 与 `workflow_dispatch`，发布 step 可直接执行 | R1-G01、R1-RC02/04 | 公共发布只允许与 `desktop/package.json` 一致的 `vX.Y.Z` tag；非匹配触发仅验证不得上传 |
 | 公开工作流仅 Windows | release/beta workflow 只有 `windows-latest`；macOS 验证仅有本地脚本 | macOS 候选组合证据、R1-G01 | 为 macOS arm64 建受控候选 job 或形成同 SHA 的可审计平台证据；不得用 Windows 包装替代 |
@@ -113,6 +112,8 @@ git diff --check -- docs/plans/r1-03-release-verification-matrix.md scripts/rele
 ```bash
 node scripts/release/r1-03-static-gate-audit.cjs --strict
 ```
+
+R1-MIG01 已解除视觉资产双迁移历史的静态阻断；严格模式仍因公开发布触发和 macOS 工作流缺口返回 `2`。静态 PASS 只证明兼容保护与 fixture 存在，R1-D01/D02 的行为结论必须来自实际迁移测试。
 
 ## 文档与发布判断
 

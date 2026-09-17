@@ -73,6 +73,26 @@ function insertMigrationRecord(database, migrationName, options = {}) {
   );
 }
 
+function applyRecordedMigrationHistory(database, omittedMigrations = new Set()) {
+  for (const migrationName of allMigrationNames) {
+    if (omittedMigrations.has(migrationName)) {
+      continue;
+    }
+    database.exec(fs.readFileSync(path.join(migrationsDir, migrationName, "migration.sql"), "utf8"));
+    insertMigrationRecord(database, migrationName);
+  }
+}
+
+function assertFinishedMigrationRecord(database, migrationName) {
+  assert.ok(database.prepare(
+    `SELECT 1 FROM "_prisma_migrations"
+     WHERE migration_name = ?
+       AND finished_at IS NOT NULL
+       AND rolled_back_at IS NULL
+     LIMIT 1`,
+  ).get(migrationName));
+}
+
 function createSatisfiedBookAnalysisSourceCacheSchema(database) {
   database.exec(`
     CREATE TABLE "Novel" (
@@ -366,6 +386,104 @@ test("ensureRuntimeDatabaseReady adds visual source fields without replacing exi
   }
 });
 
+test("ensureRuntimeDatabaseReady preserves the broad visual migration history and records granular repairs", async () => {
+  const { tempDir, databasePath } = createTempDatabaseFile();
+  const database = new Database(databasePath);
+
+  try {
+    createMigrationTable(database);
+    applyRecordedMigrationHistory(database, new Set(visualAssetSchemaRepairMigrations));
+    database.prepare(
+      `INSERT INTO "ComicProject" (id, title, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?)`,
+    ).run("broad-project", "Broad history", new Date().toISOString(), new Date().toISOString());
+    database.prepare(
+      `INSERT INTO "ComicCharacter" (id, projectId, name, gender, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "broad-character",
+      "broad-project",
+      "Preserved broad character",
+      "female",
+      new Date().toISOString(),
+      new Date().toISOString(),
+    );
+  } finally {
+    database.close();
+  }
+
+  try {
+    await withDesktopRuntime(databasePath, () => ensureRuntimeDatabaseReady());
+
+    const verifyDb = new Database(databasePath, { readonly: true });
+    try {
+      assert.deepEqual(
+        verifyDb.prepare(
+          'SELECT name, gender FROM "ComicCharacter" WHERE id = ?',
+        ).get("broad-character"),
+        { name: "Preserved broad character", gender: "female" },
+      );
+      for (const migrationName of visualAssetSchemaRepairMigrations) {
+        assertFinishedMigrationRecord(verifyDb, migrationName);
+      }
+      assert.equal(verifyDb.pragma("integrity_check", { simple: true }), "ok");
+      assert.deepEqual(verifyDb.pragma("foreign_key_check"), []);
+    } finally {
+      verifyDb.close();
+    }
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("ensureRuntimeDatabaseReady accepts granular visual repair history without the broad record", async () => {
+  const { tempDir, databasePath } = createTempDatabaseFile();
+  const database = new Database(databasePath);
+
+  try {
+    createMigrationTable(database);
+    applyRecordedMigrationHistory(database, new Set([visualAssetCompatibilityMigration]));
+    database.prepare(
+      `INSERT INTO "ComicProject" (id, title, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?)`,
+    ).run("granular-project", "Granular history", new Date().toISOString(), new Date().toISOString());
+    database.prepare(
+      `INSERT INTO "ComicCharacter" (id, projectId, name, gender, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "granular-character",
+      "granular-project",
+      "Preserved granular character",
+      "male",
+      new Date().toISOString(),
+      new Date().toISOString(),
+    );
+  } finally {
+    database.close();
+  }
+
+  try {
+    await withDesktopRuntime(databasePath, () => ensureRuntimeDatabaseReady());
+
+    const verifyDb = new Database(databasePath, { readonly: true });
+    try {
+      assert.deepEqual(
+        verifyDb.prepare(
+          'SELECT name, gender FROM "ComicCharacter" WHERE id = ?',
+        ).get("granular-character"),
+        { name: "Preserved granular character", gender: "male" },
+      );
+      assertFinishedMigrationRecord(verifyDb, visualAssetCompatibilityMigration);
+      assert.equal(verifyDb.pragma("integrity_check", { simple: true }), "ok");
+      assert.deepEqual(verifyDb.pragma("foreign_key_check"), []);
+    } finally {
+      verifyDb.close();
+    }
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("ensureRuntimeDatabaseReady creates prompt slot overrides for existing desktop databases", async () => {
   const { tempDir, databasePath } = createTempDatabaseFile();
   const database = new Database(databasePath);
@@ -408,7 +526,10 @@ test("ensureRuntimeDatabaseReady repairs partially satisfied visual asset schema
   try {
     createMigrationTable(database);
     for (const migrationName of allMigrationNames) {
-      if (visualAssetSchemaRepairMigrations.includes(migrationName)) {
+      if (
+        migrationName === visualAssetCompatibilityMigration
+        || visualAssetSchemaRepairMigrations.includes(migrationName)
+      ) {
         continue;
       }
       database.exec(fs.readFileSync(path.join(migrationsDir, migrationName, "migration.sql"), "utf8"));
@@ -448,6 +569,11 @@ test("ensureRuntimeDatabaseReady repairs partially satisfied visual asset schema
       `INSERT INTO "ComicScene" (id, projectId, name, updatedAt)
        VALUES (?, ?, ?, ?)`,
     ).run("comic-scene-1", "comic-project-1", "Existing scene", new Date().toISOString());
+    insertMigrationRecord(database, visualAssetCompatibilityMigration, {
+      finishedAt: null,
+      appliedStepsCount: 0,
+      logs: "broad compatibility migration interrupted after partial schema changes",
+    });
   } finally {
     database.close();
   }
@@ -488,14 +614,9 @@ test("ensureRuntimeDatabaseReady repairs partially satisfied visual asset schema
       );
 
       for (const migrationName of visualAssetSchemaRepairMigrations) {
-        assert.ok(verifyDb.prepare(
-          `SELECT 1 FROM "_prisma_migrations"
-           WHERE migration_name = ?
-             AND finished_at IS NOT NULL
-             AND rolled_back_at IS NULL
-           LIMIT 1`,
-        ).get(migrationName));
+        assertFinishedMigrationRecord(verifyDb, migrationName);
       }
+      assertFinishedMigrationRecord(verifyDb, visualAssetCompatibilityMigration);
       assert.equal(verifyDb.pragma("integrity_check", { simple: true }), "ok");
       assert.deepEqual(verifyDb.pragma("foreign_key_check"), []);
     } finally {

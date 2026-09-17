@@ -3,6 +3,9 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const Database = require("better-sqlite3");
+const {
+  applyRuntimeMigrationsToDatabase,
+} = require("../dist/db/runtimeMigrations.js");
 
 const prismaRoot = path.join(__dirname, "..", "src", "prisma");
 const sqliteSchemaPath = path.join(prismaRoot, "schema.sqlite.prisma");
@@ -25,13 +28,7 @@ function listMigrationNames(migrationsDir) {
 }
 
 function applySqliteMigrations(database) {
-  for (const migrationName of listMigrationNames(sqliteMigrationsDir)) {
-    const migrationSql = fs.readFileSync(
-      path.join(sqliteMigrationsDir, migrationName, "migration.sql"),
-      "utf8",
-    );
-    database.exec(migrationSql);
-  }
+  applyRuntimeMigrationsToDatabase(database, sqliteMigrationsDir);
 }
 
 function indexExists(database, indexName) {
@@ -110,6 +107,16 @@ test("SQLite migrations contain every model and column in the SQLite Prisma sche
     assert.equal(indexExists(database, "ComicScene_projectId_idx"), true);
     assert.equal(database.pragma("integrity_check", { simple: true }), "ok");
     assert.deepEqual(database.pragma("foreign_key_check"), []);
+    assert.equal(
+      database.prepare(
+        `SELECT COUNT(*) AS count
+         FROM "_prisma_migrations"
+         WHERE finished_at IS NOT NULL
+           AND rolled_back_at IS NULL`,
+      ).get().count,
+      listMigrationNames(sqliteMigrationsDir).length,
+      "runtime migration path must record every packaged migration as finished",
+    );
   } finally {
     database.close();
   }
