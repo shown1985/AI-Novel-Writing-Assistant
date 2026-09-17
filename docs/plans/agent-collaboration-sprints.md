@@ -151,7 +151,7 @@ Sprint Goal：作者能安静阅读、看见真实成果与一个下一步，并
 
 | Story | 点数 | 验收重点 | 依赖 / ownership |
 | --- | --- | --- | --- |
-| S2-01 单书总控按责任模块化 | 5 | 拆分查询、导演状态/恢复、阶段装配；行为兼容；无文件继续超过硬阈值；模块 README | 独占 NovelEdit.tsx 与新增 novels/workspace/application、presentation；其他总控 Story 等待 |
+| S2-01 单书总控按责任模块化 | 5 | Done：[application 身份隔离](./s2-01a-single-book-application-facade.md)与[presentation 等价装配](./s2-01b-single-book-presentation.md)均通过；无文件超过硬阈值 | 独占 NovelEdit.tsx 与 novels/workspace/application、presentation；R1-S2A/S2B 分窗完成 |
 | S2-02 专业章节阅读与协作区域开关 | 3 | Done：[正文优先、选区唤起、状态保持与窄屏单层验收通过](./s2-02-professional-chapter-assist-panels.md) | chapterEditor 组；R1-S2A 完成，不重复开发 |
 | S2-03 单书一个推荐动作和来源恢复 | 5 | 已交付/当前工作/待决定分开；无 URL taskId 仍正确显示导演恢复；局部债不伪装全书失败 | S2-01 后独占总控组；复用既有投影与命令 |
 | S2-04 实际模型和选择来源可追溯 | 5 | 显式覆盖/任务路由/默认/备用有来源；提交前与运行实际结果分开；历史记录不按当前配置重算 | 根集成人冻结元数据；factory、usageTracking、live 由一个平台 owner 接线 |

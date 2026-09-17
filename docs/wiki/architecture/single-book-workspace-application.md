@@ -16,6 +16,9 @@
 4. `pendingManualRecovery` 与书级投影 `waiting_recovery` 任一成立时都保持人工暂停。后台轮询和普通模块装载不得清除它，只有显式恢复命令可以推进。
 5. 页面挂载只能读取事实和启用查询。继续、恢复、审批、重试、取消等命令必须来自来源创作页上的显式用户动作。
 6. query key 和 API 合同继续由既有公共 facade 提供，application 模块不得复制服务端合同或创建第二套任务身份。
+7. `workspace/presentation/` 只把页面本地状态、application 事实和显式事件回调装配为桌面与移动共用的 `NovelEditViewProps`；不能直接查询 API、选择任务身份或评判恢复/质量状态。
+8. 有条件的任务抽屉、生产体验交接和阶段 props 映射应由生产组件与行为测试消费同一纯装配策略；测试不得通过读取源码或复制对象展开来冒充接线覆盖。
+9. presentation 中的命令只能存在于显式事件回调。构建 props、渲染页面、切换阶段或显示最近任务不得调用生成、恢复、审批、重试或取消。
 
 ## 失败模式
 
@@ -23,10 +26,13 @@
 - 用 `workspaceTaskId` 回退导演任务身份，会把手工作品任务误当成自动导演任务并错误恢复。
 - 只信任最新轮询状态而忽略 `pendingManualRecovery`，会绕过质量优先策略的人工暂停。
 - 在查询 hook 初始化时调用 continue/recover，会让打开页面变成写操作并可能重复生产正文。
+- 把装配迁到新组件时改变父组件 Hook 顺序，会让后续 effect、mutation 或 SSE 失去稳定身份；派生值应保留原 Hook 位置并显式传给 presentation。
+- 桌面与移动分别组装任务事实，会逐渐形成两套恢复解释；两者必须继续消费同一个 `NovelEditViewProps`。
 
 ## 相关模块
 
 - `client/src/pages/novels/workspace/application/`
+- `client/src/pages/novels/workspace/presentation/`
 - `client/src/pages/novels/NovelEdit.tsx`
 - `client/src/pages/novels/hooks/novelEditWorkflowParams.ts`
 - `client/src/pages/novels/novelEditAutomationStatus.ts`
@@ -35,5 +41,6 @@
 ## 来源文档
 
 - [S2-01a 完成证据](../../plans/s2-01a-single-book-application-facade.md)
+- [S2-01b 完成证据](../../plans/s2-01b-single-book-presentation.md)
 - [R1-S2A Sprint 承诺](../../plans/r1-s2a-sprint-commitment.md)
 - [Agent Sprint 2 实施卡](../../plans/agent-collaboration-sprint-2.md)

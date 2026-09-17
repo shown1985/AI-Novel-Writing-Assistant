@@ -2,7 +2,7 @@
 
 ## 目标、范围与容量
 
-本页细分[路线图](./agent-collaboration-sprints.md)中的 S2-01～04，并作为滚动状态合同维护。S2-01a 与 S2-02 已在 R1-S2A 完成；S2-04a 已在 [R1-S2B](./r1-s2b-sprint-commitment.md) 完成，S2-01b 正在实施，其余卡按依赖保持 Ready、Blocked 或 Refinement。目标是让作者在原作品现场读到成果、按需展开协作、处理一个明确下一步，并区分预计使用模型和本次实际调用。
+本页细分[路线图](./agent-collaboration-sprints.md)中的 S2-01～04，并作为滚动状态合同维护。S2-01a 与 S2-02 已在 R1-S2A 完成；S2-01b 与 S2-04a 已在 [R1-S2B](./r1-s2b-sprint-commitment.md) 完成，其余卡按依赖保持 Ready、Blocked 或 Refinement。目标是让作者在原作品现场读到成果、按需展开协作、处理一个明确下一步，并区分预计使用模型和本次实际调用。
 
 当前源码已提供章节修改预览、候选、差异、正文保存和审校；本 Sprint 复用这些能力。全局 Creative Hub 和运行记录保持只读，运行中的任务恢复仍走现有来源页命令。简易体验的用户写门禁和不可逆转专业语义继续生效。
 
@@ -62,7 +62,7 @@
 ## S2-01b：阶段装配与页面组合收敛
 
 - 用户价值：各阶段共享一个稳定作品现场，后续交互调整不会改坏角色、世界、卷章与正文生产。
-- 状态：In Progress（R1-S2B）；S2-01a facade 已冻结。
+- 状态：Done（R1-S2B）；[Hook 顺序、真实装配矩阵与模块边界通过](./s2-01b-single-book-presentation.md)。
 - 点数：3；Owner：Agent A，与 01a 串行，不分给第二人抢改总控。
 - 真实源码：client/src/pages/novels/NovelEdit.tsx、components/NovelEditView.tsx、components/NovelEditView.types.ts（审计时 670 行）、mobile/MobileNovelEditView.tsx；现有 hooks/useNovelVolumePlanning.ts、useNovelCharacterMutations.ts 等保持本模块职责。
 - 拟建归属：client/src/pages/novels/workspace/presentation/ 的各阶段 props 装配与组合；公开 index.ts。业务编排依赖 application，通用 workspace 展示组件不依赖小说 API。
@@ -88,7 +88,7 @@
 
 数据安全与失败恢复：不操作 devResetNovelChapters、不删书、不清资产。未保存表单与流式状态须保持既有生命周期；发现挂载改变造成草稿丢失则未通过，不以清空草稿修复。
 
-交付证据：最终行数、装配职责表、无跨层深导入检查、桌面/移动合同一致性、01a+01b 定向回归。该阶段不声称新的协作功能已经可用。
+交付证据：[S2-01b 完成证据](./s2-01b-single-book-presentation.md)记录最终行数、装配职责表、无跨层深导入、桌面/移动合同一致性及 43 项 01a+01b 定向回归。该阶段不声称新的协作功能已经可用。
 
 ## S2-02：专业章节辅助区域按需展开
 
@@ -124,7 +124,7 @@
 ## S2-03a：单书成果、进度与推荐动作展示模型
 
 - 用户价值：作者能判断已经得到什么、AI 正在做什么和唯一推荐下一步，不将普通提醒误判为全书失败。
-- 状态：Blocked by S2-01a/01b；纯展示合同可先设计，生产接线等待 facade 稳定。
+- 状态：Refinement / 未承诺；S2-01a/01b 依赖已完成，须在后续 Sprint Planning 复核纯展示合同后才能进入 Ready。
 - 点数：3；Owner：Agent A，单书 presentation 独占。
 - 真实源码：client/src/pages/novels/components/NovelEditView.tsx、NovelTaskDrawer.tsx、NovelAutoDirectorProgressPanel.tsx、novelEditAutomationStatus.ts、novelWorkspaceNavigation.ts；shared/types/directorRuntime.ts 为根集成人保留。
 - 拟建归属：novels/workspace/presentation/ 的纯展示模型；展示通过 client/src/components/workspace/ 现有 primitives。
