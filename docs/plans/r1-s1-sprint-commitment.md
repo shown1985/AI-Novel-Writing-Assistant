@@ -31,7 +31,7 @@
 | --- | ---: | --- | --- | --- | --- |
 | R1-MIG01 视觉资产双迁移历史兼容 | 5 | Done | 根数据集成人 | R1-00、R1-03 | [空库、双历史、部分 schema 与 pending record 已通过](./r1-mig01-visual-asset-migration-compatibility.md) |
 | S1-00 诊断共享接线与存储契约门 | 2 | Done | 根集成人 | R1-MIG01 | [共享 DTO、存储/CAS/迁移方案与兼容矩阵已冻结](./s1-00-diagnostics-contract.md) |
-| S1-04 简易书架阅读现场恢复 | 3 | Ready | 阅读体验 Agent | 无 | 刷新、前进后退和重新进入作品后继续同章同位置阅读 |
+| S1-04 简易书架阅读现场恢复 | 3 | User Acceptance | 阅读体验 Agent | 无 | [代码级行为通过，等待用户完成浏览器交互验收](./s1-04-simple-shelf-reading-resume.md) |
 | S1-05 世界问题归属校验 | 2 | Done | 世界安全 Agent | 无 | [跨世界与不存在请求均零行写入](./s1-05-world-issue-ownership.md) |
 | S1-06 世界维护与恢复契约 Spike | 3 | In Progress | 世界契约 Agent | S1-05 | 后续提案、采用、复核和恢复有可实现的版本与幂等合同 |
 

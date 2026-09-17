@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -15,7 +15,7 @@ import {
   Settings2,
   Sparkles,
 } from "lucide-react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { ChapterQualityDebtDetails, ChapterQualityDebtSource } from "@ai-novel/shared/types/chapterQualityLoop";
 import type { SimpleCreationShelfChapterStatus } from "@ai-novel/shared/types/novel";
 import {
@@ -31,6 +31,18 @@ import { toast } from "@/components/ui/toast";
 import SimpleCreationMaterialsPanel from "./SimpleCreationMaterialsPanel";
 import OnboardingTip from "@/components/onboarding/OnboardingTip";
 import SimpleCreationIssueGovernancePanel from "./SimpleCreationIssueGovernancePanel";
+import {
+  createReadingContentVersion,
+  createReadingPosition,
+  getSimpleShelfReadingStorage,
+  matchesSimpleShelfNovel,
+  readLastReadableChapterId,
+  readReadingPosition,
+  resolveReadingScrollTop,
+  resolveSimpleShelfReadingSelection,
+  saveLastReadableChapterId,
+  saveReadingPosition,
+} from "./simpleShelfReadingState";
 
 const STATUS_LABELS: Record<SimpleCreationShelfChapterStatus, string> = {
   waiting_planning: "等待规划",
@@ -96,8 +108,9 @@ function formatWordCount(value: number): string {
 export default function SimpleNovelShelfPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const [selectedChapterId, setSelectedChapterId] = useState("");
+  const readingViewportRef = useRef<HTMLElement>(null);
 
   const shelfQuery = useQuery({
     queryKey: queryKeys.novels.simpleShelf(id),
@@ -108,29 +121,147 @@ export default function SimpleNovelShelfPage() {
       return status === "running" || status === "queued" ? 3000 : 10000;
     },
   });
-  const shelf = shelfQuery.data?.data ?? null;
+  const shelfData = shelfQuery.data?.data ?? null;
+  const shelf = matchesSimpleShelfNovel(id, shelfData?.novel.id) ? shelfData : null;
   const readableChapters = useMemo(
     () => shelf?.chapters.filter((chapter) => Boolean(chapter.content?.trim())) ?? [],
     [shelf?.chapters],
   );
+  const explicitChapterId = searchParams.has("chapterId")
+    ? searchParams.get("chapterId")?.trim() ?? ""
+    : null;
+  const readingSelection = useMemo(() => resolveSimpleShelfReadingSelection({
+    explicitChapterId,
+    lastChapterId: readLastReadableChapterId(getSimpleShelfReadingStorage(), id),
+    readableChapters,
+  }), [explicitChapterId, id, readableChapters]);
   const selectedChapter = useMemo(
-    () => readableChapters.find((chapter) => chapter.id === selectedChapterId)
-      ?? readableChapters.at(-1)
-      ?? null,
-    [readableChapters, selectedChapterId],
+    () => readableChapters.find((chapter) => chapter.id === readingSelection.chapterId) ?? null,
+    [readableChapters, readingSelection.chapterId],
+  );
+  const selectedChapterId = selectedChapter?.id ?? "";
+  const readingContentVersion = useMemo(
+    () => selectedChapter?.content
+      ? createReadingContentVersion({ content: selectedChapter.content, updatedAt: selectedChapter.updatedAt })
+      : "",
+    [selectedChapter?.content, selectedChapter?.updatedAt],
   );
 
   useEffect(() => {
-    if (selectedChapter && selectedChapter.id !== selectedChapterId) {
-      setSelectedChapterId(selectedChapter.id);
+    if (!shelf || !readingSelection.shouldReplaceUrl) return;
+    setSearchParams((previous) => {
+      const next = new URLSearchParams(previous);
+      if (readingSelection.chapterId) {
+        next.set("chapterId", readingSelection.chapterId);
+      } else {
+        next.delete("chapterId");
+      }
+      return next;
+    }, { replace: true });
+  }, [readingSelection.chapterId, readingSelection.shouldReplaceUrl, setSearchParams, shelf]);
+
+  useEffect(() => {
+    if (selectedChapterId) {
+      saveLastReadableChapterId(getSimpleShelfReadingStorage(), id, selectedChapterId);
     }
-  }, [selectedChapter, selectedChapterId]);
+  }, [id, selectedChapterId]);
+
+  useLayoutEffect(() => {
+    const viewport = readingViewportRef.current;
+    if (!viewport || !selectedChapterId || !readingContentVersion) return;
+
+    const storage = getSimpleShelfReadingStorage();
+    const novelId = id;
+    const chapterId = selectedChapterId;
+    let restoreFrame = 0;
+    let settleFrame = 0;
+    let saveFrame = 0;
+    let disposed = false;
+    let latestPosition = readReadingPosition(storage, novelId, chapterId)
+      ?? createReadingPosition(0, 0, readingContentVersion);
+
+    const usesOwnScroll = () => viewport.scrollHeight - viewport.clientHeight > 1;
+    const readMetrics = () => {
+      if (usesOwnScroll()) {
+        return {
+          maxScroll: Math.max(0, viewport.scrollHeight - viewport.clientHeight),
+          scrollTop: viewport.scrollTop,
+        };
+      }
+      const documentTop = window.scrollY + viewport.getBoundingClientRect().top;
+      return {
+        maxScroll: Math.max(0, viewport.scrollHeight - window.innerHeight),
+        scrollTop: Math.max(0, window.scrollY - documentTop),
+      };
+    };
+    const capturePosition = () => {
+      const metrics = readMetrics();
+      latestPosition = createReadingPosition(metrics.scrollTop, metrics.maxScroll, readingContentVersion);
+      return latestPosition;
+    };
+    const persistPosition = () => {
+      saveReadingPosition(
+        storage,
+        novelId,
+        chapterId,
+        latestPosition,
+      );
+    };
+    const schedulePersist = () => {
+      capturePosition();
+      if (saveFrame) return;
+      saveFrame = window.requestAnimationFrame(() => {
+        saveFrame = 0;
+        persistPosition();
+      });
+    };
+    const restorePosition = () => {
+      if (disposed) return;
+      const metrics = readMetrics();
+      const nextScrollTop = resolveReadingScrollTop(
+        latestPosition,
+        readingContentVersion,
+        metrics.maxScroll,
+      );
+      if (usesOwnScroll()) {
+        viewport.scrollTop = nextScrollTop;
+      } else {
+        const documentTop = window.scrollY + viewport.getBoundingClientRect().top;
+        window.scrollTo({ top: documentTop + nextScrollTop });
+      }
+      latestPosition = createReadingPosition(nextScrollTop, metrics.maxScroll, readingContentVersion);
+    };
+
+    restoreFrame = window.requestAnimationFrame(() => {
+      settleFrame = window.requestAnimationFrame(restorePosition);
+    });
+    viewport.addEventListener("scroll", schedulePersist, { passive: true });
+    window.addEventListener("scroll", schedulePersist, { passive: true });
+
+    return () => {
+      disposed = true;
+      window.cancelAnimationFrame(restoreFrame);
+      window.cancelAnimationFrame(settleFrame);
+      window.cancelAnimationFrame(saveFrame);
+      viewport.removeEventListener("scroll", schedulePersist);
+      window.removeEventListener("scroll", schedulePersist);
+      persistPosition();
+    };
+  }, [id, readingContentVersion, selectedChapterId]);
 
   useEffect(() => {
     if (shelf?.novel.creationExperience === "professional") {
       navigate(`/novels/${id}/edit`, { replace: true });
     }
   }, [id, navigate, shelf?.novel.creationExperience]);
+
+  const selectChapter = (chapterId: string) => {
+    setSearchParams((previous) => {
+      const next = new URLSearchParams(previous);
+      next.set("chapterId", chapterId);
+      return next;
+    });
+  };
 
   const exportMutation = useMutation({
     mutationFn: () => downloadNovelExport(id, "txt", "chapter", shelf?.novel.title),
@@ -290,7 +421,7 @@ export default function SimpleNovelShelfPage() {
                       key={chapter.id}
                       type="button"
                       disabled={!readable}
-                      onClick={() => setSelectedChapterId(chapter.id)}
+                      onClick={() => selectChapter(chapter.id)}
                       className={`group w-full rounded-2xl border p-3 text-left transition ${active ? "border-primary bg-primary/10 shadow-sm" : "border-border/70 bg-background hover:border-primary/40 hover:bg-primary/[0.03]"} ${readable ? "" : "cursor-default opacity-60"}`}
                     >
                       <div className="flex items-start gap-3">
@@ -316,7 +447,7 @@ export default function SimpleNovelShelfPage() {
               </div>
             </aside>
 
-            <main className="min-w-0 bg-background lg:min-h-0 lg:overflow-y-auto">
+            <main ref={readingViewportRef} className="min-w-0 bg-background lg:min-h-0 lg:overflow-y-auto">
               {selectedChapter?.content ? (
                 <>
                   <div className="border-b border-border/80 bg-background px-5 py-5 sm:px-8 lg:sticky lg:top-0 lg:z-10">

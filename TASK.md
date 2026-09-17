@@ -61,7 +61,7 @@ Release 2只允许做不抢占R1产能的只读Spike/Refinement。账号、LAN�
 | --- | ---: | --- | --- | --- |
 | R1-MIG01 视觉资产双迁移历史兼容 | 5 | Done | 根数据集成人 | [空库、双历史、部分 schema 与 pending record 已通过](./docs/plans/r1-mig01-visual-asset-migration-compatibility.md) |
 | S1-00 诊断共享接线与存储契约门 | 2 | Done | 根集成人 | [DTO、存储/CAS/迁移方案与兼容矩阵已冻结](./docs/plans/s1-00-diagnostics-contract.md) |
-| S1-04 简易书架阅读现场恢复 | 3 | In Progress | 阅读体验 Agent | 独占 simpleCreation 阅读状态模块 |
+| S1-04 简易书架阅读现场恢复 | 3 | User Acceptance | 阅读体验 Agent | [代码级行为已通过，等待用户完成浏览器验收](./docs/plans/s1-04-simple-shelf-reading-resume.md) |
 | S1-05 世界问题归属校验 | 2 | Done | 世界安全 Agent | [跨世界与不存在请求均零行写入](./docs/plans/s1-05-world-issue-ownership.md) |
 | S1-06 世界维护与恢复契约 Spike | 3 | In Progress | 世界契约 Agent | S1-05 依赖已解除；只产出契约，不写生产能力 |
 
@@ -72,6 +72,8 @@ Release 2只允许做不抢占R1产能的只读Spike/Refinement。账号、LAN�
 S1-05 聚焦证据：server build 通过，世界问题归属行为测试 6/6；S1-06 依赖已解除。
 
 S1-00 聚焦证据：shared build、诊断合同测试 3/3、client typecheck 通过；S1-02a/02b/03 仅解除 refinement 前置门，仍未进入本 Sprint。
+
+S1-04 聚焦证据：阅读状态行为测试 8/8、简易创作治理回归 5/5、client typecheck 通过；浏览器交互验收留给用户。
 
 ## Release 1 后续队列
 
