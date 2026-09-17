@@ -36,7 +36,7 @@ Release 2只允许做不抢占R1产能的只读Spike/Refinement。账号、LAN�
 | R1-00 上游实现与计划重对账 | 3 | Done | 根集成人 | [69张独立候选卡已按 v0.4.25 证据对账](./docs/plans/r1-00-implementation-reconciliation.md) |
 | R1-01 单机运行与数据边界冻结 | 3 | Done | 根集成人 | [本机监听与本地数据边界已冻结并通过配置测试](./docs/plans/r1-01-local-runtime-data-boundary.md) |
 | R1-02 第一本书与十章连续创作基线 | 5 | Done | R1-02 验收owner | [临时 SQLite 十章、恢复、质量债与 TXT 基线已通过](./docs/plans/r1-02-first-book-ten-chapter-baseline.md) |
-| R1-03 Release 1验证矩阵 | 3 | Ready | 桌面/验证owner | 平台、升级、主链和包装门明确 |
+| R1-03 Release 1验证矩阵 | 3 | Done | R1-03 验证owner | [平台、迁移、主链、包装与发布触发门已形成可执行矩阵](./docs/plans/r1-03-release-verification-matrix.md) |
 | R1-04 首个实施Sprint承诺 | 2 | 待R1-00～03 | PO/根集成人 | ≤25点、owner和依赖冻结 |
 
 承诺容量：16点。Stretch：无。
@@ -73,4 +73,5 @@ Release 2只允许做不抢占R1产能的只读Spike/Refinement。账号、LAN�
 - 已识别发布阻断：当前分支与 v0.4.25 存在重叠的视觉资产迁移历史；空库全迁移和新增部分迁移 fixture 均失败，须在 R1-03 验证矩阵和后续明确 Story 中处理。
 - R1-01 已强制服务端、Vite 和桌面入口只使用回环地址；LAN、wildcard、私网主机和非回环 CORS 配置会在迁移及后台恢复前失败。
 - R1-02 的确定性长链在隔离临时 SQLite 中完成十章，验证一次人工恢复、前五章正文哈希不变、第八章质量债继续、显式世界/人物编辑和 TXT 顺序完整；公共 idea→导演交接、真实模型和 UI 仍不在该证据范围内。
-- 下一张集成卡为 R1-03；R1-04 等 R1-03 完成后解锁。
+- R1-03 静态审计为 `PASS=8 / BLOCKED=3 / REVIEW=1`；当前硬阻断是重叠 SQLite 迁移、非标准 tag/手动触发可公开发布、公开工作流无 macOS job，另须冻结 macOS x64 是否进入支持范围。
+- R1-04 已解锁，由根集成人冻结首个实施 Sprint 的 Goal、容量、依赖和 ownership。

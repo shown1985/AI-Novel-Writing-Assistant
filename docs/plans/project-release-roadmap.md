@@ -84,11 +84,12 @@
 #### R1-03 Release 1 验证矩阵（3 点）
 
 - 用户价值：Windows、macOS 和本机网页不会在发布时各自表现不同。
-- 状态/Owner/依赖：Ready；桌面/验证owner；R1-00/01。
+- 状态/Owner/依赖：Done；R1-03 验证owner；R1-00/01/02。
 - 任务：形成平台×启动×升级×数据×创作主链矩阵；指定自动检查、用户 UI 验收和包装检查。
 - AC：每个门有 owner、证据和失败处理；typecheck 不替代行为检查；用户未验收必须显式记录。
 - 检查：矩阵审阅和命令可执行性核验。
 - 非范围：执行公开包装上传、签名、公证或Release晋级。
+- 证据：[R1-03 Release 1 验证矩阵](./r1-03-release-verification-matrix.md)。
 
 #### R1-04 首个实施 Sprint 承诺（2 点）
 
