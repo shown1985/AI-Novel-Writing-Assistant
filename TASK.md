@@ -3,7 +3,7 @@
 更新时间：2026-09-17
 当前分支：`codex/r1-s1-config-safety`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S1 已完成；R1-S2 待承诺
+当前状态：R1-S2A 可信单书现场
 
 ## 权威文档
 
@@ -79,10 +79,29 @@ S1-06 聚焦证据：世界维护门面、五类 revision、CAS/幂等、lease �
 
 R1-S1 Review 与 Retrospective 见 [Sprint 承诺](./docs/plans/r1-s1-sprint-commitment.md)：Sprint Goal 达成，承诺/完成 `15/15` 点，无 carryover；S1-04 五项 UI 验收通过，后续 UI 数值证据先锁定真实滚动容器。
 
+## 当前 Sprint：R1-S2A
+
+### Sprint Goal
+
+作者查看 AI 状态时不会产生模型调用，未配置参数采用可靠默认值；进入单书工作台后以正文为中心，切书、恢复和导演状态不会串书或误恢复。
+
+### 承诺 Backlog
+
+| Story | 点数 | 状态 | Owner | 依赖 / 结果 |
+| --- | ---: | --- | --- | --- |
+| S1-01 缺省数值配置正确生效 | 3 | Ready（Wave 2） | 配置 Agent | Wave 1 首个 Agent 交回 review 后领取 |
+| S1-02a 诊断读取、显式探测与持久化 | 3 | In Progress | 诊断 Agent + 根集成人 | S1-00 已完成；共享 schema/迁移由根集成人独占 |
+| S2-01a 单书查询与导演编排归属 | 5 | In Progress | 单书总控 Agent | 独占 `NovelEdit.tsx` 与新 application facade |
+| S2-02 专业章节辅助区域按需展开 | 3 | In Progress | 章节编辑 Agent + 根集成人 | 章节编辑目录独占；外部 session 身份由根集成人接线 |
+
+承诺容量：14 点。Stretch：无。权威合同见 [R1-S2A Sprint 承诺](./docs/plans/r1-s2a-sprint-commitment.md)。
+
+未承诺：S1-02b/03、S2-01b、S2-03a/03b、S2-04a/04b/04c。Ready 的 S2-04a 因容量顺延，其他卡保持依赖状态；不得在实现中顺手带入。
+
 ## Release 1 后续队列
 
 1. R1-S1：配置、诊断、阅读恢复和世界归属安全（已完成，15/15 点）。
-2. R1-S2：单书工作台、正文优先和模型来源。
+2. R1-S2：R1-S2A 可信单书现场（当前 14 点）→ 后续装配、推荐动作和模型来源窗口。
 3. R1-S3～4：可信世界、提案采用和失败复核。
 4. R1-S5～6：本机Agent委托、预算、记忆和资产。
 5. R1-S7：十章长链、有限撤回和导航收束。
