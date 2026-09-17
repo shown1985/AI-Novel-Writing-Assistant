@@ -31,7 +31,7 @@
 | --- | ---: | --- | --- | --- | --- |
 | R1-MIG01 视觉资产双迁移历史兼容 | 5 | Done | 根数据集成人 | R1-00、R1-03 | [空库、双历史、部分 schema 与 pending record 已通过](./r1-mig01-visual-asset-migration-compatibility.md) |
 | S1-00 诊断共享接线与存储契约门 | 2 | Done | 根集成人 | R1-MIG01 | [共享 DTO、存储/CAS/迁移方案与兼容矩阵已冻结](./s1-00-diagnostics-contract.md) |
-| S1-04 简易书架阅读现场恢复 | 3 | User Acceptance | 阅读体验 Agent | 无 | [代码级行为通过，等待用户完成浏览器交互验收](./s1-04-simple-shelf-reading-resume.md) |
+| S1-04 简易书架阅读现场恢复 | 3 | Done | 阅读体验 Agent | 无 | [代码级检查与隔离环境 Computer Use 交互验收均通过](./s1-04-simple-shelf-reading-resume.md) |
 | S1-05 世界问题归属校验 | 2 | Done | 世界安全 Agent | 无 | [跨世界与不存在请求均零行写入](./s1-05-world-issue-ownership.md) |
 | S1-06 世界维护与恢复契约 Spike | 3 | Done | 世界契约 Agent | S1-05 | [Runtime / Prompt / UI 合同已签认](./s1-06-world-maintenance-recovery-contract.md)；生产能力仍由 S3/S4 实施 |
 
@@ -88,3 +88,19 @@ Wave 2
 5. Sprint 结束时记录 Goal 结果、承诺/完成点数、carryover、返工/逸出缺陷、UI 验收状态和最多两项流程改进。
 
 R1-S1 完成只代表首个实施窗口通过；仍须经过后续 Sprint、R1-RC、beta 组合验证和用户验收，才能晋级 main 或发布。
+
+## R1-S1 Review 与 Retrospective
+
+### Review
+
+- Sprint Goal：达成。SQLite 双迁移历史升级阻断已解除；简易书架恢复章节与阅读位置；跨世界问题更新保持零误写；诊断共享门和世界维护恢复合同均已冻结。
+- 承诺 / 完成：15 / 15 点；R1-MIG01、S1-00、S1-04、S1-05、S1-06 全部 `Done`；无 carryover。
+- 行为证据：迁移覆盖空库、双历史、部分 schema 与 pending record；世界归属测试覆盖跨世界和不存在资源零行写入；阅读状态 8/8、治理回归 5/5，并完成隔离 SQLite 的真实浏览器交互验收。
+- UI 验收：S1-04 的刷新、普通重进、跨作品隔离、浏览器前进/后退和暂停态阅读五项均通过；浏览器控制台无告警或错误。
+- 逸出缺陷 / 返工：无产品缺陷逸出。验收过程中一度读取到外层页面滚动值，重新定位正文滚动容器后排除误报，临时诊断代码已全部撤回。
+
+### Retrospective
+
+- 有效做法：UI 验收继续使用隔离临时数据库和当前分支本地服务，既覆盖真实路由与存储行为，又不接触用户作品。
+- 改进 1：含嵌套滚动容器的验收必须先确认目标元素及其 `scrollHeight/clientHeight`，再记录数值证据。
+- 改进 2：Computer Use 的滚动持久化验收使用页面级键盘事件并以章节切换、刷新或重进复核，避免把外层页面滚动误当正文位置。

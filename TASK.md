@@ -3,7 +3,7 @@
 更新时间：2026-09-17
 当前分支：`codex/r1-s1-config-safety`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S1 配置、安全阅读与升级兼容
+当前状态：R1-S1 已完成；R1-S2 待承诺
 
 ## 权威文档
 
@@ -49,7 +49,7 @@ Release 2只允许做不抢占R1产能的只读Spike/Refinement。账号、LAN�
 - 首个实施Sprint不超过25点，所有承诺卡满足DoR。
 - Review与 Retrospective 见 [R1-S1 Sprint 承诺](./docs/plans/r1-s1-sprint-commitment.md)；承诺/完成 `16/16` 点，无 carryover。
 
-## 当前 Sprint：R1-S1
+## 已完成 Sprint：R1-S1
 
 ### Sprint Goal
 
@@ -61,7 +61,7 @@ Release 2只允许做不抢占R1产能的只读Spike/Refinement。账号、LAN�
 | --- | ---: | --- | --- | --- |
 | R1-MIG01 视觉资产双迁移历史兼容 | 5 | Done | 根数据集成人 | [空库、双历史、部分 schema 与 pending record 已通过](./docs/plans/r1-mig01-visual-asset-migration-compatibility.md) |
 | S1-00 诊断共享接线与存储契约门 | 2 | Done | 根集成人 | [DTO、存储/CAS/迁移方案与兼容矩阵已冻结](./docs/plans/s1-00-diagnostics-contract.md) |
-| S1-04 简易书架阅读现场恢复 | 3 | User Acceptance | 阅读体验 Agent | [代码级行为已通过，等待用户完成浏览器验收](./docs/plans/s1-04-simple-shelf-reading-resume.md) |
+| S1-04 简易书架阅读现场恢复 | 3 | Done | 阅读体验 Agent | [代码级检查与隔离环境 Computer Use 五项交互验收均通过](./docs/plans/s1-04-simple-shelf-reading-resume.md) |
 | S1-05 世界问题归属校验 | 2 | Done | 世界安全 Agent | [跨世界与不存在请求均零行写入](./docs/plans/s1-05-world-issue-ownership.md) |
 | S1-06 世界维护与恢复契约 Spike | 3 | Done | 世界契约 Agent | [Runtime / Prompt / UI 合同已签认，不代表生产能力已实现](./docs/plans/s1-06-world-maintenance-recovery-contract.md) |
 
@@ -73,13 +73,15 @@ S1-05 聚焦证据：server build 通过，世界问题归属行为测试 6/6；
 
 S1-00 聚焦证据：shared build、诊断合同测试 3/3、client typecheck 通过；S1-02a 已具备后续 Sprint 的 Ready 合同，S1-02b/03 仍等待实现依赖，三者均未进入本 Sprint。
 
-S1-04 聚焦证据：阅读状态行为测试 8/8、简易创作治理回归 5/5、client typecheck 通过；浏览器交互验收留给用户。
+S1-04 聚焦证据：阅读状态行为测试 8/8、简易创作治理回归 5/5、client typecheck 通过；隔离 SQLite 下的刷新、普通重进、跨作品隔离、浏览器前进/后退和暂停态阅读均通过 Computer Use 验收，浏览器无告警或错误。
 
 S1-06 聚焦证据：世界维护门面、五类 revision、CAS/幂等、lease 恢复、旧数据、Prompt 与来源页边界完成三方签认；S3-01 仍受静态 Prompt 版本登记漂移阻断，未被误标 Ready。
 
+R1-S1 Review 与 Retrospective 见 [Sprint 承诺](./docs/plans/r1-s1-sprint-commitment.md)：Sprint Goal 达成，承诺/完成 `15/15` 点，无 carryover；S1-04 五项 UI 验收通过，后续 UI 数值证据先锁定真实滚动容器。
+
 ## Release 1 后续队列
 
-1. R1-S1：配置、诊断、阅读恢复和世界归属安全。
+1. R1-S1：配置、诊断、阅读恢复和世界归属安全（已完成，15/15 点）。
 2. R1-S2：单书工作台、正文优先和模型来源。
 3. R1-S3～4：可信世界、提案采用和失败复核。
 4. R1-S5～6：本机Agent委托、预算、记忆和资产。
