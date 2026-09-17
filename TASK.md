@@ -62,12 +62,14 @@ Release 2只允许做不抢占R1产能的只读Spike/Refinement。账号、LAN�
 | R1-MIG01 视觉资产双迁移历史兼容 | 5 | Done | 根数据集成人 | [空库、双历史、部分 schema 与 pending record 已通过](./docs/plans/r1-mig01-visual-asset-migration-compatibility.md) |
 | S1-00 诊断共享接线与存储契约门 | 2 | Ready | 根集成人 | R1-MIG01 已解除迁移前置门 |
 | S1-04 简易书架阅读现场恢复 | 3 | In Progress | 阅读体验 Agent | 独占 simpleCreation 阅读状态模块 |
-| S1-05 世界问题归属校验 | 2 | In Progress | 世界安全 Agent | 独占 worldImprovement 更新入口 |
+| S1-05 世界问题归属校验 | 2 | Done | 世界安全 Agent | [跨世界与不存在请求均零行写入](./docs/plans/s1-05-world-issue-ownership.md) |
 | S1-06 世界维护与恢复契约 Spike | 3 | Ready | 世界契约 Agent | 等待 S1-05 |
 
 承诺容量：15 点。Stretch：无。权威合同见 [R1-S1 Sprint 承诺](./docs/plans/r1-s1-sprint-commitment.md)。
 
 当前 Release 静态门：`PASS=9 / BLOCKED=2 / REVIEW=1`；迁移历史共存已由行为测试保护，剩余静态阻断为公开发布触发和 macOS 工作流。
+
+S1-05 聚焦证据：server build 通过，世界问题归属行为测试 6/6；S1-06 依赖已解除。
 
 ## Release 1 后续队列
 

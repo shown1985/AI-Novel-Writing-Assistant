@@ -446,12 +446,24 @@ export async function updateWorldConsistencyIssueStatus(
   issueId: string,
   status: "open" | "resolved" | "ignored",
 ) {
-  const updated = await prisma.worldConsistencyIssue.update({
-    where: { id: issueId },
+  const [updated] = await prisma.worldConsistencyIssue.updateManyAndReturn({
+    where: { id: issueId, worldId },
     data: { status },
   });
-  if (updated.worldId !== worldId) {
+
+  if (updated) {
+    return updated;
+  }
+
+  const existing = await prisma.worldConsistencyIssue.findUnique({
+    where: { id: issueId },
+    select: { worldId: true },
+  });
+  if (!existing) {
+    throw new Error("Issue not found.");
+  }
+  if (existing.worldId !== worldId) {
     throw new Error("Issue does not belong to world.");
   }
-  return updated;
+  throw new Error("Issue status update conflicted.");
 }

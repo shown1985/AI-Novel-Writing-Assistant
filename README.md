@@ -167,6 +167,7 @@ Open-source AI novel writing assistant and long-form production studio.
 
 - 单机成书版的网页开发服务和业务 API 只接受本机访问；局域网、通配地址或远程网页来源配置会在读取或修改作品前被拒绝，避免无账号环境暴露小说内容和模型密钥。
 - 修复视觉资产两条升级历史合流后可能重复创建漫画角色字段、场景和角色资产表的问题；新安装或从既有版本升级时会沿同一安全路径保留已有作品数据。
+- 修复在一个世界中处理一致性问题时可能先改写另一个世界记录的问题；错归属或不存在的请求不会改变任何问题状态。
 
 完整历史更新见 [docs/releases/release-notes.md](./docs/releases/release-notes.md)。
 

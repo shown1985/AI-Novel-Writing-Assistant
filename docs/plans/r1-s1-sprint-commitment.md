@@ -32,7 +32,7 @@
 | R1-MIG01 视觉资产双迁移历史兼容 | 5 | Done | 根数据集成人 | R1-00、R1-03 | [空库、双历史、部分 schema 与 pending record 已通过](./r1-mig01-visual-asset-migration-compatibility.md) |
 | S1-00 诊断共享接线与存储契约门 | 2 | Ready | 根集成人 | R1-MIG01 | 后续诊断读取、探测与建议应用只使用一份可持久化、可并发保护的合同 |
 | S1-04 简易书架阅读现场恢复 | 3 | Ready | 阅读体验 Agent | 无 | 刷新、前进后退和重新进入作品后继续同章同位置阅读 |
-| S1-05 世界问题归属校验 | 2 | Ready | 世界安全 Agent | 无 | 对一个世界的问题操作不能写到另一个世界 |
+| S1-05 世界问题归属校验 | 2 | Done | 世界安全 Agent | 无 | [跨世界与不存在请求均零行写入](./s1-05-world-issue-ownership.md) |
 | S1-06 世界维护与恢复契约 Spike | 3 | Ready | 世界契约 Agent | S1-05 | 后续提案、采用、复核和恢复有可实现的版本与幂等合同 |
 
 未承诺：S1-01 当前是 `Partial`，需把剩余行为重新 refinement 后再估点；S1-02a/02b/03 仍依赖 S1-00 完成；S2-01a/S2-02 虽为 Ready，但不属于本 Sprint Goal。它们不是 Stretch，也不能在本 Sprint “顺手”实现。
