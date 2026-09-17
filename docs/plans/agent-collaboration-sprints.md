@@ -136,7 +136,7 @@ Sprint Goal：用户查看 AI 状态不触发模型调用；缺省配置正确�
 | S1-01 缺省数值配置正确生效 | 3 | P0 | Done | Agent A：配置 | [默认值与零副作用证据通过](./s1-01-numeric-settings-defaults.md) |
 | S1-00 诊断共享接线与存储契约门 | 2 | P0 | Done（合同门） | 根集成人 | [DTO、存储/CAS/迁移方案已冻结](./s1-00-diagnostics-contract.md) |
 | S1-02a 诊断读取、显式探测与持久化 | 3 | P0 | Done | Agent B：诊断 | [被动读取、显式检测、持久化与双库迁移通过](./s1-02a-diagnostic-readiness-backend.md) |
-| S1-02b 设置与知识库诊断状态消费 | 3 | P0 | In Progress（R1-S2B） | Agent B：诊断 | S1-02a 已完成；本窗口完成 UI 验收 |
+| S1-02b 设置与知识库诊断状态消费 | 3 | P0 | Done | Agent B：诊断 | [自动读取零探测、显式检测防重与 Computer Use 验收通过](./s1-02b-diagnostic-readiness-ui.md) |
 | S1-03 检测建议与应用分开 | 5 | P0 | Refinement / Not Ready | Agent B：诊断 | S1-02a/b；事务指纹、revision=0 CAS、幂等请求与409合同未冻结；同一 owner 串行 |
 | S1-04 简易书架阅读现场恢复 | 3 | P1 | Done | Agent C：阅读 | [代码级检查与隔离环境 Computer Use 交互验收均通过](./s1-04-simple-shelf-reading-resume.md) |
 | S1-05 世界问题更新的归属校验 | 2 | P0 | Done | 根集成人 | [跨世界与不存在请求零行写入](./s1-05-world-issue-ownership.md) |

@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useLLMStore } from "@/store/llmStore";
+import { resetDiagnosticReadinessAfterConfigurationChange } from "@/pages/settings/diagnostics";
 import {
   shouldInitializeProviderSelection,
   shouldShowFirstNovelHandoff,
@@ -147,7 +148,7 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
         queryClient.invalidateQueries({ queryKey: queryKeys.settings.apiKeys }),
         queryClient.invalidateQueries({ queryKey: queryKeys.settings.llmSelection }),
         queryClient.invalidateQueries({ queryKey: queryKeys.settings.modelRoutes }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.settings.modelRouteConnectivity }),
+        resetDiagnosticReadinessAfterConfigurationChange(queryClient, queryKeys.settings.modelRouteReadiness),
         queryClient.invalidateQueries({ queryKey: queryKeys.onboarding.firstNovel }),
       ]);
     },

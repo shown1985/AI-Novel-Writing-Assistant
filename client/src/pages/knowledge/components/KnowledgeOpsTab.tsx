@@ -1,7 +1,9 @@
-import { CircleAlert, CircleCheck, Clock3, Database, Trash2 } from "lucide-react";
+import { CircleAlert, CircleCheck, CircleDashed, Clock3, Database, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import type { DiagnosticReadinessReport, DiagnosticTargetResult } from "@ai-novel/shared/types/diagnostics";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { RagHealthStatus, RagJobSummary } from "@/api/knowledge";
+import type { RagJobSummary } from "@/api/knowledge";
+import { getDiagnosticStateLabel, type DiagnosticUiState } from "@/pages/settings/diagnostics";
 import {
   formatRagJobMeta,
   formatStatus,
@@ -13,8 +15,9 @@ interface KnowledgeOpsTabProps {
   visibleDocumentsCount: number;
   enabledCount: number;
   disabledCount: number;
-  ragHealth?: RagHealthStatus;
-  ragHealthNotice?: string;
+  ragReadiness?: DiagnosticReadinessReport;
+  ragReadinessState: DiagnosticUiState;
+  ragReadinessNotice?: string;
   jobs: RagJobSummary[];
   failedJobs: RagJobSummary[];
   actionMessage?: string;
@@ -23,6 +26,8 @@ interface KnowledgeOpsTabProps {
   onClearFinishedJobs: () => void;
   onDeleteJob: (jobId: string) => void;
   onOpenSettings: () => void;
+  onCheckReadiness: () => void;
+  onRetryReadiness: () => void;
 }
 
 const FINISHED_RAG_JOB_STATUSES = new Set<RagJobSummary["status"]>(["succeeded", "failed", "cancelled"]);
@@ -59,12 +64,83 @@ function formatJobType(jobType: string): string {
   return JOB_TYPE_LABELS[jobType] ?? "同步检索内容";
 }
 
+function getReadinessPresentation(state: DiagnosticUiState) {
+  switch (state) {
+    case "healthy":
+      return {
+        title: "资料可以用于创作",
+        description: "向量模型与资料库最近一次检测正常，已完成索引的资料可以参与创作。",
+        surface: "bg-success/[0.065]",
+        iconSurface: "bg-success/10 text-success",
+        icon: CircleCheck,
+      };
+    case "failed":
+      return {
+        title: "资料连接检测未通过",
+        description: "查看连接详情并修复对应设置；失败记录不会自动修改你的配置。",
+        surface: "bg-destructive/[0.055]",
+        iconSurface: "bg-destructive/10 text-destructive",
+        icon: CircleAlert,
+      };
+    case "stale":
+      return {
+        title: "资料连接状态已过期",
+        description: "检索配置发生了变化；这不是连接失败，可在需要时重新检测。",
+        surface: "bg-sky-500/[0.055]",
+        iconSurface: "bg-sky-500/10 text-sky-700",
+        icon: CircleDashed,
+      };
+    case "not_checked":
+      return {
+        title: "资料连接尚未检测",
+        description: "未检测不等于连接失败，也不会影响不依赖知识库的基础创作。",
+        surface: "bg-muted/25",
+        iconSurface: "bg-muted/70 text-muted-foreground",
+        icon: CircleDashed,
+      };
+    case "error":
+      return {
+        title: "无法读取连接记录",
+        description: "状态读取暂时失败；这不代表向量模型或资料库连接失败。",
+        surface: "bg-amber-500/[0.055]",
+        iconSurface: "bg-amber-500/10 text-amber-700",
+        icon: CircleAlert,
+      };
+    case "pending":
+      return {
+        title: "正在检测资料连接",
+        description: "正在检查向量模型与资料库；页面会自动读取完成结果。",
+        surface: "bg-amber-500/[0.055]",
+        iconSurface: "bg-amber-500/10 text-amber-700",
+        icon: Loader2,
+      };
+    case "loading":
+      return {
+        title: "正在读取连接记录",
+        description: "这里只读取最近诊断，不会调用向量模型或资料库。",
+        surface: "bg-muted/25",
+        iconSurface: "bg-muted/70 text-muted-foreground",
+        icon: Loader2,
+      };
+  }
+}
+
+function formatTargetDetail(target?: DiagnosticTargetResult): string {
+  if (!target) {
+    return "尚未获得这个目标的检测记录";
+  }
+  const identity = [target.provider, target.model].filter(Boolean).join(" · ");
+  const error = target.errorSummary ? ` · ${target.errorSummary}` : "";
+  return `${identity || "配置已读取"} · ${getDiagnosticStateLabel(target.checkState)}${error}`;
+}
+
 export default function KnowledgeOpsTab({
   visibleDocumentsCount,
   enabledCount,
   disabledCount,
-  ragHealth,
-  ragHealthNotice,
+  ragReadiness,
+  ragReadinessState,
+  ragReadinessNotice,
   jobs,
   failedJobs,
   actionMessage,
@@ -73,38 +149,59 @@ export default function KnowledgeOpsTab({
   onClearFinishedJobs,
   onDeleteJob,
   onOpenSettings,
+  onCheckReadiness,
+  onRetryReadiness,
 }: KnowledgeOpsTabProps) {
   const finishedJobCount = jobs.filter((job) => canDeleteRagJob(job)).length;
   const activeJobCount = jobs.filter((job) => job.status === "queued" || job.status === "running").length;
-  const healthOk = Boolean(ragHealth?.ok);
+  const presentation = getReadinessPresentation(ragReadinessState);
+  const StatusIcon = presentation.icon;
+  const embeddingTarget = ragReadiness?.targets.find((target) => target.targetKind === "rag_embedding");
+  const vectorTarget = ragReadiness?.targets.find((target) => target.targetKind === "rag_vector_store");
+  const diagnosticBusy = ragReadinessState === "loading" || ragReadinessState === "pending";
 
   return (
     <div className="space-y-6">
       <section
         aria-label="资料检索可用状态"
-        className={`rounded-3xl px-5 py-5 sm:px-6 ${healthOk ? "bg-success/[0.065]" : "bg-destructive/[0.055]"}`}
+        className={`rounded-3xl px-5 py-5 sm:px-6 ${presentation.surface}`}
       >
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex min-w-0 items-start gap-3">
-            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${healthOk ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>
-              {healthOk ? <CircleCheck className="h-5 w-5" /> : <CircleAlert className="h-5 w-5" />}
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${presentation.iconSurface}`}>
+              <StatusIcon className={`h-5 w-5 ${diagnosticBusy ? "animate-spin" : ""}`} />
             </div>
             <div className="min-w-0">
               <h2 className="text-lg font-semibold tracking-tight">
-                {healthOk ? "资料可以用于创作" : "资料检索需要处理"}
+                {presentation.title}
               </h2>
               <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                {healthOk
-                  ? "向量模型与资料库连接正常，已完成索引的资料可以参与拆书、规划和正文创作。"
-                  : "向量模型或资料库连接异常，修复连接后即可继续建立索引和召回资料。"}
+                {presentation.description}
               </p>
             </div>
           </div>
-          {!healthOk ? (
-            <Button type="button" size="sm" className="w-full rounded-full sm:w-auto" onClick={onOpenSettings}>
-              检查检索设置
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            {ragReadinessState === "failed" ? (
+              <Button type="button" size="sm" variant="outline" className="w-full rounded-full sm:w-auto" onClick={onOpenSettings}>
+                打开检索设置
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              size="sm"
+              className="w-full rounded-full sm:w-auto"
+              variant={ragReadinessState === "healthy" ? "outline" : "default"}
+              onClick={ragReadinessState === "error" ? onRetryReadiness : onCheckReadiness}
+              disabled={diagnosticBusy}
+            >
+              <RefreshCw className={`h-4 w-4 ${diagnosticBusy ? "animate-spin" : ""}`} />
+              {ragReadinessState === "error"
+                ? "重新读取状态"
+                : diagnosticBusy
+                  ? ragReadinessState === "pending" ? "检测中..." : "读取中..."
+                  : ragReadiness?.diagnosticId ? "重新检测" : "检测资料连接"}
             </Button>
-          ) : null}
+          </div>
         </div>
 
         <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 border-t border-foreground/[0.06] pt-4 text-sm">
@@ -125,16 +222,14 @@ export default function KnowledgeOpsTab({
             <div>
               <div className="font-medium text-foreground">向量模型</div>
               <div className="mt-1 break-words">
-                {ragHealth?.embedding.provider ?? "-"} · {ragHealth?.embedding.model ?? "-"} · {ragHealth?.embedding.ok ? "可用" : "不可用"}
+                {formatTargetDetail(embeddingTarget)}
               </div>
-              {ragHealth?.embedding.detail ? <div className="mt-1 break-words">{ragHealth.embedding.detail}</div> : null}
             </div>
             <div>
               <div className="font-medium text-foreground">资料库连接</div>
-              <div className="mt-1">{ragHealth?.qdrant.ok ? "连接正常" : "连接失败"}</div>
-              {ragHealth?.qdrant.detail ? <div className="mt-1 break-words">{ragHealth.qdrant.detail}</div> : null}
+              <div className="mt-1 break-words">{formatTargetDetail(vectorTarget)}</div>
             </div>
-            {ragHealthNotice ? <div className="sm:col-span-2">{ragHealthNotice}</div> : null}
+            {ragReadinessNotice ? <div className="sm:col-span-2">{ragReadinessNotice}</div> : null}
           </div>
         </details>
       </section>

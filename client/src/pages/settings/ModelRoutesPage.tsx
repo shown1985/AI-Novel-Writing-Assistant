@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, CopyCheck, RefreshCw, Save } from "lucide-react";
 import type { StructuredFallbackSettings } from "@/api/settings";
 import {
   getAPIKeySettings,
+  getModelRouteReadiness,
   getModelRoutes,
   getStructuredFallbackConfig,
   saveModelRoute,
@@ -20,27 +21,40 @@ import ModelRouteFields from "./ModelRouteFields";
 import { MODEL_ROUTE_LABELS } from "./modelRouteLabels";
 import {
   buildRouteSavePayload,
-  formatConnectivityStatus,
   getPreferredModel,
   getProviderDisplayName,
   isSameRouteDraft,
   parseStructuredRetryCount,
-  resolveConnectivityState,
-  type ConnectivityState,
   type RouteDraft,
   type RouteSavePayload,
   type StructuredFallbackDraft,
 } from "./modelRoutes.utils";
+import {
+  createDiagnosticReadQueryPolicy,
+  createExplicitDiagnosticCheckController,
+  formatDiagnosticTargetStatus,
+  getDiagnosticStateLabel,
+  refreshDiagnosticReadinessAfterCheck,
+  resetDiagnosticReadinessAfterConfigurationChange,
+  resolveDiagnosticTargetState,
+  resolveDiagnosticUiState,
+  summarizeDiagnosticTargets,
+  type DiagnosticUiState,
+} from "./diagnostics";
 import type { ModelRouteTaskType } from "@ai-novel/shared/types/novel";
 
-function RouteStatusDot({ state }: { state: ConnectivityState }) {
+function RouteStatusDot({ state }: { state: DiagnosticUiState }) {
   const colorClass = state === "healthy"
     ? "bg-emerald-500"
     : state === "failed"
       ? "bg-red-500"
-      : state === "checking"
+      : state === "pending" || state === "loading"
         ? "bg-amber-400"
-        : "bg-slate-300";
+        : state === "error"
+          ? "bg-orange-500"
+          : state === "stale"
+            ? "bg-sky-400"
+            : "bg-slate-300";
 
   return <span className={`inline-block h-2.5 w-2.5 rounded-full ${colorClass}`} aria-hidden="true" />;
 }
@@ -48,9 +62,13 @@ function RouteStatusDot({ state }: { state: ConnectivityState }) {
 export default function ModelRoutesPage() {
   const queryClient = useQueryClient();
   const [actionResult, setActionResult] = useState("");
+  const [diagnosticNotice, setDiagnosticNotice] = useState("");
   const [routeDrafts, setRouteDrafts] = useState<Record<string, RouteDraft>>({});
   const [bulkDraft, setBulkDraft] = useState<RouteDraft | null>(null);
   const [structuredFallbackDraft, setStructuredFallbackDraft] = useState<StructuredFallbackDraft | null>(null);
+  const checkModelRoutesController = useRef(
+    createExplicitDiagnosticCheckController(testModelRouteConnectivity),
+  );
 
   const apiKeySettingsQuery = useQuery({
     queryKey: queryKeys.settings.apiKeys,
@@ -62,11 +80,21 @@ export default function ModelRoutesPage() {
     queryFn: getModelRoutes,
   });
 
-  const modelRouteConnectivityQuery = useQuery({
-    queryKey: queryKeys.settings.modelRouteConnectivity,
-    queryFn: testModelRouteConnectivity,
+  const modelRouteReadinessQuery = useQuery({
+    queryKey: queryKeys.settings.modelRouteReadiness,
+    ...createDiagnosticReadQueryPolicy(getModelRouteReadiness),
     enabled: modelRoutesQuery.isSuccess,
-    refetchOnWindowFocus: false,
+  });
+
+  const checkModelRoutesMutation = useMutation({
+    mutationFn: () => checkModelRoutesController.current.run(),
+    onMutate: () => setDiagnosticNotice(""),
+    onSuccess: async () => {
+      await refreshDiagnosticReadinessAfterCheck(queryClient, queryKeys.settings.modelRouteReadiness);
+    },
+    onError: (error) => {
+      setDiagnosticNotice(error instanceof Error ? error.message : "模型路由检测失败，请稍后重试。");
+    },
   });
 
   const structuredFallbackQuery = useQuery({
@@ -81,7 +109,7 @@ export default function ModelRoutesPage() {
       setActionResult("保存完成，这个任务会使用新路由。");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.settings.modelRoutes }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.settings.modelRouteConnectivity }),
+        resetDiagnosticReadinessAfterConfigurationChange(queryClient, queryKeys.settings.modelRouteReadiness),
       ]);
     },
   });
@@ -95,7 +123,7 @@ export default function ModelRoutesPage() {
       setActionResult(`保存完成，${count} 个任务会使用新路由。`);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.settings.modelRoutes }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.settings.modelRouteConnectivity }),
+        resetDiagnosticReadinessAfterConfigurationChange(queryClient, queryKeys.settings.modelRouteReadiness),
       ]);
     },
   });
@@ -106,31 +134,37 @@ export default function ModelRoutesPage() {
       setActionResult("结构化调用容错设置已保存。");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.settings.structuredFallback }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.settings.modelRouteConnectivity }),
+        resetDiagnosticReadinessAfterConfigurationChange(queryClient, queryKeys.settings.modelRouteReadiness),
       ]);
     },
   });
 
   const providerConfigs = useMemo(() => apiKeySettingsQuery.data?.data ?? [], [apiKeySettingsQuery.data?.data]);
   const modelRoutes = modelRoutesQuery.data?.data;
-  const modelRouteConnectivity = modelRouteConnectivityQuery.data?.data;
+  const modelRouteReadiness = modelRouteReadinessQuery.data?.data;
   const structuredFallback = structuredFallbackQuery.data?.data;
   const taskTypes = modelRoutes?.taskTypes ?? [];
   const providerOptions = useMemo(() => providerConfigs.map((item) => item.provider), [providerConfigs]);
   const routeMap = useMemo(() => new Map((modelRoutes?.routes ?? []).map((item) => [item.taskType, item])), [modelRoutes?.routes]);
-  const connectivityMap = useMemo(
-    () => new Map((modelRouteConnectivity?.statuses ?? []).map((item) => [item.taskType, item])),
-    [modelRouteConnectivity?.statuses],
+  const diagnosticTargetMap = useMemo(
+    () => new Map(
+      (modelRouteReadiness?.targets ?? [])
+        .filter((target) => target.targetKind === "model_route" && target.taskType)
+        .map((target) => [target.taskType!, target]),
+    ),
+    [modelRouteReadiness?.targets],
   );
-  const connectivitySummary = useMemo(() => {
-    const statuses = modelRouteConnectivity?.statuses ?? [];
-    return {
-      total: statuses.length,
-      healthy: statuses.filter((item) => (item.plain?.ok ?? true) && (item.structured?.ok ?? true)).length,
-      failed: statuses.filter((item) => (item.plain && !item.plain.ok) || (item.structured && !item.structured.ok)).length,
-      testedAt: modelRouteConnectivity?.testedAt ?? "",
-    };
-  }, [modelRouteConnectivity?.statuses, modelRouteConnectivity?.testedAt]);
+  const diagnosticSummary = useMemo(
+    () => summarizeDiagnosticTargets(modelRouteReadiness?.targets ?? []),
+    [modelRouteReadiness?.targets],
+  );
+  const diagnosticState = resolveDiagnosticUiState({
+    report: modelRouteReadiness,
+    isLoading: modelRouteReadinessQuery.isPending,
+    isRefreshing: modelRouteReadinessQuery.isFetching,
+    isError: modelRouteReadinessQuery.isError,
+    isChecking: checkModelRoutesMutation.isPending,
+  });
   const preferredProviderConfig = useMemo(
     () => providerConfigs.find((item) => item.isConfigured && item.isActive && getPreferredModel(item))
       ?? providerConfigs.find((item) => getPreferredModel(item))
@@ -148,8 +182,8 @@ export default function ModelRoutesPage() {
   );
   const dirtyTaskTypeSet = useMemo(() => new Set(dirtyTaskTypes), [dirtyTaskTypes]);
   const failedTaskTypes = useMemo(
-    () => taskTypes.filter((taskType) => resolveConnectivityState(connectivityMap.get(taskType), false) === "failed"),
-    [connectivityMap, taskTypes],
+    () => taskTypes.filter((taskType) => diagnosticTargetMap.get(taskType)?.checkState === "failed"),
+    [diagnosticTargetMap, taskTypes],
   );
   const emptyRouteTaskTypes = useMemo(
     () => taskTypes.filter((taskType) => {
@@ -159,6 +193,7 @@ export default function ModelRoutesPage() {
     [routeMap, taskTypes],
   );
   const isSavingRoutes = saveModelRouteMutation.isPending || saveAllModelRoutesMutation.isPending;
+  const isDiagnosticPending = diagnosticState === "pending";
 
   function getRouteDraft(taskType: ModelRouteTaskType): RouteDraft {
     const existing = routeDrafts[taskType];
@@ -266,34 +301,56 @@ export default function ModelRoutesPage() {
             <div>检测会覆盖普通对话和结构化输出；表单修改需要保存后参与检测。</div>
             <div className="flex flex-wrap items-center gap-3 text-xs">
               <span className="inline-flex items-center gap-2">
-                <RouteStatusDot
-                  state={modelRouteConnectivityQuery.isPending || modelRouteConnectivityQuery.isFetching
-                    ? "checking"
-                    : connectivitySummary.failed > 0
-                      ? "failed"
-                      : connectivitySummary.total > 0
-                        ? "healthy"
-                        : "idle"}
-                />
-                {modelRouteConnectivityQuery.isPending || modelRouteConnectivityQuery.isFetching
-                  ? "正在检测生效路由..."
-                  : connectivitySummary.total > 0
-                    ? `检测结果：${connectivitySummary.total} 条路由，健康 ${connectivitySummary.healthy}，异常 ${connectivitySummary.failed}`
-                    : "尚未执行模型兼容性检测"}
+                <RouteStatusDot state={diagnosticState} />
+                {diagnosticState === "healthy"
+                  ? `检测结果：健康 ${diagnosticSummary.healthy} 条`
+                  : diagnosticState === "failed"
+                    ? `检测结果：健康 ${diagnosticSummary.healthy} 条，失败 ${diagnosticSummary.failed} 条`
+                    : diagnosticState === "stale"
+                      ? "模型配置已变化，最近检测结果已过期"
+                      : diagnosticState === "not_checked"
+                        ? "尚未执行模型兼容性检测"
+                        : diagnosticState === "pending"
+                          ? "正在检测生效路由..."
+                          : diagnosticState === "error"
+                            ? "无法读取模型路由检测状态"
+                            : "正在读取模型路由检测状态..."}
               </span>
-              {connectivitySummary.testedAt ? (
-                <span>检测时间：{new Date(connectivitySummary.testedAt).toLocaleString()}</span>
+              {modelRouteReadiness?.checkedAt ? (
+                <span>检测时间：{new Date(modelRouteReadiness.checkedAt).toLocaleString()}</span>
               ) : null}
             </div>
+            {diagnosticState === "stale" || diagnosticState === "not_checked" ? (
+              <div className="text-xs text-muted-foreground">未检测或检测记录过期不会阻止按当前已保存配置创作。</div>
+            ) : null}
+            {diagnosticState === "error" ? (
+              <div className="text-xs text-amber-700">读取失败不代表模型不可用，可先重新读取状态。</div>
+            ) : null}
+            {diagnosticNotice ? <div className="text-xs text-muted-foreground">{diagnosticNotice}</div> : null}
           </div>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
-              onClick={() => void modelRouteConnectivityQuery.refetch()}
-              disabled={modelRouteConnectivityQuery.isFetching || !modelRoutesQuery.isSuccess}
+              onClick={() => {
+                if (diagnosticState === "error") {
+                  setDiagnosticNotice("");
+                  void modelRouteReadinessQuery.refetch();
+                  return;
+                }
+                if (!isDiagnosticPending) {
+                  checkModelRoutesMutation.mutate();
+                }
+              }}
+              disabled={isDiagnosticPending || diagnosticState === "loading" || !modelRoutesQuery.isSuccess}
             >
-              <RefreshCw className={`h-4 w-4 ${modelRouteConnectivityQuery.isFetching ? "animate-spin" : ""}`} />
-              {modelRouteConnectivityQuery.isFetching ? "检测中..." : "重新检测"}
+              <RefreshCw className={`h-4 w-4 ${isDiagnosticPending || diagnosticState === "loading" ? "animate-spin" : ""}`} />
+              {diagnosticState === "error"
+                ? "重新读取状态"
+                : isDiagnosticPending
+                  ? "检测中..."
+                  : modelRouteReadiness?.diagnosticId
+                    ? "重新检测"
+                    : "检测模型路由"}
             </Button>
             <Button asChild variant="outline">
               <Link to="/settings">
@@ -456,22 +513,16 @@ export default function ModelRoutesPage() {
         const draft = getRouteDraft(taskType);
         const label = MODEL_ROUTE_LABELS[taskType];
         const providerName = getProviderDisplayName(providerConfigs, draft.provider);
-        const connectivity = connectivityMap.get(taskType);
-        const connectivityState = resolveConnectivityState(
-          connectivity,
-          modelRouteConnectivityQuery.isPending || modelRouteConnectivityQuery.isFetching,
-        );
+        const diagnosticTarget = diagnosticTargetMap.get(taskType);
+        const persistedTargetState = resolveDiagnosticTargetState(diagnosticTarget, diagnosticState);
         const isDirty = dirtyTaskTypeSet.has(taskType);
-        const hasUnsavedRouteDiff = connectivity != null
-          && (
-            draft.provider !== connectivity.provider
-            || (draft.model.trim().length > 0 && draft.model !== connectivity.model)
-            || (draft.requestProtocol !== "auto" && draft.requestProtocol !== connectivity.requestProtocol)
-            || (
-              draft.structuredResponseFormat !== "auto"
-              && draft.structuredResponseFormat !== connectivity.structured?.strategy
-            )
-          );
+        const hasUnsavedRouteDiff = diagnosticTarget != null && isDirty;
+        const targetState = hasUnsavedRouteDiff
+          && persistedTargetState !== "loading"
+          && persistedTargetState !== "error"
+          && persistedTargetState !== "pending"
+          ? "stale"
+          : persistedTargetState;
 
         return (
           <Card key={taskType}>
@@ -479,14 +530,8 @@ export default function ModelRoutesPage() {
               <CardTitle className="flex flex-wrap items-center gap-2">
                 <span>{label.title}</span>
                 <span className="inline-flex items-center gap-2 rounded-full border px-2 py-0.5 text-xs font-normal text-muted-foreground">
-                  <RouteStatusDot state={connectivityState} />
-                  {connectivityState === "healthy"
-                    ? "兼容性正常"
-                    : connectivityState === "failed"
-                      ? "存在异常"
-                      : connectivityState === "checking"
-                        ? "检测中"
-                        : "未检测"}
+                  <RouteStatusDot state={targetState} />
+                  {getDiagnosticStateLabel(targetState)}
                 </span>
                 {isDirty ? <Badge variant="secondary">待保存</Badge> : null}
               </CardTitle>
@@ -511,19 +556,16 @@ export default function ModelRoutesPage() {
                 <div className="space-y-1 text-xs text-muted-foreground">
                   <div>{isDirty ? "表单改动保存后生效。" : `任务使用：${providerName}。`}</div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <RouteStatusDot state={connectivityState} />
-                    <span>{formatConnectivityStatus(connectivity)}</span>
+                    <RouteStatusDot state={targetState} />
+                    <span>{formatDiagnosticTargetStatus(diagnosticTarget)}</span>
                   </div>
-                  {connectivity?.structured ? (
+                  {diagnosticTarget?.recommendation ? (
                     <div>
-                      请求协议：{connectivity.structured.requestProtocol ?? connectivity.requestProtocol ?? "无"}，
-                      结构化策略：{connectivity.structured.strategy ?? "无"}，
-                      {connectivity.structured.reasoningForcedOff ? "会关闭 thinking" : "保留 thinking"}，
-                      {connectivity.structured.fallbackAvailable ? "备用模型可用" : "备用模型未启用"}
+                      检测记录包含兼容建议；检测不会自动修改路由。
                     </div>
                   ) : null}
                   {hasUnsavedRouteDiff ? (
-                    <div>检测结果来自生效路由；保存后会自动重新检测。</div>
+                    <div>检测结果来自已保存的旧配置；保存后可按需重新检测。</div>
                   ) : null}
                 </div>
                 <Button

@@ -287,3 +287,8 @@ export async function getRagReadiness() {
   const { data } = await apiClient.get<ApiResponse<DiagnosticReadinessReport>>("/rag/readiness");
   return data;
 }
+
+export async function checkRagReadiness() {
+  const { data } = await apiClient.post<ApiResponse<DiagnosticReadinessReport>>("/rag/readiness");
+  return data;
+}

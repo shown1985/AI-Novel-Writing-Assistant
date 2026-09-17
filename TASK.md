@@ -3,7 +3,7 @@
 更新时间：2026-09-18
 当前分支：`codex/r1-s1-config-safety`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S2B 已启动；9 点承诺、无 Stretch
+当前状态：R1-S2B 已完成；9/9 点、无 carryover
 
 ## 权威文档
 
@@ -102,7 +102,7 @@ R1-S1 Review 与 Retrospective 见 [Sprint 承诺](./docs/plans/r1-s1-sprint-com
 
 Review 与 Retrospective 见 [R1-S2A Sprint 承诺](./docs/plans/r1-s2a-sprint-commitment.md)。S2-02 已完成 Computer Use 验收；S1-02a 的 shared/server 构建与 32 项聚焦检查通过，测试数据库全部位于 `/tmp` 隔离目录。
 
-## 当前 Sprint：R1-S2B
+## 已完成 Sprint：R1-S2B
 
 ### Sprint Goal
 
@@ -112,7 +112,7 @@ Review 与 Retrospective 见 [R1-S2A Sprint 承诺](./docs/plans/r1-s2a-sprint-c
 
 | Story | 点数 | 状态 | Owner | 依赖 / 验收边界 |
 | --- | ---: | --- | --- | --- |
-| S1-02b 设置与知识库诊断状态消费 | 3 | In Progress | 诊断 UI Agent；根集成人共享接线 | 自动 GET 零探测，显式 POST；状态分离并完成 Computer Use |
+| S1-02b 设置与知识库诊断状态消费 | 3 | Done | 诊断 UI Agent；根集成人共享接线 | [自动 GET 零探测、显式 POST 防重与 Computer Use 验收通过](./docs/plans/s1-02b-diagnostic-readiness-ui.md) |
 | S2-01b 阶段装配与页面组合收敛 | 3 | Done | 单书 Presentation Agent | [Hook 顺序、真实装配矩阵与模块边界 43 项回归通过](./docs/plans/s2-01b-single-book-presentation.md) |
 | S2-04a 模型选择来源与有效参数合同 | 3 | Done | 模型平台 Agent；根集成人共享类型 | [字段级来源、调整厂商归因与脱敏投影 19 项聚焦检查通过](./docs/plans/s2-04a-model-selection-provenance.md) |
 
@@ -120,10 +120,14 @@ Review 与 Retrospective 见 [R1-S2A Sprint 承诺](./docs/plans/r1-s2a-sprint-c
 
 未承诺：S1-03 已重新估为 5 点并返回 Refinement；S2-03a 的 01b 依赖已解除但仍须后续 Sprint Planning，03b 继续等待 03a；S2-04b 进入持久化合同 Refinement，04c 继续等待 04b。不得在本 Sprint 中顺手带入。
 
+完成 `9/9` 点，无 Story carryover。Sprint Goal 达成：诊断页面自动读取与显式检测完成分离，单书阶段装配收敛，模型解析来源合同可提供脱敏证据。S1-02b 的 14 项行为检查、client typecheck 与隔离环境 Computer Use 通过；真实进入、刷新和焦点恢复只有 GET，模型路由与知识库双击各只有一次 POST，pending 轮询会在 lease 到期后停止。
+
+Review 与 Retrospective 见 [R1-S2B Sprint 承诺](./docs/plans/r1-s2b-sprint-commitment.md)：承诺/完成 `9/9` 点，carryover 0，逸出缺陷 0；评审内发现的问题均在 Story Done 前关闭。
+
 ## Release 1 后续队列
 
 1. R1-S1：配置、诊断、阅读恢复和世界归属安全（已完成，15/15 点）。
-2. R1-S2：R1-S2A 可信单书现场已结束（14/14 点，Goal 部分达成）；R1-S2B 正在执行诊断 UI 消费、单书装配和模型来源合同（9 点）。
+2. R1-S2：R1-S2A 可信单书现场已结束（14/14 点，Goal 部分达成）；R1-S2B 主动诊断与可信装配已结束（9/9 点，Goal 达成）。
 3. R1-S3～4：可信世界、提案采用和失败复核。
 4. R1-S5～6：本机Agent委托、预算、记忆和资产。
 5. R1-S7：十章长链、有限撤回和导航收束。

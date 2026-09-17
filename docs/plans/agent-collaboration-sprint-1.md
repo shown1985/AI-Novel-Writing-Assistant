@@ -112,13 +112,13 @@
 ### S1-02b：设置与知识库诊断状态消费
 
 - 用户价值：清楚知道哪些配置可运行、哪些连接尚未检测，并主动决定检测。
-- Owner：Agent B 前端，与02a同 owner串行；3点；状态 In Progress（R1-S2B），S1-00/02a 已完成。
+- Owner：Agent B 前端，与02a同 owner串行；3点；状态 Done（R1-S2B）。
 - Owned：上文 SettingsOverviewPage、ModelRoutesPage、SettingsReadinessCard、KnowledgePage、KnowledgeOpsTab；API/queryKeys由根集成人接线。
 - 子任务：自动查询改被动接口；显式按钮绑定检测；未知/过期/失败/读取错误分别呈现；取消旧 Boolean(ok)与错误伪健康投影；基础配置与检测健康解耦。
 - 验收：进入/聚焦/刷新零探测；点击检测有pending且防重复；有效配置未检测仍可开始创作；读取错误可重试而非未配置；切换目标不会展示旧指纹健康；知识库未知不是红色连接失败。
-- 检查：状态消费/命令调用行为测试、client typecheck；UI由用户验收。
+- 检查：状态消费/命令调用行为测试、client typecheck；隔离环境 Computer Use 验收。
 - 非范围：改变开书流程、RAG自动启用、默认模型替换。
-- 完成证据：各状态样例与事件调用计数；mock UI只能算联调，02a未完成时本卡不是业务Done。
+- 完成证据：[14 项行为检查、类型检查与隔离环境 Computer Use 均通过](./s1-02b-diagnostic-readiness-ui.md)。
 
 ## S1-03：检测建议与应用分开
 

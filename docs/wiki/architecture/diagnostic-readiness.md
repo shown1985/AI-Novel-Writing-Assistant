@@ -45,6 +45,15 @@
 - 旧手动保存仍可独立工作，但必须推进目标 revision，使旧报告与建议无法继续应用。
 - 建议应用必须携带诊断 ID、当前指纹、目标 revision、唯一目标集合和幂等 operation ID；指纹或任一目标冲突时整批零写入。
 
+### 客户端消费与缓存权威
+
+- 页面进入、刷新、重新聚焦和后台轮询只能调用 readiness GET。POST 检测只能绑定作者明确点击的检测按钮；同一浏览器上下文中的未完成命令必须合并，不能因双击重复检测。
+- 客户端展示状态按 `本地显式命令 pending -> GET 读取错误 -> 服务端 pending -> loading/refreshing -> report.checkState` 决定。读取错误不是检测失败，`not_checked` 和 `stale` 也不能使用失败语气。
+- 服务端 pending 的租约有效时可以有限轮询 GET；租约到期或 pending 消失后必须停止。轮询不能调用 POST，也不能自行续租。
+- POST 响应不是客户端缓存权威。命令完成后只失效 readiness GET，让服务端按当前指纹重新投影；配置写入后必须重置旧 readiness，避免旧健康结果在新配置上闪现。
+- 模型基础配置有效时，只有当前报告的明确 `failed` 阻止创建；`not_checked / stale / pending / loading / error` 都是可见建议态。RAG 始终是可选增强，未知状态不阻止不依赖知识库的基础创作。
+- 知识库页面只消费统一的 `checkState` 和目标结果，不再把旧健康接口的 `ok` 布尔值当作事实源。
+
 ## Examples
 
 ```text
@@ -86,4 +95,5 @@
 
 - [S1-00 诊断共享接线与存储契约门](../../plans/s1-00-diagnostics-contract.md)
 - [S1-02a 完成证据](../../plans/s1-02a-diagnostic-readiness-backend.md)
+- [S1-02b 完成证据](../../plans/s1-02b-diagnostic-readiness-ui.md)
 - [Sprint 1 实施卡](../../plans/agent-collaboration-sprint-1.md)

@@ -14,7 +14,7 @@
 
 | Story | 点数 | 当前状态 | Owner | 依赖 | 用户结果 |
 | --- | ---: | --- | --- | --- | --- |
-| S1-02b 设置与知识库诊断状态消费 | 3 | In Progress | 诊断 UI Agent；根集成人负责共享 API/query keys | S1-00/02a Done | 页面自动读取零模型/embedding 调用，作者显式点击后才检测，并能区分未知、过期、失败与读取错误 |
+| S1-02b 设置与知识库诊断状态消费 | 3 | Done | 诊断 UI Agent；根集成人负责共享 API/query keys | [14 项行为检查与隔离 Computer Use 通过](./s1-02b-diagnostic-readiness-ui.md) | 页面自动读取零模型/embedding 调用，作者显式点击后才检测，并能区分未知、过期、失败与读取错误 |
 | S2-01b 阶段装配与页面组合收敛 | 3 | Done | 单书 Presentation Agent | [43 项装配与身份回归通过](./s2-01b-single-book-presentation.md) | 桌面与移动视图消费同一装配结果，后续调整不再继续膨胀总控或复制任务解释 |
 | S2-04a 模型选择来源与有效参数合同 | 3 | Done | 模型平台 Agent；根集成人负责共享类型/出口 | [19 项聚焦检查通过](./s2-04a-model-selection-provenance.md) | 模型解析按字段说明请求值、有效值、来源和能力调整原因，且不泄露凭证 |
 
@@ -83,3 +83,18 @@ Wave 1（并行）
 5. Sprint 结束记录 Goal、承诺/完成点数、carryover、返工/逸出缺陷、UI 验收与最多两项流程改进。
 
 R1-S2B 完成只解除建议应用、推荐动作和实际调用来源链的前置依赖；Release 1 仍须经过后续 Sprint、R1-RC、beta 组合验证和最终用户验收。
+
+## Sprint Review
+
+- Sprint Goal 达成：设置、模型路由和知识库的自动读取与显式检测已分离；单书阶段展示装配收敛；模型解析可以按字段提供脱敏来源和调整原因。
+- 承诺/完成：`9/9` 点；三张承诺 Story 全部 Done；carryover 0；未带入任何 Stretch。
+- S1-02b：14/14 行为检查、client typecheck 和隔离 SQLite 的 Computer Use 验收通过；进入、刷新、焦点恢复均零自动 POST，模型路由和知识库真实双击各只产生一次 POST，pending 轮询在 lease 到期后停止。
+- S2-01b：43 项装配、身份、暂停、导航、任务抽屉和生产交接回归通过；独立复核无 P0～P3，所有相关源文件低于 1300 行。
+- S2-04a：shared/server build、19 项来源矩阵和 2 项温度回归通过；字段级来源包含 provider 归因，外发投影不包含凭证。
+- UI 验收：S1-02b PASS（原生 Computer Use）；S2-01b 无可见行为变更，按验证复用规则不重复浏览器验收；S2-04a 为内部合同，无 UI。
+- 逸出缺陷：0。评审内返工包括补齐诊断错误优先级、POST 防重与缓存权威边界、恢复单书页面 hook 顺序，以及为参数调整补充 provider 归因，均在 Done 前关闭。
+
+## Sprint Retrospective
+
+- 保留：跨层 Story 先用可执行的纯策略模块固定状态优先级和副作用边界，再接页面并用 Computer Use 核对真实请求日志。
+- 改进：下一窗口在派发前冻结跨页状态词典与缓存所有权；涉及长页面的卡先建立 facade/owned 子目录，再开始替换调用点，减少评审返工。

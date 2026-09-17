@@ -1,6 +1,5 @@
 import type {
   APIKeyStatus,
-  ModelRouteConnectivityStatus,
   ModelRoutesResponse,
 } from "@/api/settings";
 import type {
@@ -23,7 +22,6 @@ export interface StructuredFallbackDraft extends RouteDraft {
   retryCount: string;
 }
 
-export type ConnectivityState = "idle" | "checking" | "healthy" | "failed";
 type SavedModelRoute = ModelRoutesResponse["routes"][number];
 
 export interface RouteSavePayload {
@@ -107,49 +105,4 @@ export function isSameRouteDraft(draft: RouteDraft, route: SavedModelRoute | und
     && parseMaxTokens(draft.maxTokens) === route.maxTokens
     && draft.requestProtocol === route.requestProtocol
     && draft.structuredResponseFormat === route.structuredResponseFormat;
-}
-
-export function formatStructuredStatus(status: ModelRouteConnectivityStatus["structured"]): string {
-  if (!status) {
-    return "结构化诊断：未执行";
-  }
-  if (status.ok) {
-    return `结构化正常 · ${status.requestProtocol ?? "auto"} · ${status.strategy ?? "prompt_json"}${status.reasoningForcedOff ? " · 会关闭 thinking" : ""}`;
-  }
-  return `结构化异常 · ${status.errorCategory ?? "unknown"} · ${status.error ?? "未知错误"}`;
-}
-
-export function formatConnectivityStatus(status?: ModelRouteConnectivityStatus | null): string {
-  if (!status) {
-    return "尚未检测生效路由。";
-  }
-  const parts: string[] = [];
-  if (status.plain) {
-    parts.push(
-      status.plain.ok
-        ? `普通连通正常${status.plain.latency != null ? ` · ${status.plain.latency}ms` : ""}`
-        : `普通连通失败 · ${status.plain.error ?? "未知错误"}`,
-    );
-  }
-  parts.push(formatStructuredStatus(status.structured));
-  return `${status.provider} / ${status.model} · ${parts.join(" · ")}`;
-}
-
-export function resolveConnectivityState(
-  status: ModelRouteConnectivityStatus | undefined,
-  checking: boolean,
-): ConnectivityState {
-  if (checking) {
-    return "checking";
-  }
-  if (!status) {
-    return "idle";
-  }
-  if ((status.plain && !status.plain.ok) || (status.structured && !status.structured.ok)) {
-    return "failed";
-  }
-  if (status.plain?.ok || status.structured?.ok) {
-    return "healthy";
-  }
-  return "idle";
 }
