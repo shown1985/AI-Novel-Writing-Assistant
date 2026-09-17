@@ -9,6 +9,7 @@ import type {
   KnowledgeDocumentSummary,
 } from "@ai-novel/shared/types/knowledge";
 import type { ApiResponse } from "@ai-novel/shared/types/api";
+import type { DiagnosticReadinessReport } from "@ai-novel/shared/types/diagnostics";
 import { apiClient } from "./client";
 
 export interface RagJobProgress {
@@ -280,4 +281,9 @@ export async function getRagHealth(previousHealth?: RagHealthStatus) {
   }
 
   return response.data;
+}
+
+export async function getRagReadiness() {
+  const { data } = await apiClient.get<ApiResponse<DiagnosticReadinessReport>>("/rag/readiness");
+  return data;
 }

@@ -3,6 +3,11 @@ import type {
   DirectorAutoApprovalPreferenceSettings,
 } from "@ai-novel/shared/types/autoDirectorApproval";
 import type { DirectorIssuePolicy } from "@ai-novel/shared/types/directorIssue";
+import type {
+  ApplyDiagnosticRecommendationsRequest,
+  ApplyDiagnosticRecommendationsResult,
+  DiagnosticReadinessReport,
+} from "@ai-novel/shared/types/diagnostics";
 import type { LLMProvider, ProviderAuthMode, ReasoningEffort } from "@ai-novel/shared/types/llm";
 import type {
   ModelRouteConfig,
@@ -438,6 +443,13 @@ export async function getModelRoutes() {
   return data;
 }
 
+export async function getModelRouteReadiness() {
+  const { data } = await apiClient.get<ApiResponse<DiagnosticReadinessReport>>(
+    "/llm/model-routes/connectivity",
+  );
+  return data;
+}
+
 export async function testModelRouteConnectivity() {
   const { data } = await apiClient.post<ApiResponse<ModelRouteConnectivityResponse>>("/llm/model-routes/connectivity");
   return data;
@@ -445,6 +457,16 @@ export async function testModelRouteConnectivity() {
 
 export async function saveModelRoute(payload: ModelRouteConfig) {
   const { data } = await apiClient.put<ApiResponse<null>>("/llm/model-routes", payload);
+  return data;
+}
+
+export async function applyModelRouteDiagnosticRecommendations(
+  payload: ApplyDiagnosticRecommendationsRequest,
+) {
+  const { data } = await apiClient.put<ApiResponse<ApplyDiagnosticRecommendationsResult>>(
+    "/llm/model-routes",
+    payload,
+  );
   return data;
 }
 
