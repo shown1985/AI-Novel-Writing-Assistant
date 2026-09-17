@@ -100,6 +100,7 @@ export function resolveModelTemperatureWithProvenance(
       effective,
       adjustments: effective === requested ? [] : [{
         kind: "capability_fixed",
+        provider,
         before: requested,
         after: effective,
         reason: "模型能力要求使用固定温度。",
@@ -113,6 +114,7 @@ export function resolveModelTemperatureWithProvenance(
     if (adjusted !== effective) {
       adjustments.push({
         kind: "capability_clamped_min",
+        provider,
         before: effective,
         after: adjusted,
         reason: "请求温度低于模型支持的最小值。",
@@ -125,6 +127,7 @@ export function resolveModelTemperatureWithProvenance(
     if (adjusted !== effective) {
       adjustments.push({
         kind: "capability_clamped_max",
+        provider,
         before: effective,
         after: adjusted,
         reason: "请求温度高于模型支持的最大值。",

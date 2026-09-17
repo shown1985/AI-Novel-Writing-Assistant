@@ -391,6 +391,7 @@ export async function resolveLLMClientOptions(
     if (effectiveMaxTokens !== undefined) {
       maxTokensProvenance = appendModelSelectionAdjustment(maxTokensProvenance, {
         kind: "structured_omit",
+        provider: resolvedProvider,
         before: effectiveMaxTokens,
         after: null,
         reason: "当前结构化输出模式要求省略 Token 上限。",
@@ -406,6 +407,7 @@ export async function resolveLLMClientOptions(
     if (cappedMaxTokens !== effectiveMaxTokens) {
       maxTokensProvenance = appendModelSelectionAdjustment(maxTokensProvenance, {
         kind: "structured_cap",
+        provider: resolvedProvider,
         before: effectiveMaxTokens,
         after: cappedMaxTokens,
         reason: "当前结构化输出模式降低了安全 Token 上限。",

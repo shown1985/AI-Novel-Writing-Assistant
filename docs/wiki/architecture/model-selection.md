@@ -38,7 +38,7 @@
 - 模型来源必须由实际 resolver 在解析 provider、model、temperature 和 maxTokens 时同步生成；客户端、实况或历史查询不得根据“当前设置”反推一次旧调用。
 - 每个字段分别记录 `requested / effective / source / adjustments`。同一次调用允许字段来自不同来源，例如厂商由显式请求指定、模型来自厂商配置、温度和 Token 上限来自任务路由。
 - source 只表达确定事实：显式请求、任务路由、任务默认、厂商配置、环境配置、内建默认、备用默认、系统默认或未知。旧记录没有证据时使用 `unknown`，不能补造来源。
-- adjustment 保存发生修正前后的值与结构化原因。当前覆盖厂商 Token 上限、历史 4096 占位、固定/最小/最大温度，以及结构化输出的 Token 截断或省略。
+- adjustment 保存发生修正前后的值、执行修正时的 provider 与结构化原因。provider 必须归属于产生该修正的解析层；如果任务路由先按 DeepSeek 限制 Token、随后显式请求把最终厂商覆盖为 OpenAI，限制记录仍归因于 DeepSeek。当前覆盖厂商 Token 上限、历史 4096 占位、固定/最小/最大温度，以及结构化输出的 Token 截断或省略。
 - `routeDegraded` 保留严格任务缺路由时的既有语义；`routeDegradedReason` 独立说明严格路由未配置或路由存储查询失败，因此非严格任务可以保持 `routeDegraded=false` 同时记录查询失败原因。
 - 共享 provenance 是脱敏投影，不是 `ResolvedLLMClientOptions` 的序列化结果。API Key、Base URL、authMode、modelKwargs、Prompt 与 session 信息禁止进入该结构。
 - attempt lineage 在来源合同中只定义关联形状。实际请求 ID、重试/修复/备用尝试和持久化属于后续调用证据能力，不能在解析阶段伪造。

@@ -64,6 +64,8 @@ export type ModelSelectionAdjustmentKind =
 
 export interface ModelSelectionAdjustment<T = string | number | null> {
   kind: ModelSelectionAdjustmentKind;
+  /** Provider whose deterministic compatibility rule produced this adjustment. */
+  provider: LLMProvider;
   before: T | null;
   after: T | null;
   reason: string;

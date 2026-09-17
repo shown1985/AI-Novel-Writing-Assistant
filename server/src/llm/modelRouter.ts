@@ -184,6 +184,7 @@ function normalizeMaxTokens(provider: LLMProvider, maxTokens?: number): Normaliz
       effective: undefined,
       adjustments: [{
         kind: "legacy_4096_unset",
+        provider,
         before: normalized,
         after: null,
         reason: "历史值 4096 表示沿用厂商默认 Token 上限。",
@@ -196,6 +197,7 @@ function normalizeMaxTokens(provider: LLMProvider, maxTokens?: number): Normaliz
       effective: providerLimit,
       adjustments: [{
         kind: "provider_limit",
+        provider,
         before: normalized,
         after: providerLimit,
         reason: "请求的 Token 上限超过厂商支持范围。",

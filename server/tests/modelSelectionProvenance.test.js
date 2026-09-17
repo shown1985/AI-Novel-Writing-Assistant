@@ -24,6 +24,197 @@ function routeRow(overrides = {}) {
   };
 }
 
+function resolvedTuple(resolved) {
+  return {
+    provider: resolved.provider,
+    model: resolved.model,
+    temperature: resolved.temperature,
+    maxTokens: resolved.maxTokens ?? null,
+    routeKey: resolved.routeKey ?? resolved.selectionProvenance?.routeKey ?? null,
+    routeDegraded: resolved.routeDegraded === true,
+  };
+}
+
+function provenanceSources(provenance) {
+  return {
+    provider: provenance.provider.source,
+    model: provenance.model.source,
+    temperature: provenance.temperature.source,
+    maxTokens: provenance.maxTokens.source,
+  };
+}
+
+test("model route resolution preserves the frozen value and source matrix", async () => {
+  const originalFindUnique = prisma.modelRouteConfig.findUnique;
+  const cases = [
+    {
+      name: "configured non-strict route",
+      taskType: "planner",
+      row: routeRow(),
+      expected: {
+        provider: "deepseek", model: "deepseek-route-model", temperature: 0.3,
+        maxTokens: 8192, routeKey: "planner", routeDegraded: false,
+      },
+      sources: { provider: "task_route", model: "task_route", temperature: "task_route", maxTokens: "task_route" },
+      reason: null,
+    },
+    {
+      name: "missing non-strict route",
+      taskType: "planner",
+      row: null,
+      expected: {
+        provider: "deepseek", model: "deepseek-v4-flash", temperature: 0.3,
+        maxTokens: null, routeKey: "planner", routeDegraded: false,
+      },
+      sources: {
+        provider: "task_route_default", model: "task_route_default",
+        temperature: "task_route_default", maxTokens: "task_route_default",
+      },
+      reason: null,
+    },
+    {
+      name: "failed non-strict route lookup",
+      taskType: "planner",
+      error: new Error("route store unavailable"),
+      expected: {
+        provider: "deepseek", model: "deepseek-v4-flash", temperature: 0.3,
+        maxTokens: null, routeKey: "planner", routeDegraded: false,
+      },
+      sources: {
+        provider: "task_route_default", model: "task_route_default",
+        temperature: "task_route_default", maxTokens: "task_route_default",
+      },
+      reason: "route_lookup_failed",
+    },
+    {
+      name: "missing strict route",
+      taskType: "critical_review",
+      row: null,
+      expected: {
+        provider: "deepseek", model: "deepseek-v4-flash", temperature: 0.1,
+        maxTokens: null, routeKey: "critical_review", routeDegraded: true,
+      },
+      sources: {
+        provider: "task_route_default", model: "task_route_default",
+        temperature: "task_route_default", maxTokens: "task_route_default",
+      },
+      reason: "strict_route_not_configured",
+    },
+    {
+      name: "failed strict route lookup",
+      taskType: "critical_review",
+      error: new Error("route store unavailable"),
+      expected: {
+        provider: "deepseek", model: "deepseek-v4-flash", temperature: 0.1,
+        maxTokens: null, routeKey: "critical_review", routeDegraded: true,
+      },
+      sources: {
+        provider: "task_route_default", model: "task_route_default",
+        temperature: "task_route_default", maxTokens: "task_route_default",
+      },
+      reason: "route_lookup_failed",
+    },
+    {
+      name: "provider-only override",
+      taskType: "planner",
+      row: routeRow(),
+      override: { provider: "openai" },
+      expected: {
+        provider: "openai", model: "deepseek-route-model", temperature: 0.3,
+        maxTokens: 8192, routeKey: "planner", routeDegraded: false,
+      },
+      sources: { provider: "explicit_request", model: "task_route", temperature: "task_route", maxTokens: "task_route" },
+      reason: null,
+      adjustmentProvider: "deepseek",
+    },
+    {
+      name: "model-only override",
+      taskType: "planner",
+      row: routeRow(),
+      override: { model: "explicit-model" },
+      expected: {
+        provider: "deepseek", model: "explicit-model", temperature: 0.3,
+        maxTokens: 8192, routeKey: "planner", routeDegraded: false,
+      },
+      sources: { provider: "task_route", model: "explicit_request", temperature: "task_route", maxTokens: "task_route" },
+      reason: null,
+    },
+    {
+      name: "temperature-only override",
+      taskType: "planner",
+      row: routeRow(),
+      override: { temperature: 0.55 },
+      expected: {
+        provider: "deepseek", model: "deepseek-route-model", temperature: 0.55,
+        maxTokens: 8192, routeKey: "planner", routeDegraded: false,
+      },
+      sources: { provider: "task_route", model: "task_route", temperature: "explicit_request", maxTokens: "task_route" },
+      reason: null,
+    },
+    {
+      name: "maxTokens-only override",
+      taskType: "planner",
+      row: routeRow(),
+      override: { maxTokens: 7000 },
+      expected: {
+        provider: "deepseek", model: "deepseek-route-model", temperature: 0.3,
+        maxTokens: 7000, routeKey: "planner", routeDegraded: false,
+      },
+      sources: { provider: "task_route", model: "task_route", temperature: "task_route", maxTokens: "explicit_request" },
+      reason: null,
+    },
+    {
+      name: "four-field override",
+      taskType: "planner",
+      row: routeRow(),
+      override: { provider: "openai", model: "explicit-model", temperature: 0.55, maxTokens: 20000 },
+      expected: {
+        provider: "openai", model: "explicit-model", temperature: 0.55,
+        maxTokens: 20000, routeKey: "planner", routeDegraded: false,
+      },
+      sources: {
+        provider: "explicit_request", model: "explicit_request",
+        temperature: "explicit_request", maxTokens: "explicit_request",
+      },
+      reason: null,
+    },
+    {
+      name: "legacy maxTokens placeholder",
+      taskType: "planner",
+      row: routeRow({ maxTokens: 4096 }),
+      expected: {
+        provider: "deepseek", model: "deepseek-route-model", temperature: 0.3,
+        maxTokens: null, routeKey: "planner", routeDegraded: false,
+      },
+      sources: { provider: "task_route", model: "task_route", temperature: "task_route", maxTokens: "task_route" },
+      reason: null,
+      adjustmentProvider: "deepseek",
+    },
+  ];
+
+  try {
+    for (const scenario of cases) {
+      prisma.modelRouteConfig.findUnique = async () => {
+        if (scenario.error) throw scenario.error;
+        return scenario.row;
+      };
+      const resolved = await resolveModel(scenario.taskType, scenario.override);
+      assert.deepEqual(resolvedTuple(resolved), scenario.expected, scenario.name);
+      assert.deepEqual(provenanceSources(resolved.selectionProvenance), scenario.sources, scenario.name);
+      assert.equal(resolved.routeDegradedReason, scenario.reason, scenario.name);
+      if (scenario.adjustmentProvider) {
+        assert.equal(
+          resolved.selectionProvenance.maxTokens.adjustments[0]?.provider,
+          scenario.adjustmentProvider,
+          scenario.name,
+        );
+      }
+    }
+  } finally {
+    prisma.modelRouteConfig.findUnique = originalFindUnique;
+  }
+});
+
 test("model route provenance keeps requested values and deterministic adjustments", async () => {
   const originalFindUnique = prisma.modelRouteConfig.findUnique;
   prisma.modelRouteConfig.findUnique = async () => routeRow();
@@ -37,6 +228,7 @@ test("model route provenance keeps requested values and deterministic adjustment
       source: "task_route",
       adjustments: [{
         kind: "provider_limit",
+        provider: "deepseek",
         before: 32768,
         after: 8192,
         reason: "请求的 Token 上限超过厂商支持范围。",
@@ -138,6 +330,7 @@ test("factory records mixed field sources and returns a detached sanitized proje
     assert.equal(provenance.temperature.source, "task_route");
     assert.equal(provenance.maxTokens.source, "task_route");
     assert.deepEqual(provenance.maxTokens.adjustments.map((item) => item.kind), ["provider_limit"]);
+    assert.deepEqual(provenance.maxTokens.adjustments.map((item) => item.provider), ["deepseek"]);
     assert.equal(writeCount, 0);
     assert.equal(transportCount, 0);
 
@@ -218,6 +411,119 @@ test("factory reports provider configuration, environment, built-in and fallback
   }
 });
 
+test("factory without a task preserves the frozen default-selection matrix", async () => {
+  const previousOpenAiModel = process.env.OPENAI_MODEL;
+  const previousDeepSeekModel = process.env.DEEPSEEK_MODEL;
+  const cases = [
+    {
+      name: "provider configured model",
+      provider: "openai",
+      options: {},
+      openAiSecret: { key: "test-key", model: "configured-model" },
+      expected: {
+        provider: "openai", model: "configured-model", temperature: 0.7,
+        maxTokens: null, routeKey: null, routeDegraded: false,
+      },
+      sources: {
+        provider: "explicit_request", model: "provider_configuration",
+        temperature: "system_default", maxTokens: "system_default",
+      },
+    },
+    {
+      name: "environment model",
+      provider: "openai",
+      options: {},
+      openAiSecret: { key: "test-key" },
+      openAiModel: "environment-model",
+      expected: {
+        provider: "openai", model: "environment-model", temperature: 0.7,
+        maxTokens: null, routeKey: null, routeDegraded: false,
+      },
+      sources: {
+        provider: "explicit_request", model: "environment",
+        temperature: "system_default", maxTokens: "system_default",
+      },
+    },
+    {
+      name: "built-in model",
+      provider: "openai",
+      options: {},
+      openAiSecret: { key: "test-key" },
+      expected: {
+        provider: "openai", model: "gpt-5", temperature: 0.7,
+        maxTokens: null, routeKey: null, routeDegraded: false,
+      },
+      sources: {
+        provider: "explicit_request", model: "built_in_default",
+        temperature: "system_default", maxTokens: "system_default",
+      },
+    },
+    {
+      name: "explicit model",
+      provider: "openai",
+      options: { model: "explicit-model" },
+      openAiSecret: { key: "test-key", model: "configured-model" },
+      expected: {
+        provider: "openai", model: "explicit-model", temperature: 0.7,
+        maxTokens: null, routeKey: null, routeDegraded: false,
+      },
+      sources: {
+        provider: "explicit_request", model: "explicit_request",
+        temperature: "system_default", maxTokens: "system_default",
+      },
+    },
+    {
+      name: "fallback provider",
+      provider: undefined,
+      options: { fallbackProvider: "openai" },
+      openAiSecret: { key: "test-key" },
+      expected: {
+        provider: "openai", model: "gpt-5", temperature: 0.7,
+        maxTokens: null, routeKey: null, routeDegraded: false,
+      },
+      sources: {
+        provider: "fallback_default", model: "built_in_default",
+        temperature: "system_default", maxTokens: "system_default",
+      },
+    },
+    {
+      name: "system defaults",
+      provider: undefined,
+      options: {},
+      deepSeekSecret: { key: "test-key" },
+      expected: {
+        provider: "deepseek", model: "deepseek-v4-flash", temperature: 0.7,
+        maxTokens: null, routeKey: null, routeDegraded: false,
+      },
+      sources: {
+        provider: "system_default", model: "built_in_default",
+        temperature: "system_default", maxTokens: "system_default",
+      },
+    },
+  ];
+
+  try {
+    for (const scenario of cases) {
+      delete process.env.OPENAI_MODEL;
+      delete process.env.DEEPSEEK_MODEL;
+      if (scenario.openAiModel) process.env.OPENAI_MODEL = scenario.openAiModel;
+      setProviderSecretCache("openai", scenario.openAiSecret ?? null);
+      setProviderSecretCache("deepseek", scenario.deepSeekSecret ?? null);
+
+      const resolved = await resolveLLMClientOptions(scenario.provider, scenario.options);
+      assert.deepEqual(resolvedTuple(resolved), scenario.expected, scenario.name);
+      assert.deepEqual(provenanceSources(resolved.selectionProvenance), scenario.sources, scenario.name);
+    }
+  } finally {
+    if (previousOpenAiModel === undefined) delete process.env.OPENAI_MODEL;
+    else process.env.OPENAI_MODEL = previousOpenAiModel;
+    if (previousDeepSeekModel === undefined) delete process.env.DEEPSEEK_MODEL;
+    else process.env.DEEPSEEK_MODEL = previousDeepSeekModel;
+    setProviderSecretCache("openai", null);
+    setProviderSecretCache("deepseek", null);
+  }
+});
+
 test("capability and structured-output adjustments preserve requested and effective values", async () => {
   setProviderSecretCache("kimi", { key: "test-key" });
   setProviderSecretCache("minimax", { key: "test-key" });
@@ -238,6 +544,7 @@ test("capability and structured-output adjustments preserve requested and effect
     assert.deepEqual(fixed.selectionProvenance.temperature.adjustments.map((item) => item.kind), [
       "capability_fixed",
     ]);
+    assert.deepEqual(fixed.selectionProvenance.temperature.adjustments.map((item) => item.provider), ["kimi"]);
 
     const clamped = await resolveLLMClientOptions("minimax", {
       model: "MiniMax-M2.7",
@@ -247,6 +554,7 @@ test("capability and structured-output adjustments preserve requested and effect
     assert.deepEqual(clamped.selectionProvenance.temperature.adjustments.map((item) => item.kind), [
       "capability_clamped_min",
     ]);
+    assert.deepEqual(clamped.selectionProvenance.temperature.adjustments.map((item) => item.provider), ["minimax"]);
 
     const clampedMaximum = await resolveLLMClientOptions("minimax", {
       model: "MiniMax-M2.7",
@@ -255,6 +563,9 @@ test("capability and structured-output adjustments preserve requested and effect
     assert.equal(clampedMaximum.temperature, 1);
     assert.deepEqual(clampedMaximum.selectionProvenance.temperature.adjustments.map((item) => item.kind), [
       "capability_clamped_max",
+    ]);
+    assert.deepEqual(clampedMaximum.selectionProvenance.temperature.adjustments.map((item) => item.provider), [
+      "minimax",
     ]);
 
     const omitted = await resolveLLMClientOptions("qwen", {
@@ -269,6 +580,7 @@ test("capability and structured-output adjustments preserve requested and effect
     assert.deepEqual(omitted.selectionProvenance.maxTokens.adjustments.map((item) => item.kind), [
       "structured_omit",
     ]);
+    assert.deepEqual(omitted.selectionProvenance.maxTokens.adjustments.map((item) => item.provider), ["qwen"]);
 
     const capped = await resolveLLMClientOptions("custom_modelscope", {
       maxTokens: 20000,
@@ -278,6 +590,9 @@ test("capability and structured-output adjustments preserve requested and effect
     assert.equal(capped.maxTokens, 8192);
     assert.deepEqual(capped.selectionProvenance.maxTokens.adjustments.map((item) => item.kind), [
       "structured_cap",
+    ]);
+    assert.deepEqual(capped.selectionProvenance.maxTokens.adjustments.map((item) => item.provider), [
+      "custom_modelscope",
     ]);
   } finally {
     setProviderSecretCache("kimi", null);

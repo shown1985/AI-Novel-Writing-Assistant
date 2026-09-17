@@ -11,7 +11,7 @@
 
 - `resolveModel` 与 `resolveLLMClientOptions` 在产生实际配置的同一条路径同步生成 `selectionProvenance`；客户端或后续持久层不需要重新计算来源。
 - provider、model、temperature、maxTokens 分别记录 requested、effective、source 与 adjustments，允许同一次调用的字段来自显式请求、任务路由、厂商配置、环境变量或默认值。
-- 确定性调整覆盖厂商 Token 上限、历史 4096 占位、固定/最小/最大温度，以及结构化输出的 Token 截断或省略。
+- 确定性调整覆盖厂商 Token 上限、历史 4096 占位、固定/最小/最大温度，以及结构化输出的 Token 截断或省略。每条 adjustment 还记录执行该修正时的 provider；即使任务路由先按 DeepSeek 限制 Token、随后调用层显式覆盖为 OpenAI，也会保留 DeepSeek 作为限制来源，不把旧层修正误归因给最终厂商。
 - 任务路由保留 routeKey、既有 strict-only `routeDegraded` 语义和独立原因；路由存储查询失败不会改变回退结果，但会留下 `route_lookup_failed`。
 - 对外投影只复制共享 provenance 字段，不包含 API Key、Base URL、鉴权方式、model kwargs、Prompt、session 或 OpenCode session ID。
 - 旧历史可显式投影为 `unknown`；attempt lineage 只冻结类型，不在本 Story 生成或保存标识。
@@ -25,10 +25,11 @@
 ## 验证证据
 
 - `pnpm --filter @ai-novel/shared build`：通过。
+- shared build 只证明 provenance 与 attempt-lineage 共享类型可以编译；S2-04a 未创建、关联、发送或持久化 attempt 标识，因此不能据此声称运行时 attempt lineage 已验证。
 - `pnpm --filter @ai-novel/server build`：通过。
-- `node --test server/tests/modelRouter.test.js server/tests/modelSelectionProvenance.test.js`：17/17 通过。
+- `node --test server/tests/modelRouter.test.js server/tests/modelSelectionProvenance.test.js`：19/19 通过。
 - `node --test --test-name-pattern='kimi k2 and k3|minimax clamps temperature' server/tests/llmProviders.test.js`：2/2 通过。
-- 聚焦矩阵覆盖显式选择、任务路由、provider 配置、环境、内建/备用/系统默认、严格与非严格路由失败、全部 adjustment、unknown legacy、脱敏 detached projection、零 fetch transport 与零 route upsert。
+- 表驱动等价矩阵以独立字面量冻结 provider/model/temperature/maxTokens/routeKey/routeDegraded 期望，覆盖 route row/no row/lookup error、strict/non-strict、显式 provider/model/temperature/maxTokens 单项与四字段交叉、legacy 4096/provider limit，以及 factory 无 task 时的 provider config/env/builtin/fallback/system default；同时断言字段来源和 adjustment provider。
 - 验证使用 mock Prisma、secret、env 和 fetch；没有真实模型调用，也没有用户数据库写入。
 
 完整 `llmProviders.test.js` 仍有两条与当前 GLM structured-output profile 不一致的既有断言。相关 profile、reasoning 与测试文件和 `HEAD` 完全一致，失败不经过本 Story 新增来源逻辑；本卡未越界修改该能力档案。
