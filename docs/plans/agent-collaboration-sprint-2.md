@@ -31,7 +31,7 @@
 ## S2-01a：单书查询与导演编排归属
 
 - 用户价值：切换作品、阶段和任务时仍能看到属于当前作品的真实状态，后续协作入口有明确事实来源。
-- 状态：Ready（模块收敛）；前置门为实际源码责任清单和准确基线；不依赖新产品接口。
+- 状态：Done（application 归属）；S2-01b 只承接 presentation 装配，不重复迁移本卡能力。
 - 点数：5；Owner：Agent A，独占总控模块。
 - 真实源码：client/src/pages/novels/NovelEdit.tsx（审计时 2871 行）、hooks/useNovelEditWorkflow.ts、hooks/useNovelEditInitialization.ts、hooks/useNovelEditChapterRuntime.ts、hooks/novelEditWorkflowParams.ts。
 - 拟建归属：client/src/pages/novels/workspace/application/ 下的查询与导演编排能力；对外通过该模块 index.ts 使用。名称在责任清单中冻结，不新建同层泛用 helpers。
@@ -57,12 +57,12 @@
 
 数据安全与失败恢复：不触发章节重置、快照恢复、数据库迁移或用户库写测试；查询 Error 与 Empty 分开。迁移失败以代码修复或回退本阶段未发布代码解决，不回滚用户创作数据。
 
-交付证据：责任/依赖图、迁移前后查询矩阵、身份与暂停行为结果、文件行数、模块边界 README、定向检查记录。没有 S2-01b 的最终阈值证据不能声明总控收敛完成。
+交付证据：[S2-01a 完成证据](./s2-01a-single-book-application-facade.md)记录责任/依赖图、查询矩阵、身份与暂停行为、文件行数、模块边界 README 与定向检查。S2-01 父项仍等待 S2-01b 的 presentation 装配，不因本卡提前标成全部完成。
 
 ## S2-01b：阶段装配与页面组合收敛
 
 - 用户价值：各阶段共享一个稳定作品现场，后续交互调整不会改坏角色、世界、卷章与正文生产。
-- 状态：Blocked by S2-01a；01a facade 冻结后 Ready。
+- 状态：Ready；S2-01a facade 已冻结，需在后续 Sprint 重新承诺后才能开工。
 - 点数：3；Owner：Agent A，与 01a 串行，不分给第二人抢改总控。
 - 真实源码：client/src/pages/novels/NovelEdit.tsx、components/NovelEditView.tsx、components/NovelEditView.types.ts（审计时 670 行）、mobile/MobileNovelEditView.tsx；现有 hooks/useNovelVolumePlanning.ts、useNovelCharacterMutations.ts 等保持本模块职责。
 - 拟建归属：client/src/pages/novels/workspace/presentation/ 的各阶段 props 装配与组合；公开 index.ts。业务编排依赖 application，通用 workspace 展示组件不依赖小说 API。

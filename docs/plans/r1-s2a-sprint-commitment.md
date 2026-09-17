@@ -16,7 +16,7 @@
 | --- | ---: | --- | --- | --- | --- |
 | S1-01 缺省数值配置正确生效 | 3 | Done | 配置 Agent | [7 项输入矩阵与零副作用检查通过](./s1-01-numeric-settings-defaults.md) | 未配置、空白和坏值使用声明默认，合法低值与允许的 0 保持 |
 | S1-02a 诊断读取、显式探测与持久化 | 3 | In Progress | 诊断 Agent；根集成人负责共享接线 | S1-00 已完成 | 打开页面只读取状态，显式检测才调用模型/embedding，结果跨重启可追溯 |
-| S2-01a 单书查询与导演编排归属 | 5 | In Progress | 单书总控 Agent | 准确责任清单与基线已核对 | 当前作品、导演任务、暂停与恢复状态进入 owned application facade，不串书、不误恢复 |
+| S2-01a 单书查询与导演编排归属 | 5 | Done | 单书总控 Agent | [application facade、边界说明与 36 项检查通过](./s2-01a-single-book-application-facade.md) | 当前作品、导演任务、暂停与恢复状态进入 owned application facade，不串书、不误恢复 |
 | S2-02 专业章节辅助区域按需展开 | 3 | Done | 章节编辑 Agent；根集成人负责外部身份接线 | [10 项行为检查与隔离 UI 验收通过](./s2-02-professional-chapter-assist-panels.md) | 正文默认优先，章节参考和 AI 协作按需展开，折叠与同章刷新不丢草稿或候选 |
 
 `S1-01/02a` 是未进入 R1-S1 的 Backlog，不是 carryover；沿用原 Story ID 与点数。`S2-01` 父 ID 只作路线图映射，本窗口只承诺已满足 DoR 的 `S2-01a`，不把被其阻断的 `S2-01b` 提前计入。
