@@ -4,7 +4,7 @@
 
 本页是 [交互与 AI Sprint 路线图](./agent-collaboration-sprints.md) 的首轮任务卡与滚动状态合同。各子 Story 的状态和完成证据以本页链接及当前 Sprint 承诺为准。
 
-目标是可信的 AI 配置状态、可恢复的阅读现场和世界问题安全更新。完整 refinement 后候选核心 22 点：显式补计共享接线门2点，将原 S1-02 的5点概要拆成后端3点和前端3点。点数不是单窗口承诺；可分 S1-A 配置/安全/契约、S1-B 诊断/阅读验收。三个执行 Agent 与一个根集成人；S1-X 为可移出的 Stretch。
+目标是可信的 AI 配置状态、可恢复的阅读现场和世界问题安全更新。滚动 refinement 后候选核心 24 点：显式补计共享接线门2点，将原 S1-02 的5点概要拆成后端3点和前端3点，并将需要事务 CAS/幂等收据的 S1-03 从3点校正为5点。点数不是单窗口承诺；可分 S1-A 配置/安全/契约、S1-B 诊断/阅读验收。三个执行 Agent 与一个根集成人；S1-X 为可移出的 Stretch。
 
 ## 拟定的首轮接口行为
 
@@ -112,7 +112,7 @@
 ### S1-02b：设置与知识库诊断状态消费
 
 - 用户价值：清楚知道哪些配置可运行、哪些连接尚未检测，并主动决定检测。
-- Owner：Agent B 前端，与02a同 owner串行；3点；状态 Ready，S1-00/02a 已完成。
+- Owner：Agent B 前端，与02a同 owner串行；3点；状态 In Progress（R1-S2B），S1-00/02a 已完成。
 - Owned：上文 SettingsOverviewPage、ModelRoutesPage、SettingsReadinessCard、KnowledgePage、KnowledgeOpsTab；API/queryKeys由根集成人接线。
 - 子任务：自动查询改被动接口；显式按钮绑定检测；未知/过期/失败/读取错误分别呈现；取消旧 Boolean(ok)与错误伪健康投影；基础配置与检测健康解耦。
 - 验收：进入/聚焦/刷新零探测；点击检测有pending且防重复；有效配置未检测仍可开始创作；读取错误可重试而非未配置；切换目标不会展示旧指纹健康；知识库未知不是红色连接失败。
@@ -124,8 +124,9 @@
 
 作为作者，我希望看到兼容检测建议后再决定是否改变任务模型配置。
 
-- Owner：Agent B，与 S1-02 串行；点数3；优先级 P0。
+- Owner：Agent B，与 S1-02 串行；点数5；优先级 P0；状态 Refinement / Not Ready。
 - Owned：沿用 S1-02 的 connectivity、LLM route和 ModelRoutesPage，避免两个 Agent 同改。
+- Ready 前置：冻结事务内当前配置指纹计算及 PostgreSQL 隔离级别；定义没有显式 route 行时 revision=0 的 CAS 创建；固定 PUT 成功/重放/冲突判别联合与 HTTP 409；定义覆盖诊断、指纹、排序目标、服务端建议与 revision 的 canonical request hash；服务端按已保存诊断验证目标与建议；固定前端 operationId 的创建、重试和默认选择生命周期。
 - 验收：检测返回建议，正式模型路由保持原值；失败检测不改模型、协议、格式。
 - 验收：作者选择应用时展示受影响任务，走既有保存命令；只保存明确选定的任务。
 - 验收：旧指纹建议显示过期，要求重新检测或重新审阅；请求携带诊断 ID、明确目标与 expectedFingerprint/revision，服务端在保存事务内校验目标当前配置，冲突409且零写入，不能只依靠前端预检。批量应用原子成功或明确整批冲突，不能沿用 Promise.all 后宣称整批成功；提交失败保留选择并说明结果。重放应用不重复写入，已消费或已变更的建议返回原结果或确定冲突。

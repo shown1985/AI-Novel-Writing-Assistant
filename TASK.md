@@ -3,7 +3,7 @@
 更新时间：2026-09-18
 当前分支：`codex/r1-s1-config-safety`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S2A 已完成；下一窗口待 Sprint Planning
+当前状态：R1-S2B 已启动；9 点承诺、无 Stretch
 
 ## 权威文档
 
@@ -102,10 +102,28 @@ R1-S1 Review 与 Retrospective 见 [Sprint 承诺](./docs/plans/r1-s1-sprint-com
 
 Review 与 Retrospective 见 [R1-S2A Sprint 承诺](./docs/plans/r1-s2a-sprint-commitment.md)。S2-02 已完成 Computer Use 验收；S1-02a 的 shared/server 构建与 32 项聚焦检查通过，测试数据库全部位于 `/tmp` 隔离目录。
 
+## 当前 Sprint：R1-S2B
+
+### Sprint Goal
+
+作者进入设置或知识库只读取已有诊断并主动决定何时检测；单书各阶段完成稳定展示装配，模型解析同步产出可信且脱敏的选择来源，为下一窗口的建议应用、推荐动作和实际调用展示解除依赖。
+
+### 承诺 Backlog
+
+| Story | 点数 | 状态 | Owner | 依赖 / 验收边界 |
+| --- | ---: | --- | --- | --- |
+| S1-02b 设置与知识库诊断状态消费 | 3 | In Progress | 诊断 UI Agent；根集成人共享接线 | 自动 GET 零探测，显式 POST；状态分离并完成 Computer Use |
+| S2-01b 阶段装配与页面组合收敛 | 3 | In Progress | 单书 Presentation Agent | 等价装配、无命令副作用、总控恢复行数余量 |
+| S2-04a 模型选择来源与有效参数合同 | 3 | In Progress | 模型平台 Agent；根集成人共享类型 | 解析结果不变，字段级来源可信且脱敏，零 transport/写入 |
+
+承诺容量：9 点。Stretch：无。权威合同见 [R1-S2B Sprint 承诺](./docs/plans/r1-s2b-sprint-commitment.md)。
+
+未承诺：S1-03 已重新估为 5 点并返回 Refinement；S2-03a/03b 仍受 01b/03a 阻断；S2-04b/04c 等待来源合同和持久化/API 门。不得在本 Sprint 中顺手带入。
+
 ## Release 1 后续队列
 
 1. R1-S1：配置、诊断、阅读恢复和世界归属安全（已完成，15/15 点）。
-2. R1-S2：R1-S2A 可信单书现场已结束（14/14 点，Goal 部分达成）→ 下一窗口优先完成诊断 UI 消费、建议应用、单书装配和模型来源窗口。
+2. R1-S2：R1-S2A 可信单书现场已结束（14/14 点，Goal 部分达成）；R1-S2B 正在执行诊断 UI 消费、单书装配和模型来源合同（9 点）。
 3. R1-S3～4：可信世界、提案采用和失败复核。
 4. R1-S5～6：本机Agent委托、预算、记忆和资产。
 5. R1-S7：十章长链、有限撤回和导航收束。
