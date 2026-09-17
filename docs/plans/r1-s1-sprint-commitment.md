@@ -33,7 +33,7 @@
 | S1-00 诊断共享接线与存储契约门 | 2 | Done | 根集成人 | R1-MIG01 | [共享 DTO、存储/CAS/迁移方案与兼容矩阵已冻结](./s1-00-diagnostics-contract.md) |
 | S1-04 简易书架阅读现场恢复 | 3 | User Acceptance | 阅读体验 Agent | 无 | [代码级行为通过，等待用户完成浏览器交互验收](./s1-04-simple-shelf-reading-resume.md) |
 | S1-05 世界问题归属校验 | 2 | Done | 世界安全 Agent | 无 | [跨世界与不存在请求均零行写入](./s1-05-world-issue-ownership.md) |
-| S1-06 世界维护与恢复契约 Spike | 3 | In Progress | 世界契约 Agent | S1-05 | 后续提案、采用、复核和恢复有可实现的版本与幂等合同 |
+| S1-06 世界维护与恢复契约 Spike | 3 | Done | 世界契约 Agent | S1-05 | [Runtime / Prompt / UI 合同已签认](./s1-06-world-maintenance-recovery-contract.md)；生产能力仍由 S3/S4 实施 |
 
 未承诺：S1-01 当前是 `Partial`，需把剩余行为重新 refinement 后再估点；S1-02a/02b/03 仍依赖 S1-00 完成；S2-01a/S2-02 虽为 Ready，但不属于本 Sprint Goal。它们不是 Stretch，也不能在本 Sprint “顺手”实现。
 

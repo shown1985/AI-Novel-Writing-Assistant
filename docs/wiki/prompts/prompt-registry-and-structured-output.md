@@ -133,6 +133,8 @@
 
 ## 相关模块
 
+- 世界评估、提案与提交后复核的 AI / Runtime 分工见[世界维护提交与恢复边界](../workflows/world-maintenance-recovery.md)。
+
 - `server/src/prompting/`
 - `server/src/prompting/core/promptRunner.ts`
 - `server/src/prompting/registry.ts`

@@ -178,6 +178,8 @@
 
 ## 相关模块
 
+- 世界内容的提案、提交、双侧同步 CAS 与复核恢复遵循[世界维护提交与恢复边界](../workflows/world-maintenance-recovery.md)；Gateway 只消费 canonical 本书世界与适用作者决定，不拥有 maintenance 写入。
+
 - `server/src/services/novel/worldContext/WorldContextGateway.ts`
 - `server/src/services/novel/worldContext/NovelWorldInstanceService.ts`
 - `server/src/services/novel/storyWorldSlice/NovelWorldSliceService.ts`

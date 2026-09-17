@@ -63,7 +63,7 @@ Release 2只允许做不抢占R1产能的只读Spike/Refinement。账号、LAN�
 | S1-00 诊断共享接线与存储契约门 | 2 | Done | 根集成人 | [DTO、存储/CAS/迁移方案与兼容矩阵已冻结](./docs/plans/s1-00-diagnostics-contract.md) |
 | S1-04 简易书架阅读现场恢复 | 3 | User Acceptance | 阅读体验 Agent | [代码级行为已通过，等待用户完成浏览器验收](./docs/plans/s1-04-simple-shelf-reading-resume.md) |
 | S1-05 世界问题归属校验 | 2 | Done | 世界安全 Agent | [跨世界与不存在请求均零行写入](./docs/plans/s1-05-world-issue-ownership.md) |
-| S1-06 世界维护与恢复契约 Spike | 3 | In Progress | 世界契约 Agent | S1-05 依赖已解除；只产出契约，不写生产能力 |
+| S1-06 世界维护与恢复契约 Spike | 3 | Done | 世界契约 Agent | [Runtime / Prompt / UI 合同已签认，不代表生产能力已实现](./docs/plans/s1-06-world-maintenance-recovery-contract.md) |
 
 承诺容量：15 点。Stretch：无。权威合同见 [R1-S1 Sprint 承诺](./docs/plans/r1-s1-sprint-commitment.md)。
 
@@ -71,9 +71,11 @@ Release 2只允许做不抢占R1产能的只读Spike/Refinement。账号、LAN�
 
 S1-05 聚焦证据：server build 通过，世界问题归属行为测试 6/6；S1-06 依赖已解除。
 
-S1-00 聚焦证据：shared build、诊断合同测试 3/3、client typecheck 通过；S1-02a/02b/03 仅解除 refinement 前置门，仍未进入本 Sprint。
+S1-00 聚焦证据：shared build、诊断合同测试 3/3、client typecheck 通过；S1-02a 已具备后续 Sprint 的 Ready 合同，S1-02b/03 仍等待实现依赖，三者均未进入本 Sprint。
 
 S1-04 聚焦证据：阅读状态行为测试 8/8、简易创作治理回归 5/5、client typecheck 通过；浏览器交互验收留给用户。
+
+S1-06 聚焦证据：世界维护门面、五类 revision、CAS/幂等、lease 恢复、旧数据、Prompt 与来源页边界完成三方签认；S3-01 仍受静态 Prompt 版本登记漂移阻断，未被误标 Ready。
 
 ## Release 1 后续队列
 
