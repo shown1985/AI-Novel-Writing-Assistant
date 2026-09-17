@@ -3,7 +3,7 @@
 更新时间：2026-09-17
 当前分支：`codex/r1-s0-release-readiness`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S0 路线重整与Backlog refinement
+当前状态：R1-S1 配置、安全阅读与升级兼容
 
 ## 权威文档
 
@@ -23,7 +23,7 @@
 
 Release 2只允许做不抢占R1产能的只读Spike/Refinement。账号、LAN登录、MySQL迁移和协作入口不得以半成品进入Release 1。
 
-## 当前 Sprint：R1-S0
+## 已完成 Sprint：R1-S0
 
 ### Sprint Goal
 
@@ -37,17 +37,35 @@ Release 2只允许做不抢占R1产能的只读Spike/Refinement。账号、LAN�
 | R1-01 单机运行与数据边界冻结 | 3 | Done | 根集成人 | [本机监听与本地数据边界已冻结并通过配置测试](./docs/plans/r1-01-local-runtime-data-boundary.md) |
 | R1-02 第一本书与十章连续创作基线 | 5 | Done | R1-02 验收owner | [临时 SQLite 十章、恢复、质量债与 TXT 基线已通过](./docs/plans/r1-02-first-book-ten-chapter-baseline.md) |
 | R1-03 Release 1验证矩阵 | 3 | Done | R1-03 验证owner | [平台、迁移、主链、包装与发布触发门已形成可执行矩阵](./docs/plans/r1-03-release-verification-matrix.md) |
-| R1-04 首个实施Sprint承诺 | 2 | 待R1-00～03 | PO/根集成人 | ≤25点、owner和依赖冻结 |
+| R1-04 首个实施Sprint承诺 | 2 | Done | PO/根集成人 | [15点、无Stretch的 R1-S1 已冻结](./docs/plans/r1-s1-sprint-commitment.md) |
 
 承诺容量：16点。Stretch：无。
 
-### R1-S0 退出门
+### R1-S0 Review
 
 - 最新源码与所有Release 1候选Story完成证据对账。
 - R1默认仅回环访问、SQLite本地事实源和零隐式上传成为稳定合同。
 - 第一本书/十章长链fixture和平台验证矩阵可执行。
 - 首个实施Sprint不超过25点，所有承诺卡满足DoR。
-- Review与Retrospective完成，文档阶段提交，工作区干净。
+- Review与 Retrospective 见 [R1-S1 Sprint 承诺](./docs/plans/r1-s1-sprint-commitment.md)；承诺/完成 `16/16` 点，无 carryover。
+
+## 当前 Sprint：R1-S1
+
+### Sprint Goal
+
+先解除 SQLite 升级阻断，再让作者获得可恢复的简易阅读现场和跨世界零误写；同时冻结诊断共享门与世界维护恢复合同。
+
+### 承诺 Backlog
+
+| Story | 点数 | 状态 | Owner | 依赖 / 结果 |
+| --- | ---: | --- | --- | --- |
+| R1-MIG01 视觉资产双迁移历史兼容 | 5 | Ready | 根数据集成人 | R1-00/03；解除 R1-D01/D02 |
+| S1-00 诊断共享接线与存储契约门 | 2 | Ready | 根集成人 | 等待 R1-MIG01 |
+| S1-04 简易书架阅读现场恢复 | 3 | Ready | 阅读体验 Agent | 可独立开始 |
+| S1-05 世界问题归属校验 | 2 | Ready | 世界安全 Agent | 可独立开始 |
+| S1-06 世界维护与恢复契约 Spike | 3 | Ready | 世界契约 Agent | 等待 S1-05 |
+
+承诺容量：15 点。Stretch：无。权威合同见 [R1-S1 Sprint 承诺](./docs/plans/r1-s1-sprint-commitment.md)。
 
 ## Release 1 后续队列
 
@@ -67,11 +85,11 @@ Release 2只允许做不抢占R1产能的只读Spike/Refinement。账号、LAN�
 - 通过DoD只代表Story完成；beta组合验证和Release gate通过后才代表可发布。
 - 每个完成阶段必须提交；提交前检查Wiki与用户可见发布记录。
 
-## R1-S0 当前证据
+## R1-S0 完成证据
 
 - R1-00 对账结果：69张独立候选卡中 `Done 0 / Partial 23 / Ready 6 / Not Ready 40`；另有不重复计点的 `S1-X` 已由 `S2-02` 接管。
 - 已识别发布阻断：当前分支与 v0.4.25 存在重叠的视觉资产迁移历史；空库全迁移和新增部分迁移 fixture 均失败，须在 R1-03 验证矩阵和后续明确 Story 中处理。
 - R1-01 已强制服务端、Vite 和桌面入口只使用回环地址；LAN、wildcard、私网主机和非回环 CORS 配置会在迁移及后台恢复前失败。
 - R1-02 的确定性长链在隔离临时 SQLite 中完成十章，验证一次人工恢复、前五章正文哈希不变、第八章质量债继续、显式世界/人物编辑和 TXT 顺序完整；公共 idea→导演交接、真实模型和 UI 仍不在该证据范围内。
 - R1-03 静态审计为 `PASS=8 / BLOCKED=3 / REVIEW=1`；当前硬阻断是重叠 SQLite 迁移、非标准 tag/手动触发可公开发布、公开工作流无 macOS job，另须冻结 macOS x64 是否进入支持范围。
-- R1-04 已解锁，由根集成人冻结首个实施 Sprint 的 Goal、容量、依赖和 ownership。
+- R1-04 已冻结 15 点 R1-S1；新增 R1-MIG01 独立承接迁移阻断，四张既有 Ready 卡进入明确波次，未满足依赖的诊断生产卡未被提前承诺。
