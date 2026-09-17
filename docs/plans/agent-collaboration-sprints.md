@@ -133,15 +133,15 @@ Sprint Goal：用户查看 AI 状态不触发模型调用；缺省配置正确�
 
 | Story | 点数 | 优先级 | 状态 | Owner | 依赖 |
 | --- | --- | --- | --- | --- | --- |
-| S1-01 缺省数值配置正确生效 | 3 | P0 | Ready（R1-S2A Wave 2） | Agent A：配置 | 无 |
+| S1-01 缺省数值配置正确生效 | 3 | P0 | Done | Agent A：配置 | [默认值与零副作用证据通过](./s1-01-numeric-settings-defaults.md) |
 | S1-00 诊断共享接线与存储契约门 | 2 | P0 | Done（合同门） | 根集成人 | [DTO、存储/CAS/迁移方案已冻结](./s1-00-diagnostics-contract.md) |
-| S1-02a 诊断读取、显式探测与持久化 | 3 | P0 | In Progress（R1-S2A） | Agent B：诊断 | S1-00 已完成；共享 schema/迁移仍由根集成人接线 |
-| S1-02b 设置与知识库诊断状态消费 | 3 | P0 | Not Ready | Agent B：诊断 | 业务验收依赖 S1-02a |
+| S1-02a 诊断读取、显式探测与持久化 | 3 | P0 | Done | Agent B：诊断 | [被动读取、显式检测、持久化与双库迁移通过](./s1-02a-diagnostic-readiness-backend.md) |
+| S1-02b 设置与知识库诊断状态消费 | 3 | P0 | Ready | Agent B：诊断 | S1-02a 已完成；进入下一 Sprint 后做 UI 验收 |
 | S1-03 检测建议与应用分开 | 3 | P0 | Not Ready | Agent B：诊断 | S1-02a/b；服务端建议应用 CAS；同一 owner 串行 |
 | S1-04 简易书架阅读现场恢复 | 3 | P1 | Done | Agent C：阅读 | [代码级检查与隔离环境 Computer Use 交互验收均通过](./s1-04-simple-shelf-reading-resume.md) |
 | S1-05 世界问题更新的归属校验 | 2 | P0 | Done | 根集成人 | [跨世界与不存在请求零行写入](./s1-05-world-issue-ownership.md) |
 | S1-06 世界维护契约 Spike | 3 | P0 | Done（合同 Spike） | 根集成人，审计 Agent 提供证据 | [三方合同已签认](./s1-06-world-maintenance-recovery-contract.md) |
-| S1-X 专业章节辅助栏按需展开 | 3 | P1 | Stretch | Agent C：阅读 | S1-04 完成且容量允许；否则进入 Sprint 2 |
+| S1-X 专业章节辅助栏按需展开 | 3 | P1 | Done（由 S2-02 承接，不重复计点） | Agent C：阅读 | [正文优先与 Computer Use 验收通过](./s2-02-professional-chapter-assist-panels.md) |
 
 原概要19点经完整分解后候选核心22点：新增显式接线门2点，S1-02拆为3+3点。Stretch不计承诺；按实施卡可拆 S1-A/S1-B 验收窗口，不强塞同一周期，不能降低验收换取点数。
 

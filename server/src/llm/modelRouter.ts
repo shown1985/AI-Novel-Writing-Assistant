@@ -369,6 +369,7 @@ export async function upsertModelRouteConfig(
       maxTokens: normalizedMaxTokens,
       requestProtocol,
       structuredResponseFormat,
+      revision: 1,
     },
     update: {
       provider,
@@ -377,6 +378,7 @@ export async function upsertModelRouteConfig(
       maxTokens: normalizedMaxTokens,
       requestProtocol,
       structuredResponseFormat,
+      revision: { increment: 1 },
     },
   });
 }

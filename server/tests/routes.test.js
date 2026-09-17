@@ -333,59 +333,6 @@ test("DELETE /api/rag/jobs/finished clears finished job records", async () => {
   }
 });
 
-test("POST /api/llm/model-routes/connectivity returns per-task connectivity statuses", async () => {
-  const originalTestModelRoutes = llmConnectivityService.testModelRoutes;
-  llmConnectivityService.testModelRoutes = async () => ({
-    testedAt: new Date().toISOString(),
-    statuses: [{
-      taskType: "repair",
-      provider: "deepseek",
-      model: "deepseek-chat",
-      ok: true,
-      latency: 128,
-      error: null,
-      plain: {
-        ok: true,
-        latency: 128,
-        error: null,
-      },
-      structured: {
-        ok: true,
-        latency: 140,
-        error: null,
-        strategy: "prompt_json",
-        reasoningForcedOff: true,
-        fallbackAvailable: true,
-        fallbackUsed: false,
-        errorCategory: null,
-        nativeJsonObject: false,
-        nativeJsonSchema: false,
-        profileFamily: "custom_openai_compatible",
-      },
-    }],
-  });
-
-  const app = createApp();
-  const server = http.createServer(app);
-  const port = await listen(server);
-  try {
-    const response = await fetch(`http://127.0.0.1:${port}/api/llm/model-routes/connectivity`, {
-      method: "POST",
-    });
-    assert.equal(response.status, 200);
-    const payload = await response.json();
-    assert.equal(payload.success, true);
-    assert.equal(payload.data.statuses[0].taskType, "repair");
-    assert.equal(payload.data.statuses[0].ok, true);
-    assert.equal(payload.data.statuses[0].plain.ok, true);
-    assert.equal(payload.data.statuses[0].structured.strategy, "prompt_json");
-    assert.equal(payload.data.statuses[0].structured.reasoningForcedOff, true);
-  } finally {
-    llmConnectivityService.testModelRoutes = originalTestModelRoutes;
-    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
-  }
-});
-
 test("GET and PUT /api/llm/structured-fallback expose the global fallback configuration", async () => {
   const originalGetStructuredFallbackSettings = structuredFallbackSettings.getStructuredFallbackSettings;
   const originalSaveStructuredFallbackSettings = structuredFallbackSettings.saveStructuredFallbackSettings;

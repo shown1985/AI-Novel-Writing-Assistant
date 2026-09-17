@@ -1,7 +1,27 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { prisma } = require("../dist/db/prisma.js");
-const { resolveModel } = require("../dist/llm/modelRouter.js");
+const { resolveModel, upsertModelRouteConfig } = require("../dist/llm/modelRouter.js");
+
+test("manual model-route saves start and advance the diagnostic revision", async () => {
+  const originalUpsert = prisma.modelRouteConfig.upsert;
+  let input = null;
+  prisma.modelRouteConfig.upsert = async (value) => {
+    input = value;
+    return {};
+  };
+
+  try {
+    await upsertModelRouteConfig("planner", {
+      provider: "openai",
+      model: "gpt-test",
+    });
+    assert.equal(input.create.revision, 1);
+    assert.deepEqual(input.update.revision, { increment: 1 });
+  } finally {
+    prisma.modelRouteConfig.upsert = originalUpsert;
+  }
+});
 
 test("resolveModel clamps DeepSeek route maxTokens to the provider limit", async () => {
   const originalFindUnique = prisma.modelRouteConfig.findUnique;

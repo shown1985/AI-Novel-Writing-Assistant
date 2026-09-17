@@ -2,7 +2,7 @@
 
 ## 开工范围
 
-本页是 [交互与 AI Sprint 路线图](./agent-collaboration-sprints.md) 的首轮任务卡。状态为开发准备，代码尚未实施。
+本页是 [交互与 AI Sprint 路线图](./agent-collaboration-sprints.md) 的首轮任务卡与滚动状态合同。各子 Story 的状态和完成证据以本页链接及当前 Sprint 承诺为准。
 
 目标是可信的 AI 配置状态、可恢复的阅读现场和世界问题安全更新。完整 refinement 后候选核心 22 点：显式补计共享接线门2点，将原 S1-02 的5点概要拆成后端3点和前端3点。点数不是单窗口承诺；可分 S1-A 配置/安全/契约、S1-B 诊断/阅读验收。三个执行 Agent 与一个根集成人；S1-X 为可移出的 Stretch。
 
@@ -71,7 +71,7 @@
 
 作为开发团队，我们希望诊断、页面与应用设置共享同一合同，避免并发开发各造一套状态。
 
-- Owner：根集成人；点数2；P0；状态 Ready（契约准备），依赖 PREP-02/03。
+- Owner：根集成人；点数2；P0；状态 Done，依赖 PREP-02/03。
 - Owned：共享诊断类型、client/src/api/settings.ts、knowledge.ts、queryKeys.ts；Prisma schema/增量迁移设计由根集成人独占；diagnostics 业务实现仍由 B 承接。
 - 子任务：固定目标级 checkState、nullable结果与读取错误；定义诊断记录、索引和保留策略；固定指纹/credential版本与持久化密钥合同；扩展现有保存命令的 expectedFingerprint、诊断 ID 与整批事务语义；生成 mock DTO 供前端消费。
 - 验收：共享类型能表达未知/成功/失败/过期而不依赖 ok 布尔值；接口没有密钥或凭证摘要。
@@ -101,17 +101,18 @@
 ### S1-02a：诊断读取、显式探测与持久化
 
 - 用户价值：查看状态不消耗模型调用，检测结果跨重启可追溯。
-- Owner：Agent B 后端；3点；状态待 S1-00。Owned 为上文 connectivity、LLM/RAG routes 与拟建 owned diagnostics application/infrastructure；共享 schema 由根集成人接线。
+- Owner：Agent B 后端；3点；状态 Done。Owned 为上文 connectivity、LLM/RAG routes 与 owned diagnostics application/infrastructure；共享 schema 由根集成人接线。
 - 子任务：提取无副作用读取；将模型与 embedding探测收敛到显式命令；保存目标级诊断；指纹失效与同指纹并发合并；迁移旧 health投影并与 S1-03 分离配置写入。
 - 验收：被动GET transport调用和路由upsert均为0；显式POST只保存诊断建议；同指纹同时扫描只一次；改凭证/地址后旧响应不变新配置健康；重启可读已完成结果且脱敏。
 - 检查：mock transport/persistence计数、故障/重启/失效行为测试；只在隔离库演练增量迁移。
 - 非范围：路由自动应用、前端展示、本次委托模型优先级。
 - 完成证据：响应样例、调用计数、存储重启证据和错误脱敏；失败探测保留上次报告并标最新失败，不冒充配置读取失败。
+- 交付证据：[S1-02a 诊断读取、显式探测与持久化](./s1-02a-diagnostic-readiness-backend.md)。
 
 ### S1-02b：设置与知识库诊断状态消费
 
 - 用户价值：清楚知道哪些配置可运行、哪些连接尚未检测，并主动决定检测。
-- Owner：Agent B 前端，与02a同 owner串行或消费根集成人固定 mock DTO；3点；状态待 S1-00，真实验收依赖02a。
+- Owner：Agent B 前端，与02a同 owner串行；3点；状态 Ready，S1-00/02a 已完成。
 - Owned：上文 SettingsOverviewPage、ModelRoutesPage、SettingsReadinessCard、KnowledgePage、KnowledgeOpsTab；API/queryKeys由根集成人接线。
 - 子任务：自动查询改被动接口；显式按钮绑定检测；未知/过期/失败/读取错误分别呈现；取消旧 Boolean(ok)与错误伪健康投影；基础配置与检测健康解耦。
 - 验收：进入/聚焦/刷新零探测；点击检测有pending且防重复；有效配置未检测仍可开始创作；读取错误可重试而非未配置；切换目标不会展示旧指纹健康；知识库未知不是红色连接失败。

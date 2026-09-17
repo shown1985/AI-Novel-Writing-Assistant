@@ -6,6 +6,7 @@ import { AppError } from "../middleware/errorHandler";
 import { validate } from "../middleware/validate";
 import { ragServices } from "../services/rag";
 import { ragConfig } from "../config/rag";
+import { checkRagReadiness, getRagReadiness } from "../modules/diagnostics";
 
 const router = Router();
 
@@ -93,29 +94,62 @@ router.delete("/jobs/:jobId", validate({ params: jobParamsSchema }), async (req,
   }
 });
 
+router.get("/readiness", async (_req, res, next) => {
+  try {
+    const data = await getRagReadiness();
+    res.status(200).json({
+      success: true,
+      data,
+      message: "知识库连接状态已加载。",
+    } satisfies ApiResponse<typeof data>);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/readiness", async (_req, res, next) => {
+  try {
+    const data = await checkRagReadiness();
+    res.status(200).json({
+      success: true,
+      data,
+      message: data.pending ? "相同配置正在检测，请稍后查看结果。" : "知识库连接检测完成。",
+    } satisfies ApiResponse<typeof data>);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/** Legacy passive projection. New consumers must use /readiness. */
 router.get("/health", async (_req, res, next) => {
   try {
-    const [embedding, qdrant] = await Promise.all([
-      ragServices.embeddingService.healthCheck(),
-      ragServices.vectorStoreService.healthCheck(),
-    ]);
+    const readiness = await getRagReadiness();
+    const embeddingTarget = readiness.targets.find((target) => target.targetKind === "rag_embedding");
+    const vectorTarget = readiness.targets.find((target) => target.targetKind === "rag_vector_store");
     const data = {
       embedding: {
-        ...embedding,
+        ok: embeddingTarget?.checkState === "healthy",
+        provider: embeddingTarget?.provider ?? "",
+        model: embeddingTarget?.model ?? "",
+        detail: embeddingTarget?.errorSummary ?? undefined,
         timeoutMs: ragConfig.embeddingTimeoutMs,
         batchSize: ragConfig.embeddingBatchSize,
         maxRetries: ragConfig.embeddingMaxRetries,
       },
       qdrant: {
-        ...qdrant,
+        ok: vectorTarget?.checkState === "healthy",
+        detail: vectorTarget?.errorSummary ?? undefined,
         timeoutMs: ragConfig.qdrantTimeoutMs,
       },
-      ok: embedding.ok && qdrant.ok,
+      ok: readiness.checkState === "healthy",
+      checkState: readiness.checkState,
+      checkedAt: readiness.checkedAt,
     };
-    res.status(data.ok ? 200 : 503).json({
-      success: data.ok,
+    const isFailed = readiness.checkState === "failed";
+    res.status(isFailed ? 503 : 200).json({
+      success: !isFailed,
       data,
-      message: data.ok ? "RAG health check passed." : "RAG health check failed.",
+      message: isFailed ? "RAG health check failed." : "RAG readiness loaded.",
     } satisfies ApiResponse<typeof data>);
   } catch (error) {
     next(error);

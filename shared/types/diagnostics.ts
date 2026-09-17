@@ -46,11 +46,27 @@ export const DIAGNOSTIC_CAPABILITY_VALUES = [
 export const diagnosticCapabilitySchema = z.enum(DIAGNOSTIC_CAPABILITY_VALUES);
 export type DiagnosticCapability = z.infer<typeof diagnosticCapabilitySchema>;
 
+export const diagnosticStructuredCapabilityDetailsSchema = z.object({
+  strategy: z.enum(DIAGNOSTIC_STRUCTURED_RESPONSE_FORMAT_VALUES).nullable(),
+  reasoningForcedOff: z.boolean(),
+  fallbackAvailable: z.boolean(),
+  fallbackUsed: z.boolean(),
+  errorCategory: z.string().trim().min(1).nullable(),
+  nativeJsonObject: z.boolean(),
+  nativeJsonSchema: z.boolean(),
+  profileFamily: z.string().trim().min(1).nullable(),
+}).strict();
+export type DiagnosticStructuredCapabilityDetails = z.infer<
+  typeof diagnosticStructuredCapabilityDetailsSchema
+>;
+
 export const diagnosticCapabilityResultSchema = z.object({
   capability: diagnosticCapabilitySchema,
   checkState: diagnosticCheckStateSchema,
   latencyMs: z.number().int().nonnegative().nullable(),
   errorSummary: z.string().trim().min(1).nullable(),
+  requestProtocol: z.enum(DIAGNOSTIC_REQUEST_PROTOCOL_VALUES).nullable().optional(),
+  structuredDetails: diagnosticStructuredCapabilityDetailsSchema.nullable().optional(),
 }).strict();
 export type DiagnosticCapabilityResult = z.infer<typeof diagnosticCapabilityResultSchema>;
 
@@ -77,13 +93,28 @@ export const diagnosticTargetResultSchema = z.object({
 }).strict();
 export type DiagnosticTargetResult = z.infer<typeof diagnosticTargetResultSchema>;
 
-export const diagnosticReadinessReportSchema = z.object({
+const diagnosticCompletedReportSchema = z.object({
   diagnosticId: z.string().trim().min(1).nullable(),
   scope: diagnosticScopeSchema,
   checkState: diagnosticCheckStateSchema,
   checkedAt: z.string().datetime().nullable(),
   configurationFingerprint: z.string().trim().min(1),
   targets: z.array(diagnosticTargetResultSchema),
+}).strict();
+
+export const diagnosticPendingRunSchema = z.object({
+  diagnosticId: z.string().trim().min(1),
+  startedAt: z.string().datetime(),
+  expiresAt: z.string().datetime(),
+}).strict();
+export type DiagnosticPendingRun = z.infer<typeof diagnosticPendingRunSchema>;
+
+export const diagnosticPreviousReportSchema = diagnosticCompletedReportSchema;
+export type DiagnosticPreviousReport = z.infer<typeof diagnosticPreviousReportSchema>;
+
+export const diagnosticReadinessReportSchema = diagnosticCompletedReportSchema.extend({
+  pending: diagnosticPendingRunSchema.nullable().optional(),
+  previousReport: diagnosticPreviousReportSchema.nullable().optional(),
 }).strict();
 export type DiagnosticReadinessReport = z.infer<typeof diagnosticReadinessReportSchema>;
 

@@ -1857,10 +1857,63 @@ model ModelRouteConfig {
   maxTokens                Int?
   requestProtocol          String  @default("auto")
   structuredResponseFormat String  @default("auto")
+  revision                 Int     @default(0)
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 
   @@index([provider])
+}
+
+model DiagnosticRun {
+  id                         String   @id @default(cuid())
+  scope                      String
+  configurationFingerprint   String
+  checkState                 String
+  startedAt                  DateTime
+  completedAt                DateTime?
+  errorSummary               String?
+  activeClaimKey             String?  @unique
+  leaseExpiresAt             DateTime?
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+  targets                    DiagnosticTargetResult[]
+  recommendationApplications DiagnosticRecommendationApplication[]
+
+  @@index([scope, createdAt])
+}
+
+model DiagnosticTargetResult {
+  id                 String   @id @default(cuid())
+  runId              String
+  targetId           String
+  targetKind         String
+  taskType           String?
+  provider           String?
+  model              String?
+  checkState         String
+  capabilitiesJson   String
+  errorSummary       String?
+  recommendationJson String?
+  revision           Int      @default(0)
+  checkedAt          DateTime?
+  createdAt          DateTime @default(now())
+  run                DiagnosticRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, targetId])
+}
+
+model DiagnosticRecommendationApplication {
+  id                  String   @id @default(cuid())
+  operationId         String   @unique
+  diagnosticId        String
+  selectionHash       String
+  expectedFingerprint String
+  currentFingerprint  String
+  resultJson          String
+  createdAt           DateTime @default(now())
+  run                 DiagnosticRun @relation(fields: [diagnosticId], references: [id], onDelete: Restrict)
+
+  @@index([diagnosticId, createdAt])
 }
 
 model NovelBible {

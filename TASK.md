@@ -1,9 +1,9 @@
 # 当前项目看板：Release 1 单机成书版
 
-更新时间：2026-09-17
+更新时间：2026-09-18
 当前分支：`codex/r1-s1-config-safety`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S2A 可信单书现场
+当前状态：R1-S2A 已完成；下一窗口待 Sprint Planning
 
 ## 权威文档
 
@@ -79,7 +79,7 @@ S1-06 聚焦证据：世界维护门面、五类 revision、CAS/幂等、lease �
 
 R1-S1 Review 与 Retrospective 见 [Sprint 承诺](./docs/plans/r1-s1-sprint-commitment.md)：Sprint Goal 达成，承诺/完成 `15/15` 点，无 carryover；S1-04 五项 UI 验收通过，后续 UI 数值证据先锁定真实滚动容器。
 
-## 当前 Sprint：R1-S2A
+## 已完成 Sprint：R1-S2A
 
 ### Sprint Goal
 
@@ -90,20 +90,22 @@ R1-S1 Review 与 Retrospective 见 [Sprint 承诺](./docs/plans/r1-s1-sprint-com
 | Story | 点数 | 状态 | Owner | 依赖 / 结果 |
 | --- | ---: | --- | --- | --- |
 | S1-01 缺省数值配置正确生效 | 3 | Done | 配置 Agent | [默认值、合法低值与零副作用 7 项行为检查通过](./docs/plans/s1-01-numeric-settings-defaults.md) |
-| S1-02a 诊断读取、显式探测与持久化 | 3 | In Progress | 诊断 Agent + 根集成人 | S1-00 已完成；共享 schema/迁移由根集成人独占 |
+| S1-02a 诊断读取、显式探测与持久化 | 3 | Done | 诊断 Agent + 根集成人 | [被动读取、显式探测、跨重启持久化与双库增量迁移通过](./docs/plans/s1-02a-diagnostic-readiness-backend.md) |
 | S2-01a 单书查询与导演编排归属 | 5 | Done | 单书总控 Agent | [作品身份、暂停保持与零自动命令 36 项检查通过](./docs/plans/s2-01a-single-book-application-facade.md) |
 | S2-02 专业章节辅助区域按需展开 | 3 | Done | 章节编辑 Agent + 根集成人 | [正文优先、按需模型调用、状态保持与隔离 Computer Use 验收通过](./docs/plans/s2-02-professional-chapter-assist-panels.md) |
 
 承诺容量：14 点。Stretch：无。权威合同见 [R1-S2A Sprint 承诺](./docs/plans/r1-s2a-sprint-commitment.md)。
 
-未承诺：S1-02b/03、S2-01b、S2-03a/03b、S2-04a/04b/04c。Ready 的 S2-04a 因容量顺延，其他卡保持依赖状态；不得在实现中顺手带入。
+未承诺：S1-02b/03、S2-01b、S2-03a/03b、S2-04a/04b/04c。Ready 的 S2-04a 因容量顺延，其他卡保持依赖状态；本 Sprint 未在实现中顺手带入。
 
-当前完成 `11/14` 点：S1-01、S2-01a、S2-02 已 Done；S1-02a 继续按冻结边界 In Progress。
+完成 `14/14` 点，无 Story carryover。Sprint Goal 部分达成：可靠默认值、单书状态隔离、正文优先和诊断后端均完成，知识库旧状态读取已被动化；模型设置页仍会自动调用旧 POST，须由下一窗口的 S1-02b 切换到被动 GET 后，才能宣称“查看 AI 状态零模型调用”在 UI 全面达成。
+
+Review 与 Retrospective 见 [R1-S2A Sprint 承诺](./docs/plans/r1-s2a-sprint-commitment.md)。S2-02 已完成 Computer Use 验收；S1-02a 的 shared/server 构建与 32 项聚焦检查通过，测试数据库全部位于 `/tmp` 隔离目录。
 
 ## Release 1 后续队列
 
 1. R1-S1：配置、诊断、阅读恢复和世界归属安全（已完成，15/15 点）。
-2. R1-S2：R1-S2A 可信单书现场（当前 14 点）→ 后续装配、推荐动作和模型来源窗口。
+2. R1-S2：R1-S2A 可信单书现场已结束（14/14 点，Goal 部分达成）→ 下一窗口优先完成诊断 UI 消费、建议应用、单书装配和模型来源窗口。
 3. R1-S3～4：可信世界、提案采用和失败复核。
 4. R1-S5～6：本机Agent委托、预算、记忆和资产。
 5. R1-S7：十章长链、有限撤回和导航收束。

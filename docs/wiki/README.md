@@ -19,6 +19,7 @@ Wiki 不记录单次提交改了什么，也不替代 release notes。它只记�
 - [当前模型选择与厂商默认模型边界](./architecture/model-selection.md)
 - [配置项归属与可见性规范](./architecture/configuration-conventions.md)
 - [Release 1 本机运行与数据边界](./architecture/local-runtime-data-boundary.md)
+- [诊断就绪读写边界](./architecture/diagnostic-readiness.md)
 
 ### Workflows
 

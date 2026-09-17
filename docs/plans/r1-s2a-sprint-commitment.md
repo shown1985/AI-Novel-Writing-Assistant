@@ -15,7 +15,7 @@
 | Story | 点数 | 当前状态 | Owner | 依赖 | 用户结果 |
 | --- | ---: | --- | --- | --- | --- |
 | S1-01 缺省数值配置正确生效 | 3 | Done | 配置 Agent | [7 项输入矩阵与零副作用检查通过](./s1-01-numeric-settings-defaults.md) | 未配置、空白和坏值使用声明默认，合法低值与允许的 0 保持 |
-| S1-02a 诊断读取、显式探测与持久化 | 3 | In Progress | 诊断 Agent；根集成人负责共享接线 | S1-00 已完成 | 打开页面只读取状态，显式检测才调用模型/embedding，结果跨重启可追溯 |
+| S1-02a 诊断读取、显式探测与持久化 | 3 | Done | 诊断 Agent；根集成人负责共享接线 | [后端读/检分离、持久化与迁移证据通过](./s1-02a-diagnostic-readiness-backend.md) | 服务端被动读取零 transport，显式检测结果跨重启可追溯 |
 | S2-01a 单书查询与导演编排归属 | 5 | Done | 单书总控 Agent | [application facade、边界说明与 36 项检查通过](./s2-01a-single-book-application-facade.md) | 当前作品、导演任务、暂停与恢复状态进入 owned application facade，不串书、不误恢复 |
 | S2-02 专业章节辅助区域按需展开 | 3 | Done | 章节编辑 Agent；根集成人负责外部身份接线 | [10 项行为检查与隔离 UI 验收通过](./s2-02-professional-chapter-assist-panels.md) | 正文默认优先，章节参考和 AI 协作按需展开，折叠与同章刷新不丢草稿或候选 |
 
@@ -90,9 +90,27 @@ Wave 2
 
 R1-S2A 完成只解锁下一窗口的装配、推荐动作和模型透明度；Release 1 仍须经过后续 Sprint、R1-RC、beta 组合验证和最终用户验收。
 
-## 当前执行证据
+## 完成证据
 
-- 已完成：S2-02，`3/14` 点。正文默认优先、两辅助区按需展开、稳定章节 session、外部正文冲突保护与窄屏单层交互均通过。
-- S2-02 行为检查 `10/10`、client typecheck、`git diff --check` 通过；Computer Use 已验证宽屏、720px 窄屏、键盘、失败保持、切章清理与请求次数。
-- 页面首次进入专业章节编辑器不再触发章节诊断模型调用；首次显式展开辅助区才请求一次 workspace，折叠重开与纯选区不会重复请求。
-- 其余三张承诺卡保持原边界；S2-02 完成没有自动把任何未承诺 Story 拉入本 Sprint。
+- S1-01：env 与数据库的未配置、空白、坏值、合法低值和允许的 `0` 共 7 项行为检查通过；读取零设置写入、零事务和零索引任务。
+- S1-02a：shared/server build、诊断 6/6、路由 2/2、路由 revision 与迁移 19/19、共享 DTO 5/5，共 32 项聚焦检查通过；SQLite/PGlite PostgreSQL 增量迁移只在隔离环境演练。
+- S2-01a：单书 application facade、导演任务身份、迟到 mutation 隔离、人工恢复暂停保持和零自动命令共 36 项检查通过；`NovelEdit.tsx` 降至 1263 行。
+- S2-02：行为检查 10/10、client typecheck 和 Computer Use 通过；覆盖宽屏、720px 窄屏、键盘、失败保持、切章清理与请求次数。
+- 所有承诺卡均有独立完成证据，完成 `14/14` 点；没有把 S1-02b/03、S2-01b、S2-03 或 S2-04 偷带入本 Sprint。
+
+## Sprint Review
+
+- Sprint Goal：**部分达成**。可靠默认值、正文优先、跨书隔离、人工恢复保持和后端诊断读/检分离均已达成；知识库旧 GET 已改为被动读取。
+- 尚未完全达成的 Goal 语句：设置概览和模型路由页仍把旧 POST 作为自动 query，打开页面仍可能探测模型。该 UI 消费明确属于未承诺的 S1-02b，不以保留兼容响应掩盖缺口。
+- 承诺 / 完成：`14 / 14` 点。Story carryover：0；S1-02b 是既有 Backlog，不是本 Sprint 未完成 Story。
+- UI 验收：S2-02 已完成 Computer Use；S1-01、S2-01a 和 S1-02a 以行为/合同检查收口。诊断 UI 的 Computer Use 验收等待 S1-02b。
+- 返工与逸出：集成审查发现直接替换 POST 响应会破坏旧设置页，已补旧结构投影和路由回归；未出现用户数据写入或付费模型调用。
+- 已知发布门：旧 SQLite 原生 `prisma migrate deploy` 历史仍会在既有视觉迁移处重复添加字段；桌面受控 runtime migration 和本 Story 新增迁移通过，未在 3 点 Story 内越界改写历史迁移。
+
+## Retrospective
+
+- 做得有效：在实现阶段冻结共享 DTO、schema 和迁移 owner，使后端、前端后续卡和双数据库合同保持同源；Computer Use 用于有实际交互风险的章节编辑 Story，而后端卡使用隔离行为证据。
+- 流程改进 1：替换已有 HTTP 响应前，先枚举全部仓库消费者并增加兼容测试；不能只验证新接口本身。
+- 流程改进 2：Prisma schema 只做局部补丁和双 schema validate；避免无关的全文件格式化扩大 diff。
+
+R1-S2A 到此结束。下一窗口必须重新 Sprint Planning；不得把“14/14 点”解释为 Release 1 或完整 R1-S2 已完成。

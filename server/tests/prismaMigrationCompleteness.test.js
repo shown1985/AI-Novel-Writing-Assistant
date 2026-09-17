@@ -105,6 +105,11 @@ test("SQLite migrations contain every model and column in the SQLite Prisma sche
     assert.equal(indexExists(database, "ComicCharacterAsset_characterId_idx"), true);
     assert.equal(indexExists(database, "ComicCharacterAsset_projectId_idx"), true);
     assert.equal(indexExists(database, "ComicScene_projectId_idx"), true);
+    assert.equal(indexExists(database, "DiagnosticRun_activeClaimKey_key"), true);
+    assert.equal(indexExists(database, "DiagnosticRun_scope_createdAt_idx"), true);
+    assert.equal(indexExists(database, "DiagnosticTargetResult_runId_targetId_key"), true);
+    assert.equal(indexExists(database, "DiagnosticRecommendationApplication_operationId_key"), true);
+    assert.equal(indexExists(database, "DiagnosticRecommendationApplication_diagnosticId_createdAt_idx"), true);
     assert.equal(database.pragma("integrity_check", { simple: true }), "ok");
     assert.deepEqual(database.pragma("foreign_key_check"), []);
     assert.equal(
