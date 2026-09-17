@@ -93,7 +93,7 @@
 ## S2-02：专业章节辅助区域按需展开
 
 - 用户价值：正文获得安静的阅读编辑空间，需要时在同章展开目录或 AI 修改帮助。
-- 状态：Ready；若 S1-X 已完成则标 Reused，不再次开发。先核对旧检查与当前代码是否仍一致。
+- 状态：Done（R1-S2A）；[行为检查、按需请求计数与隔离 Computer Use 验收通过](./s2-02-professional-chapter-assist-panels.md)。
 - 点数：3（Reused 时新增开发点数为 0）；Owner：Agent B，章节编辑模块独占。
 - 真实源码：client/src/pages/novels/components/chapterEditor/ChapterEditorShell.tsx、ChapterEditorSidebar.tsx、ChapterEditorDirectorPanel.tsx、ChapterTextEditor.tsx、SelectionAIFloatingToolbar.tsx；外部 NovelChapterEdit.tsx 改动由根集成人接线。
 - 现有能力：previewChapterAiRevision、updateNovelChapter、reviewNovelChapter；复用候选与 AIDiffPanel，不新造写作链。
@@ -115,11 +115,11 @@
 5. 保存/预览/审校失败时原稿和候选保留，并明确可重试操作；加载不遮挡已有草稿。
 6. 章节切换清理前一章 session；同章普通查询刷新不静默丢失脏稿。外部正文变化须提示冲突，不覆盖作者草稿。
 
-聚焦行为检查：有状态开关/session 行为用现有 revision request 和候选应用测试补充；client typecheck；不测试 Tailwind 字符串。UI、窄屏和键盘验收交用户。
+聚焦行为检查：有状态开关/session 行为用现有 revision request 和候选应用测试补充；client typecheck；不测试 Tailwind 字符串。宽屏、窄屏、键盘和失败保持已由获授权的 Computer Use 在隔离环境完成。
 
 数据安全与失败恢复：只改展示与本地 session。保存继续走既有命令，预览不自动写正文；外部更新冲突须保留草稿，不使用清库/重置处理。
 
-交付证据：S1-X 复用与失效检查说明，状态保留结果，零额外请求计数，用户 UI 验收或明确缺口。未做 UI 验收不得声称视觉已确认。
+交付证据：[S2-02 完成证据](./s2-02-professional-chapter-assist-panels.md)记录状态保留、初始零 workspace 请求、首次显式展开一次请求、折叠重开与纯选区零重复请求，以及宽/窄屏 UI 结果。
 
 ## S2-03a：单书成果、进度与推荐动作展示模型
 

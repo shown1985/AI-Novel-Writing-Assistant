@@ -37,6 +37,7 @@ export interface ChapterEditorShellProps {
   onRunFullAudit?: () => void;
   onGenerateChapterPlan?: () => void;
   onReplanChapter?: () => void;
+  onRequestWorkspace?: () => void;
   isRunningFullAudit?: boolean;
   isGeneratingChapterPlan?: boolean;
   isReplanningChapter?: boolean;

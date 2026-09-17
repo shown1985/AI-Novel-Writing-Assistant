@@ -168,6 +168,40 @@
 - 编辑正文后仍显示旧进度：检查投影是否按当前正文 hash 过滤边界；旧边界只能保留为历史恢复证据。
 - 自动导演在只有草稿的范围内结束：检查步骤完成标准是否统计了当前版本的资产边界、状态提交和可审阅事实，而不是只统计 `draft_saved`。
 
+## 专业章节编辑现场的会话与调用边界
+
+### Background
+
+专业章节编辑器同时承载正文草稿、选区、AI 候选和章节诊断。如果用章节 `updatedAt` 作为组件身份，普通查询刷新或保存回读会重挂载编辑器并清空作者尚未保存的工作；如果折叠的参考区仍在页面挂载时获取诊断 workspace，视觉上的“按需”仍会产生模型调用。
+
+### Current Rule
+
+- 一个章节编辑 session 只由 `novelId + chapterId` 标识。`updatedAt` 是外部内容版本信号，不是 React 挂载身份。
+- 章节参考和 AI 协作默认关闭。可能运行 Prompt 的 workspace 只在作者首次打开辅助区或显式发起修订时解锁；同一章节内折叠重开复用已有查询，不再次生成。
+- 选择正文只建立本地 target range 并显示操作入口，不得自动发送修订或诊断请求。只有点击具体修订动作后才允许调用既有 preview 能力。
+- 辅助区开关只改变展示，不销毁正文编辑器或章节 session。宽屏可独立并存；窄屏只保留最近打开的一层，并让被覆盖的正文区域不可聚焦。
+- 同一 session 收到新的服务器正文时，只有本地无脏稿、无选区、无修订指令、无问题定位且无待确认候选，才能自动同步。否则必须保留本地工作并显示冲突，让作者显式选择继续使用草稿或载入外部正文。
+- 切换作品或章节会创建新的 session，并清除上一章的草稿、选区、指令和候选；查询解锁状态同样按作品与章节隔离。
+
+### Failure Modes
+
+- 进入章节页即出现诊断模型日志：检查 workspace query 是否在页面挂载时自动 enabled，而不是等待辅助区或修订动作解锁。
+- 保存、后台刷新或同章查询完成后草稿消失：检查组件 key 是否含 `updatedAt`，以及外部正文 reconciliation 是否在脏稿存在时仍自动覆盖。
+- 折叠后候选或修订指令丢失：检查辅助区是否被条件卸载并持有自己的关键 session 状态；关键状态应归属于稳定章节 Shell。
+- 窄屏能同时 Tab 到正文与覆盖层控件：检查非当前层是否进入 `inert`，不能只依赖视觉上的绝对定位。
+
+### Related Modules
+
+- `client/src/pages/novels/NovelChapterEdit.tsx`
+- `client/src/pages/novels/components/chapterEditor/ChapterEditorShell.tsx`
+- `client/src/pages/novels/components/chapterEditor/chapterEditorSessionState.ts`
+- `server/src/services/novel/chapterEditor/ChapterEditorWorkspaceService.ts`
+
+### Source Documents
+
+- [S2-02 专业章节辅助区域按需展开](../../plans/s2-02-professional-chapter-assist-panels.md)
+- [Sprint 2 实施卡](../../plans/agent-collaboration-sprint-2.md)
+
 ## 示例
 
 推荐做法：

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { FlaskConical } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -6,6 +6,10 @@ import { getChapterEditorWorkspace, getNovelDetail } from "@/api/novel";
 import { queryKeys } from "@/api/queryKeys";
 import { Button } from "@/components/ui/button";
 import ChapterEditorShell from "./components/chapterEditor/ChapterEditorShell";
+import {
+  buildChapterEditorSessionIdentity,
+  isChapterEditorWorkspaceRequested,
+} from "./components/chapterEditor/chapterEditorSessionState";
 
 function PageStateCard(props: { message: string }) {
   return (
@@ -18,6 +22,9 @@ function PageStateCard(props: { message: string }) {
 export default function NovelChapterEdit() {
   const { id = "", chapterId = "" } = useParams();
   const navigate = useNavigate();
+  const sessionIdentity = buildChapterEditorSessionIdentity(id, chapterId);
+  const [workspaceRequestIdentity, setWorkspaceRequestIdentity] = useState<string | null>(null);
+  const workspaceRequested = isChapterEditorWorkspaceRequested(workspaceRequestIdentity, sessionIdentity);
 
   const novelDetailQuery = useQuery({
     queryKey: queryKeys.novels.detail(id),
@@ -27,7 +34,8 @@ export default function NovelChapterEdit() {
   const chapterEditorWorkspaceQuery = useQuery({
     queryKey: queryKeys.novels.chapterEditorWorkspace(id, chapterId || "none"),
     queryFn: () => getChapterEditorWorkspace(id, chapterId),
-    enabled: Boolean(id && chapterId),
+    enabled: Boolean(id && chapterId && workspaceRequested),
+    staleTime: Infinity,
   });
 
   const detail = novelDetailQuery.data?.data;
@@ -71,7 +79,7 @@ export default function NovelChapterEdit() {
         </Button>
       </div>
       <ChapterEditorShell
-        key={`${chapter.id}:${chapter.updatedAt}`}
+        key={sessionIdentity}
         novelId={id}
         chapter={chapter}
         workspace={chapterEditorWorkspaceQuery.data?.data ?? null}
@@ -80,6 +88,7 @@ export default function NovelChapterEdit() {
           : chapterEditorWorkspaceQuery.isError
             ? "error"
             : "ready"}
+        onRequestWorkspace={() => setWorkspaceRequestIdentity(sessionIdentity)}
         onBack={() => navigate(`/novels/${id}/edit`)}
         onOpenVersionHistory={() => navigate(`/novels/${id}/edit`)}
       />
