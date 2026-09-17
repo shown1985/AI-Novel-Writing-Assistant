@@ -41,3 +41,67 @@ export interface ProviderConfig {
   models: string[];
   envKey: string;
 }
+
+export type ModelSelectionSource =
+  | "explicit_request"
+  | "task_route"
+  | "task_route_default"
+  | "provider_configuration"
+  | "environment"
+  | "built_in_default"
+  | "fallback_default"
+  | "system_default"
+  | "unknown";
+
+export type ModelSelectionAdjustmentKind =
+  | "provider_limit"
+  | "legacy_4096_unset"
+  | "capability_fixed"
+  | "capability_clamped_min"
+  | "capability_clamped_max"
+  | "structured_cap"
+  | "structured_omit";
+
+export interface ModelSelectionAdjustment<T = string | number | null> {
+  kind: ModelSelectionAdjustmentKind;
+  before: T | null;
+  after: T | null;
+  reason: string;
+}
+
+export interface ModelSelectionFieldProvenance<T> {
+  requested: T | null;
+  effective: T | null;
+  source: ModelSelectionSource;
+  adjustments: ModelSelectionAdjustment<T>[];
+}
+
+export type ModelRouteDegradedReason =
+  | "strict_route_not_configured"
+  | "route_lookup_failed"
+  | null;
+
+/**
+ * Sanitized field-level evidence produced by the resolver itself.
+ * It intentionally excludes credentials, endpoints, auth modes and request/session metadata.
+ */
+export interface ModelSelectionProvenance {
+  provider: ModelSelectionFieldProvenance<LLMProvider>;
+  model: ModelSelectionFieldProvenance<string>;
+  temperature: ModelSelectionFieldProvenance<number>;
+  maxTokens: ModelSelectionFieldProvenance<number>;
+  routeKey: string | null;
+  routeDegraded: boolean;
+  routeDegradedReason: ModelRouteDegradedReason;
+}
+
+export type ModelAttemptRole = "primary" | "retry" | "repair" | "fallback" | "unknown";
+
+/** S2-04a freezes lineage shape only; later stories attach and persist identifiers. */
+export interface ModelAttemptLineage {
+  requestId: string | null;
+  attemptId: string | null;
+  parentAttemptId: string | null;
+  attemptIndex: number | null;
+  role: ModelAttemptRole;
+}

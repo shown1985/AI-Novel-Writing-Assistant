@@ -1,9 +1,20 @@
-import type { LLMProvider, ProviderAuthMode, ReasoningEffort } from "@ai-novel/shared/types/llm";
+import type {
+  LLMProvider,
+  ModelSelectionProvenance,
+  ModelSelectionSource,
+  ProviderAuthMode,
+  ReasoningEffort,
+} from "@ai-novel/shared/types/llm";
 import type { ModelRouteRequestProtocol } from "@ai-novel/shared/types/novel";
 import { ChatOpenAI } from "@langchain/openai";
 import type { PromptInvocationMeta } from "../prompting/core/promptTypes";
+import {
+  appendModelSelectionAdjustment,
+  createModelSelectionField,
+  projectModelSelectionProvenance,
+} from "../platform/llm/provenance";
 import { secretStore } from "../services/settings/secretStore";
-import { resolveModelTemperature } from "./capabilities";
+import { resolveModelTemperatureWithProvenance } from "./capabilities";
 import { createAnthropicLLM } from "./anthropicClient";
 import { attachLLMDebugLogging } from "./debugLogging";
 import { attachLLMRequestLimiter } from "./requestLimiter";
@@ -86,6 +97,7 @@ export interface ResolvedLLMClientOptions {
   promptMeta?: PromptInvocationMeta;
   modelRoute?: string;
   routeDegraded?: boolean;
+  selectionProvenance: ModelSelectionProvenance;
   openCodeSessionId?: string;
 }
 
@@ -226,6 +238,29 @@ export async function resolveLLMClientOptions(
   let resolvedMaxTokens: number | undefined = options.maxTokens;
   let resolvedModelRoute: string | undefined;
   let resolvedRouteDegraded = false;
+  let resolvedRouteDegradedReason: ModelSelectionProvenance["routeDegradedReason"] = null;
+  const providerSource: ModelSelectionSource = provider != null
+    ? "explicit_request"
+    : options.fallbackProvider != null ? "fallback_default" : "system_default";
+  let providerProvenance = createModelSelectionField({
+    requested: resolvedProvider,
+    source: providerSource,
+  });
+  let modelProvenance = createModelSelectionField<string>({
+    requested: resolvedModel,
+    effective: resolvedModel,
+    source: resolvedModel != null ? "explicit_request" : "unknown",
+  });
+  let temperatureProvenance = createModelSelectionField<number>({
+    requested: resolvedTemperature,
+    effective: resolvedTemperature,
+    source: resolvedTemperature != null ? "explicit_request" : "unknown",
+  });
+  let maxTokensProvenance = createModelSelectionField<number>({
+    requested: resolvedMaxTokens,
+    effective: resolvedMaxTokens,
+    source: resolvedMaxTokens != null ? "explicit_request" : "unknown",
+  });
 
   if (options.taskType) {
     const hasExplicitProvider = provider != null;
@@ -239,15 +274,19 @@ export async function resolveLLMClientOptions(
     });
     if (shouldUseRouteProvider) {
       resolvedProvider = route.provider;
+      providerProvenance = route.selectionProvenance.provider;
     }
     if (options.model == null && shouldUseRouteProvider) {
       resolvedModel = normalizeOptionalText(route.model);
+      modelProvenance = route.selectionProvenance.model;
     }
     if (options.temperature == null) {
       resolvedTemperature = route.temperature;
+      temperatureProvenance = route.selectionProvenance.temperature;
     }
     if (options.maxTokens == null) {
       resolvedMaxTokens = route.maxTokens;
+      maxTokensProvenance = route.selectionProvenance.maxTokens;
     }
     if (options.requestProtocol == null) {
       options.requestProtocol = route.requestProtocol;
@@ -260,6 +299,7 @@ export async function resolveLLMClientOptions(
     }
     resolvedModelRoute = route.routeKey;
     resolvedRouteDegraded = route.routeDegraded;
+    resolvedRouteDegradedReason = route.routeDegradedReason;
   }
 
   const dbSecret = await resolveProviderSecret(resolvedProvider);
@@ -274,12 +314,20 @@ export async function resolveLLMClientOptions(
     throw new Error(`未配置 ${providerName} 的 API Key。`);
   }
 
-  const model = resolvedModel
-    ?? dbSecret?.model
-    ?? getProviderEnvModel(resolvedProvider)
-    ?? (isBuiltInProvider(resolvedProvider) ? PROVIDERS[resolvedProvider].defaultModel : undefined);
+  const configuredModel = normalizeOptionalText(dbSecret?.model);
+  const environmentModel = normalizeOptionalText(getProviderEnvModel(resolvedProvider));
+  const builtInModel = isBuiltInProvider(resolvedProvider)
+    ? normalizeOptionalText(PROVIDERS[resolvedProvider].defaultModel)
+    : undefined;
+  const model = resolvedModel ?? configuredModel ?? environmentModel ?? builtInModel;
   if (!model) {
     throw new Error(`未配置 ${providerName} 的默认模型。`);
+  }
+  if (resolvedModel == null) {
+    const source: ModelSelectionSource = configuredModel != null
+      ? "provider_configuration"
+      : environmentModel != null ? "environment" : "built_in_default";
+    modelProvenance = createModelSelectionField({ requested: model, source });
   }
 
   const baseURL = resolveProviderBaseUrl(
@@ -299,7 +347,21 @@ export async function resolveLLMClientOptions(
     promptMeta: options.promptMeta,
   });
 
-  const temperature = resolveModelTemperature(resolvedProvider, model, resolvedTemperature);
+  const temperatureResolution = resolveModelTemperatureWithProvenance(
+    resolvedProvider,
+    model,
+    resolvedTemperature,
+  );
+  if (temperatureProvenance.source === "unknown") {
+    temperatureProvenance = createModelSelectionField({
+      requested: temperatureResolution.requested,
+      source: "system_default",
+    });
+  }
+  for (const adjustment of temperatureResolution.adjustments) {
+    temperatureProvenance = appendModelSelectionAdjustment(temperatureProvenance, adjustment);
+  }
+  const temperature = temperatureResolution.effective;
   const timeoutMs = normalizeOptionalTimeoutMs(options.timeoutMs);
   const concurrencyLimit = normalizeLimitValue(dbSecret?.concurrencyLimit);
   const requestIntervalMs = normalizeLimitValue(dbSecret?.requestIntervalMs);
@@ -326,14 +388,53 @@ export async function resolveLLMClientOptions(
   const reasoningEnabled = shouldForceDisableReasoning ? false : requestedReasoningEnabled;
   let effectiveMaxTokens = resolvedMaxTokens;
   if (structuredProfile && usesNativeStructured && structuredProfile.omitMaxTokensForNativeStructured) {
+    if (effectiveMaxTokens !== undefined) {
+      maxTokensProvenance = appendModelSelectionAdjustment(maxTokensProvenance, {
+        kind: "structured_omit",
+        before: effectiveMaxTokens,
+        after: null,
+        reason: "当前结构化输出模式要求省略 Token 上限。",
+      });
+    }
     effectiveMaxTokens = undefined;
   } else if (
     structuredProfile
     && typeof structuredProfile.safeStructuredMaxTokens === "number"
     && typeof effectiveMaxTokens === "number"
   ) {
-    effectiveMaxTokens = Math.min(effectiveMaxTokens, structuredProfile.safeStructuredMaxTokens);
+    const cappedMaxTokens = Math.min(effectiveMaxTokens, structuredProfile.safeStructuredMaxTokens);
+    if (cappedMaxTokens !== effectiveMaxTokens) {
+      maxTokensProvenance = appendModelSelectionAdjustment(maxTokensProvenance, {
+        kind: "structured_cap",
+        before: effectiveMaxTokens,
+        after: cappedMaxTokens,
+        reason: "当前结构化输出模式降低了安全 Token 上限。",
+      });
+    }
+    effectiveMaxTokens = cappedMaxTokens;
   }
+  if (maxTokensProvenance.source === "unknown") {
+    maxTokensProvenance = createModelSelectionField<number>({
+      requested: null,
+      effective: effectiveMaxTokens,
+      source: "system_default",
+    });
+  }
+  const selectionProvenance: ModelSelectionProvenance = {
+    provider: providerProvenance,
+    model: modelProvenance,
+    temperature: {
+      ...temperatureProvenance,
+      effective: temperature,
+    },
+    maxTokens: {
+      ...maxTokensProvenance,
+      effective: effectiveMaxTokens ?? null,
+    },
+    routeKey: resolvedModelRoute ?? null,
+    routeDegraded: resolvedRouteDegraded,
+    routeDegradedReason: resolvedRouteDegradedReason,
+  };
   const usesEnableThinkingFlag = Boolean(
     shouldForceDisableReasoning
       && structuredProfile?.family.includes("qwen"),
@@ -379,6 +480,7 @@ export async function resolveLLMClientOptions(
     promptMeta: options.promptMeta,
     modelRoute: resolvedModelRoute,
     routeDegraded: resolvedRouteDegraded,
+    selectionProvenance,
     openCodeSessionId,
   };
 }
@@ -462,4 +564,10 @@ export async function getLLM(provider?: LLMProvider, options: LLMOptions = {}): 
 
 export function getResolvedLLMClientOptionsFromInstance(llm: ChatOpenAI): ResolvedLLMClientOptions | undefined {
   return (llm as ChatOpenAIWithResolvedOptions)[RESOLVED_LLM_OPTIONS];
+}
+
+export function getModelSelectionProvenance(
+  resolved: ResolvedLLMClientOptions,
+): ModelSelectionProvenance {
+  return projectModelSelectionProvenance(resolved.selectionProvenance);
 }

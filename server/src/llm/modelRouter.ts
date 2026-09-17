@@ -1,10 +1,17 @@
-import type { LLMProvider } from "@ai-novel/shared/types/llm";
+import type {
+  LLMProvider,
+  ModelRouteDegradedReason,
+  ModelSelectionAdjustment,
+  ModelSelectionProvenance,
+  ModelSelectionSource,
+} from "@ai-novel/shared/types/llm";
 import type {
   ModelRouteRequestProtocol,
   ModelRouteStructuredResponseFormat,
   ModelRouteTaskType,
 } from "@ai-novel/shared/types/novel";
 import { prisma } from "../db/prisma";
+import { createModelSelectionField } from "../platform/llm/provenance";
 import { isBuiltInProvider, PROVIDERS } from "./providers";
 import type { StructuredOutputStrategy } from "./structuredOutput";
 
@@ -50,6 +57,8 @@ export interface ResolvedModel {
   structuredResponseFormat: ModelRouteStructuredResponseFormat;
   routeKey: ModelRouteTaskType | "default";
   routeDegraded: boolean;
+  routeDegradedReason: ModelRouteDegradedReason;
+  selectionProvenance: ModelSelectionProvenance;
 }
 
 const STRICT_ROUTE_TASK_TYPES = new Set<ModelRouteTaskType>([
@@ -58,7 +67,10 @@ const STRICT_ROUTE_TASK_TYPES = new Set<ModelRouteTaskType>([
   "state_resolution",
 ]);
 
-const DEFAULT_ROUTES: Record<ModelRouteTaskType | "default", Omit<ResolvedModel, "routeKey" | "routeDegraded">> = {
+const DEFAULT_ROUTES: Record<
+  ModelRouteTaskType | "default",
+  Omit<ResolvedModel, "routeKey" | "routeDegraded" | "routeDegradedReason" | "selectionProvenance">
+> = {
   planner: {
     provider: "deepseek",
     model: PROVIDERS.deepseek.defaultModel,
@@ -153,23 +165,71 @@ function normalizeProviderId(value: string | null | undefined): LLMProvider {
   return trimmed || "deepseek";
 }
 
-function normalizeMaxTokens(provider: LLMProvider, maxTokens?: number): number | undefined {
+interface NormalizedMaxTokens {
+  effective?: number;
+  adjustments: ModelSelectionAdjustment<number>[];
+}
+
+function normalizeMaxTokens(provider: LLMProvider, maxTokens?: number): NormalizedMaxTokens {
   if (typeof maxTokens !== "number" || !Number.isFinite(maxTokens)) {
-    return undefined;
+    return { effective: undefined, adjustments: [] };
   }
   const normalized = Math.floor(maxTokens);
   if (normalized < 1) {
-    return undefined;
+    return { effective: undefined, adjustments: [] };
   }
   // Historical UI defaults persisted 4096 as a placeholder for "use provider defaults".
   if (normalized === 4096) {
-    return undefined;
+    return {
+      effective: undefined,
+      adjustments: [{
+        kind: "legacy_4096_unset",
+        before: normalized,
+        after: null,
+        reason: "历史值 4096 表示沿用厂商默认 Token 上限。",
+      }],
+    };
   }
   const providerLimit = isBuiltInProvider(provider) ? PROVIDERS[provider].maxTokens : undefined;
-  if (typeof providerLimit === "number") {
-    return Math.min(normalized, providerLimit);
+  if (typeof providerLimit === "number" && normalized > providerLimit) {
+    return {
+      effective: providerLimit,
+      adjustments: [{
+        kind: "provider_limit",
+        before: normalized,
+        after: providerLimit,
+        reason: "请求的 Token 上限超过厂商支持范围。",
+      }],
+    };
   }
-  return normalized;
+  return { effective: normalized, adjustments: [] };
+}
+
+function createRouteSelectionProvenance(input: {
+  provider: LLMProvider;
+  model: string;
+  temperature: number;
+  maxTokens?: number;
+  source: ModelSelectionSource;
+  routeKey: ModelRouteTaskType | "default";
+  routeDegraded: boolean;
+  routeDegradedReason: ModelRouteDegradedReason;
+}): ModelSelectionProvenance {
+  const normalizedMaxTokens = normalizeMaxTokens(input.provider, input.maxTokens);
+  return {
+    provider: createModelSelectionField({ requested: input.provider, source: input.source }),
+    model: createModelSelectionField({ requested: input.model, source: input.source }),
+    temperature: createModelSelectionField({ requested: input.temperature, source: input.source }),
+    maxTokens: createModelSelectionField({
+      requested: input.maxTokens,
+      effective: normalizedMaxTokens.effective,
+      source: input.source,
+      adjustments: normalizedMaxTokens.adjustments,
+    }),
+    routeKey: input.routeKey,
+    routeDegraded: input.routeDegraded,
+    routeDegradedReason: input.routeDegradedReason,
+  };
 }
 
 export function normalizeRequestProtocol(value?: string | null): ModelRouteRequestProtocol {
@@ -220,12 +280,17 @@ function applyOverrides(
     structuredResponseFormat?: ModelRouteStructuredResponseFormat;
   },
 ): ResolvedModel {
+  const provider = userOverride?.provider ?? base.provider;
+  const model = userOverride?.model ?? base.model;
+  const temperature = userOverride?.temperature ?? base.temperature;
+  const maxTokensInput = userOverride?.maxTokens ?? base.maxTokens;
+  const normalizedMaxTokens = normalizeMaxTokens(provider, maxTokensInput);
   const merged: ResolvedModel = {
     ...base,
-    ...(userOverride?.provider != null && { provider: userOverride.provider }),
-    ...(userOverride?.model != null && { model: userOverride.model }),
-    ...(userOverride?.temperature != null && { temperature: userOverride.temperature }),
-    ...(userOverride?.maxTokens != null && { maxTokens: userOverride.maxTokens }),
+    provider,
+    model,
+    temperature,
+    maxTokens: normalizedMaxTokens.effective,
     ...(userOverride?.requestProtocol != null && { requestProtocol: userOverride.requestProtocol }),
     ...(userOverride?.structuredResponseFormat != null && {
       structuredResponseFormat: userOverride.structuredResponseFormat,
@@ -238,9 +303,38 @@ function applyOverrides(
   return {
     ...merged,
     ...routePreferences,
-    maxTokens: normalizeMaxTokens(merged.provider, merged.maxTokens),
     routeKey: merged.routeKey,
     routeDegraded: merged.routeDegraded,
+    routeDegradedReason: merged.routeDegradedReason,
+    selectionProvenance: {
+      provider: userOverride?.provider != null
+        ? createModelSelectionField({ requested: userOverride.provider, source: "explicit_request" })
+        : base.selectionProvenance.provider,
+      model: userOverride?.model != null
+        ? createModelSelectionField({ requested: userOverride.model, source: "explicit_request" })
+        : base.selectionProvenance.model,
+      temperature: userOverride?.temperature != null
+        ? createModelSelectionField({ requested: userOverride.temperature, source: "explicit_request" })
+        : base.selectionProvenance.temperature,
+      maxTokens: userOverride?.maxTokens != null
+        ? createModelSelectionField({
+          requested: userOverride.maxTokens,
+          effective: normalizedMaxTokens.effective,
+          source: "explicit_request",
+          adjustments: normalizedMaxTokens.adjustments,
+        })
+        : {
+          ...base.selectionProvenance.maxTokens,
+          effective: normalizedMaxTokens.effective ?? null,
+          adjustments: [
+            ...base.selectionProvenance.maxTokens.adjustments,
+            ...normalizedMaxTokens.adjustments,
+          ],
+        },
+      routeKey: merged.routeKey,
+      routeDegraded: merged.routeDegraded,
+      routeDegradedReason: merged.routeDegradedReason,
+    },
   };
 }
 
@@ -271,6 +365,7 @@ export async function resolveModel(
 ): Promise<ResolvedModel> {
   const normalizedTaskType = normalizeTaskType(taskType);
   const base = DEFAULT_ROUTES[normalizedTaskType] ?? DEFAULT_ROUTES.default;
+  let routeLookupFailed = false;
 
   try {
     const row = await prisma.modelRouteConfig.findUnique({
@@ -278,6 +373,7 @@ export async function resolveModel(
     });
     if (row) {
       const provider = normalizeProviderId(row.provider);
+      const normalizedMaxTokens = normalizeMaxTokens(provider, row.maxTokens ?? undefined);
       const routePreferences = normalizeRoutePreferences({
         requestProtocol: "requestProtocol" in row ? row.requestProtocol : null,
         structuredResponseFormat: "structuredResponseFormat" in row ? row.structuredResponseFormat : null,
@@ -286,22 +382,46 @@ export async function resolveModel(
         provider,
         model: row.model,
         temperature: row.temperature,
-        maxTokens: normalizeMaxTokens(provider, row.maxTokens ?? undefined),
+        maxTokens: normalizedMaxTokens.effective,
         ...routePreferences,
         routeKey: normalizedTaskType,
         routeDegraded: false,
+        routeDegradedReason: null,
+        selectionProvenance: createRouteSelectionProvenance({
+          provider,
+          model: row.model,
+          temperature: row.temperature,
+          maxTokens: row.maxTokens ?? undefined,
+          source: "task_route",
+          routeKey: normalizedTaskType,
+          routeDegraded: false,
+          routeDegradedReason: null,
+        }),
       };
       return applyOverrides(resolved, userOverride);
     }
   } catch {
     // table may not exist yet
+    routeLookupFailed = true;
   }
 
+  const routeDegraded = normalizedTaskType !== "default"
+    && STRICT_ROUTE_TASK_TYPES.has(normalizedTaskType);
+  const routeDegradedReason: ModelRouteDegradedReason = routeLookupFailed
+    ? "route_lookup_failed"
+    : routeDegraded ? "strict_route_not_configured" : null;
   return applyOverrides({
     ...base,
     routeKey: normalizedTaskType,
-    routeDegraded: normalizedTaskType !== "default"
-      && STRICT_ROUTE_TASK_TYPES.has(normalizedTaskType),
+    routeDegraded,
+    routeDegradedReason,
+    selectionProvenance: createRouteSelectionProvenance({
+      ...base,
+      source: "task_route_default",
+      routeKey: normalizedTaskType,
+      routeDegraded,
+      routeDegradedReason,
+    }),
   }, userOverride);
 }
 
@@ -329,7 +449,7 @@ export async function listModelRouteConfigs(): Promise<Array<{
         taskType: r.taskType,
         model: r.model,
         temperature: r.temperature,
-        maxTokens: normalizeMaxTokens(provider, r.maxTokens ?? undefined) ?? null,
+        maxTokens: normalizeMaxTokens(provider, r.maxTokens ?? undefined).effective ?? null,
         ...routePreferences,
       };
     });
@@ -351,7 +471,7 @@ export async function upsertModelRouteConfig(
 ): Promise<void> {
   const normalizedTaskType = normalizeTaskType(taskType as TaskType);
   const provider = normalizeProviderId(data.provider);
-  const normalizedMaxTokens = normalizeMaxTokens(provider, data.maxTokens ?? undefined) ?? null;
+  const normalizedMaxTokens = normalizeMaxTokens(provider, data.maxTokens ?? undefined).effective ?? null;
   const {
     requestProtocol,
     structuredResponseFormat,

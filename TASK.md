@@ -114,11 +114,11 @@ Review 与 Retrospective 见 [R1-S2A Sprint 承诺](./docs/plans/r1-s2a-sprint-c
 | --- | ---: | --- | --- | --- |
 | S1-02b 设置与知识库诊断状态消费 | 3 | In Progress | 诊断 UI Agent；根集成人共享接线 | 自动 GET 零探测，显式 POST；状态分离并完成 Computer Use |
 | S2-01b 阶段装配与页面组合收敛 | 3 | In Progress | 单书 Presentation Agent | 等价装配、无命令副作用、总控恢复行数余量 |
-| S2-04a 模型选择来源与有效参数合同 | 3 | In Progress | 模型平台 Agent；根集成人共享类型 | 解析结果不变，字段级来源可信且脱敏，零 transport/写入 |
+| S2-04a 模型选择来源与有效参数合同 | 3 | Done | 模型平台 Agent；根集成人共享类型 | [字段级来源、能力调整与脱敏投影 17 项聚焦检查通过](./docs/plans/s2-04a-model-selection-provenance.md) |
 
 承诺容量：9 点。Stretch：无。权威合同见 [R1-S2B Sprint 承诺](./docs/plans/r1-s2b-sprint-commitment.md)。
 
-未承诺：S1-03 已重新估为 5 点并返回 Refinement；S2-03a/03b 仍受 01b/03a 阻断；S2-04b/04c 等待来源合同和持久化/API 门。不得在本 Sprint 中顺手带入。
+未承诺：S1-03 已重新估为 5 点并返回 Refinement；S2-03a/03b 仍受 01b/03a 阻断；S2-04b 进入持久化合同 Refinement，04c 继续等待 04b。不得在本 Sprint 中顺手带入。
 
 ## Release 1 后续队列
 

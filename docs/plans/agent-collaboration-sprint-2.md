@@ -2,7 +2,7 @@
 
 ## 目标、范围与容量
 
-本页细分[路线图](./agent-collaboration-sprints.md)中的 S2-01～04，并作为滚动状态合同维护。S2-01a 与 S2-02 已在 R1-S2A 完成；S2-01b 与 S2-04a 已进入 [R1-S2B](./r1-s2b-sprint-commitment.md)，其余卡按依赖保持 Ready、Blocked 或 Refinement。目标是让作者在原作品现场读到成果、按需展开协作、处理一个明确下一步，并区分预计使用模型和本次实际调用。
+本页细分[路线图](./agent-collaboration-sprints.md)中的 S2-01～04，并作为滚动状态合同维护。S2-01a 与 S2-02 已在 R1-S2A 完成；S2-04a 已在 [R1-S2B](./r1-s2b-sprint-commitment.md) 完成，S2-01b 正在实施，其余卡按依赖保持 Ready、Blocked 或 Refinement。目标是让作者在原作品现场读到成果、按需展开协作、处理一个明确下一步，并区分预计使用模型和本次实际调用。
 
 当前源码已提供章节修改预览、候选、差异、正文保存和审校；本 Sprint 复用这些能力。全局 Creative Hub 和运行记录保持只读，运行中的任务恢复仍走现有来源页命令。简易体验的用户写门禁和不可逆转专业语义继续生效。
 
@@ -187,7 +187,7 @@
 ## S2-04a：模型选择来源与有效参数合同
 
 - 用户价值：作者理解顶部偏好、任务路由和实际生效模型之间的关系，避免以界面选择推断所有调用。
-- 状态：In Progress（R1-S2B，合同与 resolver）；实际字段/API 由根集成人冻结后进入生产接线。
+- 状态：Done（R1-S2B，合同与 resolver）；[字段级来源、调整与脱敏证据通过](./s2-04a-model-selection-provenance.md)。
 - 点数：3；Owner：Agent C 平台；共享 types/出口由根集成人单一接线。
 - 真实源码：server/src/llm/factory.ts、modelRouter.ts、usageTracking.ts、capabilities.ts；shared/types/llm.ts、llmLive.ts；client/src/store/llmStore.ts；server/src/services/settings/LLMSelectionSettingsService.ts。
 - 拟建归属：若需要新来源类型，shared/types/ 下明确模型选择能力文件；若 factory 需提取解析能力，放 owned server/src/platform/llm/ 子模块与 facade。名称由根集成人冻结。
@@ -218,7 +218,7 @@
 ## S2-04b：实际调用尝试的来源证据
 
 - 用户价值：即使重试、修复或切备用模型，作者能看到真正完成该次工作的模型，而非提交前猜测。
-- 状态：Blocked by S2-04a；持久化/迁移/出口冻结后 Ready。
+- 状态：Refinement / Not Ready；S2-04a 已完成，持久化/迁移/出口、失败降级和非导演入口覆盖仍需冻结后才能 Ready。
 - 点数：5；Owner：Agent C，平台调用/观测模块独占；根集成人拥有 schema、共享类型与挂载。
 - 真实源码：server/src/llm/factory.ts、usageTracking.ts、structuredInvoke.ts；server/src/platform/llm/live/llmLiveSession.ts、LlmLiveBroker.ts、http/llmLiveRoutes.ts；server/src/services/novel/director/runtime/DirectorUsageTelemetryQueryService.ts；server/src/services/task/taskTokenUsageSummary.ts。
 - 拟建归属：如果现有 metadataJson 不能覆盖非导演调用，新增 owned platform/llm 来源记录存储与查询能力，数据库增量模型及 SQLite/PostgreSQL 迁移由根集成人审查；这是待选型，不声称通用持久调用仓库已存在。

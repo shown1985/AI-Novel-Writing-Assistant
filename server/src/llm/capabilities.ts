@@ -2,6 +2,7 @@ import {
   isBuiltinLLMProvider,
   type BuiltinLLMProvider,
   type LLMProvider,
+  type ModelSelectionAdjustment,
 } from "@ai-novel/shared/types/llm";
 import {
   canUseForcedJsonOutput,
@@ -21,6 +22,12 @@ export interface ModelParameterCompatibility {
   fixedTemperature?: number;
   minimumTemperature?: number;
   maximumTemperature?: number;
+}
+
+export interface ModelTemperatureResolution {
+  requested: number;
+  effective: number;
+  adjustments: ModelSelectionAdjustment<number>[];
 }
 
 export function supportsForcedJsonOutput(provider: LLMProvider, model?: string, baseURL?: string): boolean {
@@ -70,18 +77,62 @@ export function resolveModelTemperature(
   requestedTemperature: number | undefined,
   fallbackTemperature = 0.7,
 ): number {
+  return resolveModelTemperatureWithProvenance(
+    provider,
+    model,
+    requestedTemperature,
+    fallbackTemperature,
+  ).effective;
+}
+
+export function resolveModelTemperatureWithProvenance(
+  provider: LLMProvider,
+  model: string | undefined,
+  requestedTemperature: number | undefined,
+  fallbackTemperature = 0.7,
+): ModelTemperatureResolution {
   const compatibility = getModelParameterCompatibility(provider, model);
+  const requested = requestedTemperature ?? fallbackTemperature;
   if (typeof compatibility.fixedTemperature === "number") {
-    return compatibility.fixedTemperature;
+    const effective = compatibility.fixedTemperature;
+    return {
+      requested,
+      effective,
+      adjustments: effective === requested ? [] : [{
+        kind: "capability_fixed",
+        before: requested,
+        after: effective,
+        reason: "模型能力要求使用固定温度。",
+      }],
+    };
   }
-  let resolvedTemperature = requestedTemperature ?? fallbackTemperature;
+  let effective = requested;
+  const adjustments: ModelSelectionAdjustment<number>[] = [];
   if (typeof compatibility.minimumTemperature === "number") {
-    resolvedTemperature = Math.max(compatibility.minimumTemperature, resolvedTemperature);
+    const adjusted = Math.max(compatibility.minimumTemperature, effective);
+    if (adjusted !== effective) {
+      adjustments.push({
+        kind: "capability_clamped_min",
+        before: effective,
+        after: adjusted,
+        reason: "请求温度低于模型支持的最小值。",
+      });
+      effective = adjusted;
+    }
   }
   if (typeof compatibility.maximumTemperature === "number") {
-    resolvedTemperature = Math.min(compatibility.maximumTemperature, resolvedTemperature);
+    const adjusted = Math.min(compatibility.maximumTemperature, effective);
+    if (adjusted !== effective) {
+      adjustments.push({
+        kind: "capability_clamped_max",
+        before: effective,
+        after: adjusted,
+        reason: "请求温度高于模型支持的最大值。",
+      });
+      effective = adjusted;
+    }
   }
-  return resolvedTemperature;
+  return { requested, effective, adjustments };
 }
 
 export function getJsonCapability(provider: LLMProvider, model?: string, baseURL?: string): JsonCapability {
