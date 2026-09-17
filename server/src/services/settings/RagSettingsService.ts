@@ -96,10 +96,10 @@ function normalizeCollectionMode(value: string | undefined, fallback: RagEmbeddi
 }
 
 function toBoolean(value: string | undefined, fallback: boolean): boolean {
-  if (value === undefined) {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) {
     return fallback;
   }
-  const normalized = value.trim().toLowerCase();
   return !["0", "false", "off", "no"].includes(normalized);
 }
 
@@ -108,6 +108,19 @@ function clampInt(value: number, fallback: number, min: number, max: number): nu
     return fallback;
   }
   return Math.max(min, Math.min(max, Math.floor(value)));
+}
+
+function parseIntSetting(
+  rawValue: string | null | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  const normalized = rawValue?.trim();
+  if (!normalized) {
+    return fallback;
+  }
+  return clampInt(Number(normalized), fallback, min, max);
 }
 
 function slugifySegment(value: string, fallback: string): string {
@@ -229,32 +242,32 @@ export async function getRagEmbeddingSettings(): Promise<RagEmbeddingSettings> {
       collectionName,
       collectionTag,
       autoReindexOnChange: toBoolean(valueMap.get(RAG_EMBEDDING_AUTO_REINDEX_KEY), defaults.autoReindexOnChange),
-      embeddingBatchSize: clampInt(
-        Number(valueMap.get(RAG_EMBEDDING_BATCH_SIZE_KEY)),
+      embeddingBatchSize: parseIntSetting(
+        valueMap.get(RAG_EMBEDDING_BATCH_SIZE_KEY),
         defaults.embeddingBatchSize,
         1,
         256,
       ),
-      embeddingTimeoutMs: clampInt(
-        Number(valueMap.get(RAG_EMBEDDING_TIMEOUT_MS_KEY)),
+      embeddingTimeoutMs: parseIntSetting(
+        valueMap.get(RAG_EMBEDDING_TIMEOUT_MS_KEY),
         defaults.embeddingTimeoutMs,
         5000,
         300000,
       ),
-      embeddingMaxRetries: clampInt(
-        Number(valueMap.get(RAG_EMBEDDING_MAX_RETRIES_KEY)),
+      embeddingMaxRetries: parseIntSetting(
+        valueMap.get(RAG_EMBEDDING_MAX_RETRIES_KEY),
         defaults.embeddingMaxRetries,
         0,
         8,
       ),
-      embeddingRetryBaseMs: clampInt(
-        Number(valueMap.get(RAG_EMBEDDING_RETRY_BASE_MS_KEY)),
+      embeddingRetryBaseMs: parseIntSetting(
+        valueMap.get(RAG_EMBEDDING_RETRY_BASE_MS_KEY),
         defaults.embeddingRetryBaseMs,
         100,
         10000,
       ),
-      embeddingConcurrency: clampInt(
-        Number(valueMap.get(RAG_EMBEDDING_CONCURRENCY_KEY)),
+      embeddingConcurrency: parseIntSetting(
+        valueMap.get(RAG_EMBEDDING_CONCURRENCY_KEY),
         defaults.embeddingConcurrency,
         1,
         16,

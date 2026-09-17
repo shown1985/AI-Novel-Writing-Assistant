@@ -89,7 +89,7 @@ R1-S1 Review 与 Retrospective 见 [Sprint 承诺](./docs/plans/r1-s1-sprint-com
 
 | Story | 点数 | 状态 | Owner | 依赖 / 结果 |
 | --- | ---: | --- | --- | --- |
-| S1-01 缺省数值配置正确生效 | 3 | Ready（Wave 2） | 配置 Agent | Wave 1 首个 Agent 交回 review 后领取 |
+| S1-01 缺省数值配置正确生效 | 3 | Done | 配置 Agent | [默认值、合法低值与零副作用 7 项行为检查通过](./docs/plans/s1-01-numeric-settings-defaults.md) |
 | S1-02a 诊断读取、显式探测与持久化 | 3 | In Progress | 诊断 Agent + 根集成人 | S1-00 已完成；共享 schema/迁移由根集成人独占 |
 | S2-01a 单书查询与导演编排归属 | 5 | In Progress | 单书总控 Agent | 独占 `NovelEdit.tsx` 与新 application facade |
 | S2-02 专业章节辅助区域按需展开 | 3 | Done | 章节编辑 Agent + 根集成人 | [正文优先、按需模型调用、状态保持与隔离 Computer Use 验收通过](./docs/plans/s2-02-professional-chapter-assist-panels.md) |
@@ -98,7 +98,7 @@ R1-S1 Review 与 Retrospective 见 [Sprint 承诺](./docs/plans/r1-s1-sprint-com
 
 未承诺：S1-02b/03、S2-01b、S2-03a/03b、S2-04a/04b/04c。Ready 的 S2-04a 因容量顺延，其他卡保持依赖状态；不得在实现中顺手带入。
 
-当前完成 `3/14` 点：S2-02 已 Done；S1-02a、S2-01a 继续 In Progress，S1-01 仍按 Wave 2 规则等待领取。
+当前完成 `6/14` 点：S1-01、S2-02 已 Done；S1-02a、S2-01a 继续按冻结边界 In Progress。
 
 ## Release 1 后续队列
 

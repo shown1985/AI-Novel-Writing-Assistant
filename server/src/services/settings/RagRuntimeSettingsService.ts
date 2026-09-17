@@ -88,10 +88,10 @@ function normalizeUrl(value: string | undefined, fallback: string): string {
 }
 
 function toBoolean(value: string | undefined, fallback: boolean): boolean {
-  if (value === undefined) {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) {
     return fallback;
   }
-  const normalized = value.trim().toLowerCase();
   return !["0", "false", "off", "no"].includes(normalized);
 }
 
@@ -100,6 +100,19 @@ function clampInt(value: number, fallback: number, min: number, max: number): nu
     return fallback;
   }
   return Math.max(min, Math.min(max, Math.floor(value)));
+}
+
+function parseIntSetting(
+  rawValue: string | null | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  const normalized = rawValue?.trim();
+  if (!normalized) {
+    return fallback;
+  }
+  return clampInt(Number(normalized), fallback, min, max);
 }
 
 function applyRagRuntimeSettings(
@@ -170,38 +183,38 @@ export async function getRagRuntimeSettings(): Promise<RagRuntimeSettings> {
     return applyRagRuntimeSettings({
       enabled: toBoolean(valueMap.get(RAG_ENABLED_KEY), defaults.enabled),
       qdrantUrl: normalizeUrl(valueMap.get(QDRANT_URL_KEY), defaults.qdrantUrl),
-      qdrantTimeoutMs: clampInt(
-        Number(valueMap.get(QDRANT_TIMEOUT_MS_KEY)),
+      qdrantTimeoutMs: parseIntSetting(
+        valueMap.get(QDRANT_TIMEOUT_MS_KEY),
         defaults.qdrantTimeoutMs,
         1000,
         300000,
       ),
-      qdrantUpsertMaxBytes: clampInt(
-        Number(valueMap.get(QDRANT_UPSERT_MAX_BYTES_KEY)),
+      qdrantUpsertMaxBytes: parseIntSetting(
+        valueMap.get(QDRANT_UPSERT_MAX_BYTES_KEY),
         defaults.qdrantUpsertMaxBytes,
         1024 * 1024,
         64 * 1024 * 1024,
       ),
-      qdrantUpsertConcurrency: clampInt(
-        Number(valueMap.get(QDRANT_UPSERT_CONCURRENCY_KEY)),
+      qdrantUpsertConcurrency: parseIntSetting(
+        valueMap.get(QDRANT_UPSERT_CONCURRENCY_KEY),
         defaults.qdrantUpsertConcurrency,
         1,
         16,
       ),
-      chunkSize: clampInt(Number(valueMap.get(CHUNK_SIZE_KEY)), defaults.chunkSize, 200, 4000),
-      chunkOverlap: clampInt(Number(valueMap.get(CHUNK_OVERLAP_KEY)), defaults.chunkOverlap, 0, 1000),
-      vectorCandidates: clampInt(Number(valueMap.get(VECTOR_CANDIDATES_KEY)), defaults.vectorCandidates, 1, 200),
-      keywordCandidates: clampInt(Number(valueMap.get(KEYWORD_CANDIDATES_KEY)), defaults.keywordCandidates, 1, 200),
-      finalTopK: clampInt(Number(valueMap.get(FINAL_TOP_K_KEY)), defaults.finalTopK, 1, 50),
-      workerPollMs: clampInt(Number(valueMap.get(WORKER_POLL_MS_KEY)), defaults.workerPollMs, 200, 60000),
-      workerMaxAttempts: clampInt(Number(valueMap.get(WORKER_MAX_ATTEMPTS_KEY)), defaults.workerMaxAttempts, 1, 20),
-      workerRetryBaseMs: clampInt(
-        Number(valueMap.get(WORKER_RETRY_BASE_MS_KEY)),
+      chunkSize: parseIntSetting(valueMap.get(CHUNK_SIZE_KEY), defaults.chunkSize, 200, 4000),
+      chunkOverlap: parseIntSetting(valueMap.get(CHUNK_OVERLAP_KEY), defaults.chunkOverlap, 0, 1000),
+      vectorCandidates: parseIntSetting(valueMap.get(VECTOR_CANDIDATES_KEY), defaults.vectorCandidates, 1, 200),
+      keywordCandidates: parseIntSetting(valueMap.get(KEYWORD_CANDIDATES_KEY), defaults.keywordCandidates, 1, 200),
+      finalTopK: parseIntSetting(valueMap.get(FINAL_TOP_K_KEY), defaults.finalTopK, 1, 50),
+      workerPollMs: parseIntSetting(valueMap.get(WORKER_POLL_MS_KEY), defaults.workerPollMs, 200, 60000),
+      workerMaxAttempts: parseIntSetting(valueMap.get(WORKER_MAX_ATTEMPTS_KEY), defaults.workerMaxAttempts, 1, 20),
+      workerRetryBaseMs: parseIntSetting(
+        valueMap.get(WORKER_RETRY_BASE_MS_KEY),
         defaults.workerRetryBaseMs,
         1000,
         300000,
       ),
-      httpTimeoutMs: clampInt(Number(valueMap.get(HTTP_TIMEOUT_MS_KEY)), defaults.httpTimeoutMs, 1000, 300000),
+      httpTimeoutMs: parseIntSetting(valueMap.get(HTTP_TIMEOUT_MS_KEY), defaults.httpTimeoutMs, 1000, 300000),
     }, qdrantApiKey);
   } catch (error) {
     if (isMissingTableError(error)) {

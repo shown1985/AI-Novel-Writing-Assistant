@@ -57,7 +57,7 @@
 作为作者，我希望未调整的 AI 参数采用可靠推荐值，避免无意获得极短等待或极低资料召回。
 
 - Owner：Agent A。
-- 点数：3；优先级 P0；无依赖。
+- 点数：3；优先级 P0；状态 Done；无依赖。
 - Owned：server/src/config/rag.ts；server/src/services/settings/RagRuntimeSettingsService.ts、RagSettingsService.ts、StyleEngineRuntimeSettingsService.ts；直接相关配置解析测试。结构化备用设置仅纳入空白输入边界，不改用户合法 retry。
 - 验收：undefined/null/空字符串/空白采用声明默认；允许字段显式 0 保留；坏值回默认；越界遵守既有校验。
 - 验收：缺省切片800、重叠120、候选40、TopK8；embedding batch64、timeout30秒、retry2；trace采样1；写法提取10分钟，覆盖 env 与数据库两层。
@@ -65,6 +65,7 @@
 - 实现：使用所属配置模块的明确数值解析边界，禁止引入无归属通用 helpers；原配置来源与 AppSetting 覆盖语义保持。
 - 检查：新增配置边界行为测试，mock Prisma或隔离数据库；构建对应 server/dist 后运行定向测试；复用 ragCompatibilityBootstrap.test.js 的隔离方法，严禁桌面库测试。
 - 完成证据：输入矩阵及生效值、用户保存值未变、没有索引任务或配置更新副作用。
+- 交付证据：[S1-01 缺省数值配置完成证据](./s1-01-numeric-settings-defaults.md)。
 
 ## S1-00：诊断共享接线与存储契约门
 

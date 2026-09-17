@@ -31,7 +31,11 @@ function parseTimeoutMs(
   min: number,
   max: number,
 ): number {
-  return clampInt(Number(rawValue ?? ""), fallback, min, max);
+  const normalized = rawValue?.trim();
+  if (!normalized) {
+    return fallback;
+  }
+  return clampInt(Number(normalized), fallback, min, max);
 }
 
 function getDefaultStyleExtractionTimeoutMs(): number {
