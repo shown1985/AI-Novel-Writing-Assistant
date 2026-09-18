@@ -14,7 +14,7 @@
 
 | Story | 点数 | 当前状态 | Owner / 文件域 | 依赖 | 交付结果 |
 | --- | ---: | --- | --- | --- | --- |
-| S2-03a 单书成果、进度与推荐动作展示模型 | 3 | User Acceptance | 单书 Presentation owner；`client/src/pages/novels/workspace/presentation/` 及经授权的既有单书展示消费点 | S2-01a/b、S2-03a0 Done | [代码级行为与桌面/移动消费已通过](./s2-03a-single-book-display-model.md)；等待用户 UI 验收，不执行命令 |
+| S2-03a 单书成果、进度与推荐动作展示模型 | 3 | Done | 单书 Presentation owner；`client/src/pages/novels/workspace/presentation/` 及经授权的既有单书展示消费点 | S2-01a/b、S2-03a0 Done | [21/21 行为回归与隔离环境 Computer Use 验收通过](./s2-03a-single-book-display-model.md)；只读展示未执行命令 |
 | S2-04b1 通用 attempt store 与 repository | 3 | Done | 根数据集成人独占两套 Prisma schema/migration；模型平台 repository 位于 `server/src/platform/llm/provenance/attempts/` | S2-04a、S2-04b0 Done | [双库精确增量与真实 Prisma adapter 持久证据通过](./s2-04b1-model-attempt-store.md)；不接 transport，UI 验收不适用 |
 | S2-04b2 Prompt execution 边界拆分 | 3 | Done | Prompt 平台 owner 独占 `promptRunner.ts` 与 `prompting/core/execution/` | S2-04b0 Done | [facade/import 等价与 57/57 有效回归通过](./s2-04b2-prompt-execution-boundaries.md)；`promptRunner.ts` 为 668 行，UI 验收不适用 |
 
@@ -67,4 +67,18 @@ Wave 2
 - S2-04b4 / 04c：继续依赖 04b3 和读 DTO；不提前做 UI mock 冒充实际来源。
 - S3-01：Ready 但按 Release 顺序留在后续窗口，不与本轮 Prompt Runner 拆分并写。
 
-Sprint 退出时记录 Goal、`9/9` 或实际完成点数、carryover、迁移双库结果、`promptRunner` 行数与等价证据、S2-03a UI 消费/验收边界、文档/发布判断、逸出缺陷和最多两项流程改进。
+## Sprint Review
+
+- Sprint Goal 达成，承诺/完成 `9/9` 点，carryover 0；三张承诺 Story 均为 Done。
+- S2-03a 的 21/21 展示模型回归、client typecheck 与隔离环境 Computer Use 通过：桌面/移动三层事实、局部完成不等于整书完成、失败保留、跨作品隔离和零导演命令均有证据。
+- S2-04b1 的 PostgreSQL/SQLite 精确增量、真实 repository adapter、幂等/唯一 adopted、重启读取与敏感字段缺失检查通过；未写用户库、未执行破坏性迁移。
+- S2-04b2 保持 facade/import 等价，将 `promptRunner.ts` 从 1,348 行降至 668 行；59 项 runner/live/usage 检查中 57 项通过、2 项显式跳过。补充基线发现的 transport retry 失败已作为 `R1-PROMPT01` 留在 Refinement，不并入纯拆分范围。
+- UI 可见变化的发布说明已在 S2-03a 实现阶段维护；本次退出更新仅补验收与敏捷状态，不重复增加发布记录。
+
+## Sprint Retrospective
+
+- 有效做法：先冻结 03a0/04b0 合同，再让展示、持久层和 Prompt execution 在互不重叠文件域并行推进，避免共享类型和运行语义漂移。
+- 改进 1：后续 UI fixture 在启动前补齐卷章节摘要等必填字段，减少与 Story 无关的校验提示干扰验收观察。
+- 改进 2：纯边界拆分除复用定向回归外，再运行一组补充基线；发现既存失败时立即建立独立 Refinement 卡，不把缺陷修复塞入当前 Story。
+
+退出结论：`S2-03b` 与 `S2-04b3` 的实现依赖已解除，可进入下一次 Sprint Planning；本 Sprint 不顺手启动二者，也不把 Release 1 视为完成。

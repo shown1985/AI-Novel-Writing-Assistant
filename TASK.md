@@ -3,7 +3,7 @@
 更新时间：2026-09-18
 当前分支：`codex/r1-s2d-evidence-foundations`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S2D 已启动；9 点承诺、无 Stretch
+当前状态：R1-S2D 已完成（9/9 点）；下一 Sprint 尚未 Planning
 
 ## 权威文档
 
@@ -146,7 +146,7 @@ Review 与 Retrospective 见 [R1-S2B Sprint 承诺](./docs/plans/r1-s2b-sprint-c
 
 Review 与 Retrospective 见 [R1-S2C Sprint 承诺](./docs/plans/r1-s2c-sprint-commitment.md)：S2-04b0 server build 与 seam proof 8/8 通过；S3-00 全量静态门与相关 Prompt 测试通过；本窗口无生产 UI，UI 验收不适用。
 
-## 当前 Sprint：R1-S2D
+## 已完成 Sprint：R1-S2D
 
 ### Sprint Goal
 
@@ -156,7 +156,7 @@ Review 与 Retrospective 见 [R1-S2C Sprint 承诺](./docs/plans/r1-s2c-sprint-c
 
 | Story | 点数 | 状态 | Owner | 验收边界 |
 | --- | ---: | --- | --- | --- |
-| S2-03a 单书成果、进度与推荐动作展示模型 | 3 | User Acceptance | 单书 Presentation owner | [纯模型、桌面/移动消费和 21/21 行为回归已通过](./docs/plans/s2-03a-single-book-display-model.md)；等待用户 UI 验收，不执行命令 |
+| S2-03a 单书成果、进度与推荐动作展示模型 | 3 | Done | 单书 Presentation owner | [21/21 行为回归与隔离环境 Computer Use 验收通过](./docs/plans/s2-03a-single-book-display-model.md)；桌面/移动、跨书隔离与零命令有证据 |
 | S2-04b1 通用 attempt store 与 repository | 3 | Done | 根数据集成人 + 模型平台 owner | [双库增量迁移、真实 adapter、幂等/唯一 adopted、重启读取与脱敏证据通过](./docs/plans/s2-04b1-model-attempt-store.md)；不接 transport，UI 验收不适用 |
 | S2-04b2 Prompt execution 边界拆分 | 3 | Done | Prompt 平台 owner | [facade 等价、三类 execution 边界与 57/57 有效回归通过](./docs/plans/s2-04b2-prompt-execution-boundaries.md)；核心文件 668 行，不接 attempt store，UI 验收不适用 |
 
@@ -166,10 +166,14 @@ Review 与 Retrospective 见 [R1-S2C Sprint 承诺](./docs/plans/r1-s2c-sprint-c
 
 新发现的 `R1-PROMPT01` 结构化空响应 transport retry 基线缺陷进入 Refinement；它不在本 Sprint 承诺内，不并入 S2-04b2 纯拆分范围。
 
+完成 `9/9` 点，无 Story carryover。Sprint Goal 达成：单书页面能区分已保存正文、本轮任务与全书目标，并只显示一个可信建议；通用 attempt store 与 Prompt execution owned 边界已建立。S2-03a 的桌面/400×800 移动视口、局部完成、失败保留、跨作品隔离和零导演命令均通过 Computer Use 验收。Review 与 Retrospective 见 [R1-S2D Sprint 承诺](./docs/plans/r1-s2d-sprint-commitment.md)。
+
+下一 Planning 的 Ready 候选为 S2-03b、S2-04b3 与 S3-01；尚未承诺、尚未开始。`R1-PROMPT01` 继续留在 Refinement。
+
 ## Release 1 后续队列
 
 1. R1-S1：配置、诊断、阅读恢复和世界归属安全（已完成，15/15 点）。
-2. R1-S2：R1-S2A 可信单书现场已结束（14/14 点）；R1-S2B 主动诊断与可信装配已结束（9/9 点）；R1-S2C 事实权威与世界 Prompt 解锁已结束（8/8 点）；R1-S2D 展示与调用证据底座进行中（9 点）。
+2. R1-S2：R1-S2A 可信单书现场已结束（14/14 点）；R1-S2B 主动诊断与可信装配已结束（9/9 点）；R1-S2C 事实权威与世界 Prompt 解锁已结束（8/8 点）；R1-S2D 展示与调用证据底座已结束（9/9 点）。
 3. R1-S3～4：可信世界、提案采用和失败复核；S3-01 已由 S3-00 解锁为 Ready，等待后续 Sprint Planning。
 4. R1-S5～6：本机Agent委托、预算、记忆和资产。
 5. R1-S7：十章长链、有限撤回和导航收束。

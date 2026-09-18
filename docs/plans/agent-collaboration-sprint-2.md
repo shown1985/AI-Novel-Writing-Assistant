@@ -133,7 +133,7 @@
 ## S2-03a：单书成果、进度与推荐动作展示模型
 
 - 用户价值：作者能判断已经得到什么、AI 正在做什么和唯一推荐下一步，不将普通提醒误判为全书失败。
-- 状态：**User Acceptance（R1-S2D）**；[纯模型、桌面/移动消费与代码级行为证据已通过](./s2-03a-single-book-display-model.md)，等待用户 UI 验收。未验收前不记 Done，也不解锁 03b。
+- 状态：**Done（R1-S2D）**；[21/21 行为回归、client typecheck 与隔离环境 Computer Use 验收已通过](./s2-03a-single-book-display-model.md)，只读展示未创建导演命令。
 - 点数：3；Owner：Agent A，单书 presentation 独占。
 - 真实源码：client/src/pages/novels/components/NovelEditView.tsx、NovelTaskDrawer.tsx、NovelAutoDirectorProgressPanel.tsx、novelEditAutomationStatus.ts、novelWorkspaceNavigation.ts；shared/types/directorRuntime.ts 为根集成人保留。
 - 拟建归属：novels/workspace/presentation/ 的纯展示模型；展示通过 client/src/components/workspace/ 现有 primitives。
@@ -166,7 +166,7 @@
 ## S2-03b：来源现场推荐动作与反馈接线
 
 - 用户价值：点击推荐后知道影响范围、看到处理中反馈，并能在同一创作现场完成恢复。
-- 状态：Blocked by S2-03a 与 S2-01b；既有命令列表冻结后 Ready。
+- 状态：**Ready**；S2-03a 与 S2-01b 已 Done，既有来源页命令与本卡非范围已冻结，等待后续 Sprint Planning。
 - 点数：3；Owner：Agent A，与 03a 串行；根集成人接线共享 API。
 - 真实源码：client/src/pages/novels/components/NovelEditView.tsx、mobile/MobileNovelEditView.tsx、NovelTaskDrawer.tsx、hooks/useNovelEditWorkflow.ts、client/src/api/novelWorkflow.ts、novelDirector.ts（API facade 保留根 owner）。
 - 非范围：不在 Creative Hub/运行记录增加执行按钮，不新增第二 continue/repair API，不修改自动导演 issue policy，不以 toast 代替持久状态。
@@ -293,7 +293,7 @@
 ### S2-04b3：真实 transport attempt 接线
 
 - 用户价值：重试、结构策略切换、JSON 修复、语义重试和备用模型的每次真实调用都能分开记录，并明确最终采用者。
-- 状态：**Not Ready**；5 点，依赖 04b1 与 04b2 Done。模型平台 Agent 串行拥有 recorder、structured invoke/repair 和拆分后的 text execution hooks。
+- 状态：**Ready**；5 点，04b1 与 04b2 已 Done。模型平台 Agent 串行拥有 recorder、structured invoke/repair 和拆分后的 text execution hooks，等待后续 Sprint Planning。
 - 范围：建立 request/attempt ID 生命周期，在每次物理 invoke/stream 前 start、终态 finalize；把 strategy/transport/fallback/repair/semantic lineage 与 04a 脱敏选择证据关联。
 - 非范围：不改重试次数/模型路由、不因观测失败重发生成、不做公开 API/UI、不扩独立世界库或 batch 身份。
 - AC：invoke/stream、null usage、失败→重试→备用成功、repair/semantic、取消与崩溃 started 行通过 production seam mock；repository 故障不改变模型调用次数、正文结果、任务状态或人工暂停。
