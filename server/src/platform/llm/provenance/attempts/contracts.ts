@@ -1,12 +1,13 @@
 /**
- * S2-04b0 prototype contract only.
+ * Model-attempt persistence contract established by S2-04b0 and implemented
+ * by the injected store/repository in S2-04b1.
  *
  * Nothing in this directory is wired to the production LLM facade. These
  * types describe the evidence a later production story must persist at the
  * actual transport boundary.
  */
 
-export type ModelAttemptMode = "invoke" | "stream";
+export type ModelAttemptMode = "invoke" | "stream" | "legacy_unknown";
 
 export type ModelAttemptRole =
   | "primary"
@@ -69,9 +70,23 @@ export interface ModelAttemptUsage {
   totalTokens: number;
 }
 
+export const MODEL_ATTEMPT_FAILURE_CODES = [
+  "transport_unknown",
+  "transport_error",
+  "upstream_timeout",
+  "stream_missing_output",
+  "request_cancelled",
+  "validation_failed",
+  "rate_limited",
+  "authentication_failed",
+  "provider_unavailable",
+] as const;
+
+export type ModelAttemptFailureCode = (typeof MODEL_ATTEMPT_FAILURE_CODES)[number];
+
 export interface ModelAttemptFailure {
   /** Stable, allow-listed classifier; never a provider response body. */
-  code: string;
+  code: ModelAttemptFailureCode | "legacy_unknown";
   category: "transport" | "timeout" | "cancelled" | "validation" | "unknown";
   retryable: boolean;
 }
@@ -103,9 +118,9 @@ export interface StartModelAttemptInput {
   attemptId: string;
   parentAttemptId: string | null;
   attemptIndex: number;
-  role: ModelAttemptRole;
-  routeTier: ModelAttemptRouteTier;
-  mode: ModelAttemptMode;
+  role: Exclude<ModelAttemptRole, "legacy_unknown">;
+  routeTier: Exclude<ModelAttemptRouteTier, "legacy_unknown">;
+  mode: Exclude<ModelAttemptMode, "legacy_unknown">;
   provider: string;
   model: string;
   structuredStrategy?: string | null;

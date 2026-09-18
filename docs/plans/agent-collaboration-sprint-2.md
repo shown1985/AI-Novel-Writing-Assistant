@@ -267,7 +267,7 @@
 ### S2-04b1：通用 attempt store 与 repository
 
 - 用户价值：模型用量未知、进程重启或默认模型改变后，真实调用尝试仍有不可伪造的持久证据。
-- 状态：**Ready（R1-S2D）**；3 点。根集成人独占 PostgreSQL/SQLite schema 与迁移；模型平台 Agent 拥有 repository adapter 与聚合读取。
+- 状态：**Done（R1-S2D）**；3 点。[双库精确增量、真实 Prisma adapter、幂等/并发/重启/脱敏证据已通过](./s2-04b1-model-attempt-store.md)。根集成人独占 PostgreSQL/SQLite schema 与迁移；模型平台 Agent 拥有 repository adapter 与聚合读取。UI 验收不适用。
 - 范围：按 04b0 ADR 增加独立 `ModelAttemptEvidence` 表、双库增量迁移、幂等 start/finalize、唯一 adopted 事务约束和按 request/novel 的重建读取。
 - 非范围：不接真实 transport、不改 Prompt Runner、不建用户 UI、不回填 Token 表或 live 历史、不自动清理旧证据。
 - AC：两套迁移在隔离库通过；null usage、started orphan、重复 start/finalize、冲突终态、单 request 唯一 adopted、重启重建和敏感字段缺失均有行为证据。

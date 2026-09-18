@@ -51,7 +51,7 @@ export class InMemoryModelAttemptRepository implements ModelAttemptRepository {
       if (!parent || parent.requestId !== input.requestId || parent.attemptIndex >= input.attemptIndex) {
         throw new Error("invalid_parent_attempt");
       }
-    } else if (input.role !== "primary" && input.role !== "legacy_unknown") {
+    } else if (input.role !== "primary") {
       throw new Error("missing_parent_attempt");
     }
     this.rows.set(input.attemptId, clone(row));

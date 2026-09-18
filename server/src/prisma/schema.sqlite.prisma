@@ -2587,6 +2587,56 @@ model DirectorLlmUsageRecord {
   @@index([attributionStatus, recordedAt])
 }
 
+model ModelAttemptEvidence {
+  attemptId                  String   @id
+  requestId                  String
+  parentAttemptId            String?
+  attemptIndex               Int
+  role                       String
+  routeTier                  String
+  mode                       String
+  status                     String
+  finalAdoption              String
+  provider                   String?
+  model                      String?
+  structuredStrategy         String?
+  attributionKind            String
+  attributionSource          String
+  novelId                    String?
+  taskId                     String?
+  directorRunId              String?
+  directorStepIdempotencyKey String?
+  directorNodeKey            String?
+  chapterId                  String?
+  entrypoint                 String?
+  promptId                   String?
+  promptVersion              String?
+  taskType                   String?
+  modelRoute                 String?
+  promptTokens               Int?
+  completionTokens           Int?
+  reasoningTokens            Int?
+  totalTokens                Int?
+  failureCode                String?
+  failureCategory            String?
+  failureRetryable           Boolean?
+  startedAt                  DateTime
+  finishedAt                 DateTime?
+  durationMs                 Int?
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  @@unique([requestId, attemptIndex])
+  @@index([requestId, startedAt])
+  @@index([parentAttemptId])
+  @@index([novelId, startedAt])
+  @@index([taskId, startedAt])
+  @@index([directorRunId, startedAt])
+  @@index([chapterId, startedAt])
+  @@index([status, startedAt])
+  @@index([requestId, finalAdoption])
+}
+
 model DirectorEvent {
   id             String             @id
   runId          String?

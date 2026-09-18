@@ -1,10 +1,11 @@
-# Model attempt evidence prototype
+# Model attempt evidence persistence boundary
 
-`attempts/` is the isolated S2-04b0 contract and seam proof for evidence about
-actual model transport attempts. It is deliberately **not** exported from
+`attempts/` contains the S2-04b0 contract and seam proof plus the S2-04b1
+generic persistence repository for evidence about actual model transport
+attempts. It is deliberately **not** exported from
 `server/src/platform/llm/provenance/index.ts` and is not connected to the
-factory, structured invocation, usage tracking, prompt runner, live broker,
-Prisma, or HTTP routes.
+application Prisma singleton, factory, structured invocation, usage tracking,
+prompt runner, live broker, transport, or HTTP routes.
 
 The production boundary frozen here is:
 
@@ -21,6 +22,14 @@ The production boundary frozen here is:
 - persisted records contain no API keys, endpoint URLs, auth headers, prompt
   text, model output, provider error bodies, or session credentials.
 
-The in-memory adapter and coordinator under `prototype/` exist only to prove
-the port is executable with mocked transport. Production stories must replace
-them at the real transport/validation seams rather than import this prototype.
+`PersistedModelAttemptRepository` applies idempotency, lineage, terminal
+immutability, unique-adoption, redacted mapping, and aggregate reconstruction
+over an injected `ModelAttemptStore`. Database-specific adapters must provide
+request-serializable transactions and atomic unique-key/CAS operations.
+`PrismaModelAttemptStore` supplies that adapter for either synchronized Prisma
+schema through an injected client; it never imports or opens the application
+database singleton itself.
+
+The in-memory adapter and coordinator under `prototype/` remain seam-proof
+only. Production transport stories must use the production repository at the
+real transport/validation seams rather than import the prototype.

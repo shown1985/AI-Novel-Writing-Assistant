@@ -2,6 +2,7 @@ import type {
   ModelAttemptAttribution,
   ModelAttemptEvidenceStatus,
   ModelAttemptFailure,
+  ModelAttemptFailureCode,
   ModelAttemptMode,
   ModelAttemptObservationIssue,
   ModelAttemptPromptIdentity,
@@ -48,14 +49,14 @@ export interface PrototypeAttemptPlanItem {
   attemptId: string;
   parentAttemptId: string | null;
   attemptIndex: number;
-  role: ModelAttemptRole;
-  routeTier: ModelAttemptRouteTier;
+  role: Exclude<ModelAttemptRole, "legacy_unknown">;
+  routeTier: Exclude<ModelAttemptRouteTier, "legacy_unknown">;
   target: PrototypeTransportTarget;
 }
 
 export interface PrototypeAttemptRequest {
   requestId: string;
-  mode: ModelAttemptMode;
+  mode: Exclude<ModelAttemptMode, "legacy_unknown">;
   attribution: ModelAttemptAttribution;
   prompt: ModelAttemptPromptIdentity;
   attempts: PrototypeAttemptPlanItem[];
@@ -247,7 +248,7 @@ export async function executeAttemptSeamPrototype<T>(input: {
 
 export class PrototypeTransportError extends Error {
   constructor(
-    readonly code: string,
+    readonly code: ModelAttemptFailureCode,
     readonly category: ModelAttemptFailure["category"] = "transport",
     readonly retryable = false,
   ) {

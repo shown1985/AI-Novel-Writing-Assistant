@@ -11,7 +11,10 @@ import type {
  * port.
  */
 export interface ModelAttemptRepository {
-  /** Idempotent for an identical attemptId payload; conflicting reuse fails. */
+  /**
+   * Idempotent for an identical immutable start payload, including when the
+   * stored attempt has since reached a terminal state; conflicting reuse fails.
+   */
   startAttempt(input: StartModelAttemptInput): Promise<void>;
 
   /** Idempotent for an identical terminal payload; terminal facts are immutable. */

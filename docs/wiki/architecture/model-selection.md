@@ -49,9 +49,12 @@
 - 一个逻辑 request 可以包含多个有序 attempt。每次 invoke/stream、transport retry、structured strategy retry、JSON repair、semantic retry 和 fallback 都有独立 `attemptId`、`attemptIndex`、role、route tier 与 parent；transport 状态和最终是否被采用必须分开记录。
 - usage 可以为 null，仍必须保留 attempt。旧历史缺证据时只能是 `legacy_unknown` 或未记录，不能把 null 当成零用量，也不能按当前默认模型补造来源。
 - 通用 attempt store 与导演 Token 表职责分离。前者是跨产品入口的调用事实，采用 append/finalize 模型；后者仍服务导演用量投影，不能因为已有 task/run 外键就泛化成全局事实源。
+- 通用 store 的数据库行只保存冻结的标量白名单；API key、Base URL、鉴权/header、Prompt/上下文/正文、模型输出、reasoning 和 provider 错误正文不能进入表。失败码使用显式有限集合，旧未知值只读为 `legacy_unknown`。
+- `startAttempt` 与 `finalizeAttempt` 的幂等、终态不可改写和单 request 唯一 adopted 必须在 request 可串行化事务内完成；数据库 adapter 使用 started-only CAS finalize，遇到唯一键或序列化冲突时重开整个事务，而不是局部重放写入。
+- repair、semantic retry 和 fallback 属于同一 request lineage，但每个 attempt 可以有自己的 Prompt 身份和模型选择；跨 attempt 只固定调用模式与完整归因 frame，不能把首次 Prompt id/version 错当成 request 恒等字段。
+- 首版 attempt 表只保存归因标量 ID，不建立指向小说、任务或章节的 Cascade 外键，也不自动清理或从导演 Token 表回填历史。删除业务对象不能顺带抹掉模型调用证据。
 - 归因按完整 frame 选择：有效自动导演 runtime frame 优先，其次是调用点显式传入的 Prompt invocation frame；冲突或缺失时保持 unknown，不得从 label、entrypoint 关键词、URL 或 live taskId 做字段级拼接。
 - attempt 观测是 side channel。存储 start/finalize 失败不得重发模型、改写正文、改变任务状态、升级质量债或清除人工暂停；调用结果应显式携带 `complete|partial|missing` 观测状态。
-- 持久记录只保存脱敏 provider/model、Prompt 身份、归因 ID、标准化 usage、稳定错误分类和时间；禁止保存 API Key、Base URL、鉴权头、Prompt/上下文/小说正文、模型输出、reasoning 或 provider 错误 body。
 - `promptRunner.ts` 超过硬阈值时，先按 execution context、text execution 与 structured execution 拆分并保持 facade 等价，再接 attempt recorder；不得继续把观测逻辑堆进巨型核心文件。
 
 ## 示例
@@ -101,3 +104,4 @@
 - [项目协作规则](../../../AGENTS.md)
 - [S2-04a 模型选择来源与有效参数完成证据](../../plans/s2-04a-model-selection-provenance.md)
 - [S2-04b0 实际模型调用尝试证据合同](../../plans/s2-04b-model-attempt-evidence-contract.md)
+- [S2-04b1 通用 attempt store 完成证据](../../plans/s2-04b1-model-attempt-store.md)
