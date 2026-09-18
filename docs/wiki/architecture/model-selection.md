@@ -43,6 +43,17 @@
 - 共享 provenance 是脱敏投影，不是 `ResolvedLLMClientOptions` 的序列化结果。API Key、Base URL、authMode、modelKwargs、Prompt 与 session 信息禁止进入该结构。
 - attempt lineage 在来源合同中只定义关联形状。实际请求 ID、重试/修复/备用尝试和持久化属于后续调用证据能力，不能在解析阶段伪造。
 
+### 实际调用尝试证据边界
+
+- “预计使用模型”来自 resolver；“实际调用模型”只能来自真实 provider transport 尝试。Token 用量表、十分钟 live interaction 和当前模型配置都不能回填历史 attempt。
+- 一个逻辑 request 可以包含多个有序 attempt。每次 invoke/stream、transport retry、structured strategy retry、JSON repair、semantic retry 和 fallback 都有独立 `attemptId`、`attemptIndex`、role、route tier 与 parent；transport 状态和最终是否被采用必须分开记录。
+- usage 可以为 null，仍必须保留 attempt。旧历史缺证据时只能是 `legacy_unknown` 或未记录，不能把 null 当成零用量，也不能按当前默认模型补造来源。
+- 通用 attempt store 与导演 Token 表职责分离。前者是跨产品入口的调用事实，采用 append/finalize 模型；后者仍服务导演用量投影，不能因为已有 task/run 外键就泛化成全局事实源。
+- 归因按完整 frame 选择：有效自动导演 runtime frame 优先，其次是调用点显式传入的 Prompt invocation frame；冲突或缺失时保持 unknown，不得从 label、entrypoint 关键词、URL 或 live taskId 做字段级拼接。
+- attempt 观测是 side channel。存储 start/finalize 失败不得重发模型、改写正文、改变任务状态、升级质量债或清除人工暂停；调用结果应显式携带 `complete|partial|missing` 观测状态。
+- 持久记录只保存脱敏 provider/model、Prompt 身份、归因 ID、标准化 usage、稳定错误分类和时间；禁止保存 API Key、Base URL、鉴权头、Prompt/上下文/小说正文、模型输出、reasoning 或 provider 错误 body。
+- `promptRunner.ts` 超过硬阈值时，先按 execution context、text execution 与 structured execution 拆分并保持 facade 等价，再接 attempt recorder；不得继续把观测逻辑堆进巨型核心文件。
+
 ## 示例
 
 推荐做法：
@@ -89,3 +100,4 @@
 - [模块边界与文档治理](./module-boundaries.md)
 - [项目协作规则](../../../AGENTS.md)
 - [S2-04a 模型选择来源与有效参数完成证据](../../plans/s2-04a-model-selection-provenance.md)
+- [S2-04b0 实际模型调用尝试证据合同](../../plans/s2-04b-model-attempt-evidence-contract.md)

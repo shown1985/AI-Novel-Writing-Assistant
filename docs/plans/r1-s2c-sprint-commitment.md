@@ -15,7 +15,7 @@
 | Story | 点数 | 当前状态 | Owner | 依赖 | 交付结果 |
 | --- | ---: | --- | --- | --- | --- |
 | S2-03a0 单书展示事实与动作权威 Spike | 3 | Done | 单书 Contract Agent | S2-01a/b Done | [三层进度、身份 gate、严重度、唯一动作和降级矩阵已冻结](./s2-03a-single-book-display-authority-contract.md)；生产 UI 未改 |
-| S2-04b0 实际模型调用尝试证据 Spike | 3 | Ready | 模型平台 Contract Agent | S2-04a Done | 冻结 request/attempt lineage、通用存储、身份归因、live/API、失败降级和首批非导演入口；产出 seam proof，不改生产 schema |
+| S2-04b0 实际模型调用尝试证据 Spike | 3 | Done | 模型平台 Contract Agent | S2-04a Done | [lineage、通用 store ADR、双库草案、身份、失败降级与 8 项 seam proof 已冻结](./s2-04b-model-attempt-evidence-contract.md)；生产未接线 |
 | S3-00 世界 Prompt 静态登记一致性门 | 2 | Done | 根集成人 | S1-06 Done | [9 处 loader/资产版本对齐，全量 key 一致且唯一检查通过](./s3-00-world-prompt-registry-alignment.md) |
 
 三张卡均以当前源码完成只读 DoR 复核。`S2-03a`、`S2-04b`、`S3-01` 继续保持未承诺；本 Sprint 的 Spike、登记门和测试不能冒充这些生产能力已经完成。
@@ -71,13 +71,13 @@ Wave 2
 
 - 每个 Agent 同时最多一张 `In Progress` Story；Spike Agent 不修改生产共享文件，不提交、不切分支。
 - 根集成人独占 `TASK.md`、Roadmap、详细计划状态、README/Release Notes、Wiki、Registry loader 和阶段提交。
-- S2-03a0 与 S2-04b0 文件域互不重叠；S3-00 只修改 Registry/测试。后续 03a/03b、04b1～3、S3-01 不得在本 Sprint 顺手实现。
+- S2-03a0 与 S2-04b0 文件域互不重叠；S3-00 只修改 Registry/测试。后续 03a/03b、04b1～04b4、S3-01 不得在本 Sprint 顺手实现。
 - 本窗口不 push、tag、晋级 beta/main、执行桌面包装、迁移用户库或公开上传。
 
 ## 未承诺与退出门
 
 - `S2-03a/03b`：03a0 已完成并使 03a 进入 Ready；03b 仍等待 03a 生产实现和既有命令清单冻结。当前页面仍保留既有行为。
-- `S2-04b`：由 04b0 重新拆成每张不超过 5 点的生产卡；在通用 store、promptRunner 边界和非导演身份未冻结前保持 Not Ready。
+- `S2-04b`：已由 04b0 拆成 04b1～04b4；04b1 通用 store 与 04b2 Prompt execution 拆分进入 Ready，04b3/04b4 按前置依赖保持 Not Ready，均未换入本 Sprint。
 - `S2-04c`：继续等待实际 attempt 持久证据；不按当前配置重算历史。
 - `S3-01`：S3-00 通过后才能进入 Ready；届时只迁 `world.prompts.ts` 的 14 个资产，`worldDraft.prompts.ts` 不在 3 点范围。
 - `S1-03` 与世界 Runtime 生产卡保持 Refinement/Backlog，不与本窗口交叉写共享 schema。

@@ -10,3 +10,9 @@ not reconstruct historical provenance from current settings.
 
 This module does not persist attempts, generate attempt identifiers, invoke a
 model, or change route and fallback precedence.
+
+`attempts/` contains the isolated S2-04b0 attempt-evidence contract and an
+executable mock seam proof. It is intentionally absent from this module's
+production `index.ts`; no runtime caller can consume it until the follow-up
+production stories add a real repository, transport-boundary instrumentation,
+and reviewed API contracts.

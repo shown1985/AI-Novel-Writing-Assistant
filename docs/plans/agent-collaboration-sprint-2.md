@@ -6,12 +6,12 @@
 
 当前源码已提供章节修改预览、候选、差异、正文保存和审校；本 Sprint 复用这些能力。全局 Creative Hub 和运行记录保持只读，运行中的任务恢复仍走现有来源页命令。简易体验的用户写门禁和不可逆转专业语义继续生效。
 
-细分后为 10 张卡、34 点候选容量；路线图原 18 点是初始概要估计，新增拆分显式计入超长总控收敛、展示事实权威、调用证据持久化和独立接线成本。34 点不作为一个 1～2 周窗口的固定承诺，按下面的验收窗口安排：
+细分后为 13 张卡、43 点候选容量；路线图原 18 点是初始概要估计。S2-04b0 证明实际 attempt 需要通用存储、Prompt 执行边界拆分、真实 transport 接线和首批身份/读投影四张独立卡，不能继续压在一张 5 点卡中。43 点不作为一个 1～2 周窗口的固定承诺，按下面的验收窗口安排：
 
 | 窗口 | 候选卡 | 点数 | 退出条件 |
 | --- | --- | --- | --- |
 | S2-A 创作现场 | S2-01a、01b、02、03a0、03a、03b | 20 | 总控收敛、正文开关、先冻结展示权威，再让推荐与来源恢复联通；S1-X 已通过则减去 S2-02 的 3 点 |
-| S2-B 模型透明度 | S2-04a、04b0、04b、04c | 14 | 来源合同、attempt 持久化合同、实际调用证据与只读显示联通；生产卡按 Spike 结论拆分，不缩减历史保护验收 |
+| S2-B 模型透明度 | S2-04a、04b0、04b1～04b4、04c | 23 | 来源合同、通用存储、执行边界、真实 attempt、首批身份/读投影与只读显示分窗联通；不缩减历史保护验收 |
 
 仅接纳已冻结依赖的卡。模型透明度合同可与总控拆分并行设计；未冻结的持久化和客户端接线均为 Not Ready。点数代表相对复杂度，具体开发基线由根集成人开工时记录。
 
@@ -22,7 +22,7 @@
 | S2-01 | S2-01a / S2-01b | 查询与导演编排、阶段展示装配分别归属；同一 owner 串行完成 |
 | S2-02 | S2-02 | 对应 S1-X；已交付且未被后续修改失效时只复用验收证据，不重复实现 |
 | S2-03 | S2-03a0 / S2-03a / S2-03b | 先冻结事实与动作权威，再实现纯展示模型并绑定既有来源页动作 |
-| S2-04 | S2-04a / S2-04b0 / S2-04b / S2-04c | 来源合同、attempt 存储合同、实际尝试证据、提交前与运行显示分别验收 |
+| S2-04 | S2-04a / S2-04b0 / S2-04b1～04b4 / S2-04c | 来源合同、attempt 方案、通用存储、执行边界、真实接线、首批身份/读投影和用户显示分别验收 |
 
 父 ID 是里程碑映射，不是额外实施卡，不重复计点；原概要估算只保留为历史，承诺以细分卡 refinement 后的容量为准。
 
@@ -227,16 +227,16 @@
 ## S2-04b0：实际模型调用尝试证据 Spike
 
 - 用户价值：后续历史能说明每次真实模型尝试和最终采用者，不把 Token 聚合、短期 live 状态或当前配置误称实际来源。
-- 状态：Ready（R1-S2C）；3 点；Owner：模型平台 Contract Agent。
+- 状态：**Done（R1-S2C）**；3 点；Owner：模型平台 Contract Agent。合同、ADR、迁移草案和 8 项 seam proof 见 [实际模型调用尝试证据合同](./s2-04b-model-attempt-evidence-contract.md)。
 - 交付：冻结 request/attempt lineage、通用 attempt store、SQLite/PostgreSQL 增量迁移草案、身份归因、live/API、失败降级、首批非导演入口和 `promptRunner` 拆分先决方案；用 mock transport + in-memory repository 给出 executable seam proof。
 - 非范围：不改生产 schema/路由/重试/备用/预算，不实现 04c UI，不真实调用模型，不写用户库，不把缺 usage 当免费或回填历史。
-- 检查与完整合同：[R1-S2C Sprint 承诺](./r1-s2c-sprint-commitment.md#s2-04b0)；完成后重新拆分并估算 04b 生产卡。
+- 检查与完整合同：[R1-S2C Sprint 承诺](./r1-s2c-sprint-commitment.md#s2-04b0)；server build 与隔离 prototype 8/8 通过，已重新拆分并估算 04b1～04b4。
 
-## S2-04b：实际调用尝试的来源证据
+## S2-04b：实际调用尝试的来源证据（父里程碑）
 
 - 用户价值：即使重试、修复或切备用模型，作者能看到真正完成该次工作的模型，而非提交前猜测。
-- 状态：Refinement / Not Ready；S2-04a 已完成，等待 S2-04b0 冻结持久化/迁移/出口、失败降级、`promptRunner` 架构门和非导演入口覆盖后重新拆卡。
-- 点数：5；Owner：Agent C，平台调用/观测模块独占；根集成人拥有 schema、共享类型与挂载。
+- 状态：父里程碑，不重复计点；S2-04b0 已完成，生产范围由 04b1～04b4 承接。
+- 重新估算：3 + 3 + 5 + 3 = 14 点；Owner 按卡串行接线，根集成人独占 schema、共享类型、HTTP/API 与挂载。
 - 真实源码：server/src/llm/factory.ts、usageTracking.ts、structuredInvoke.ts；server/src/platform/llm/live/llmLiveSession.ts、LlmLiveBroker.ts、http/llmLiveRoutes.ts；server/src/services/novel/director/runtime/DirectorUsageTelemetryQueryService.ts；server/src/services/task/taskTokenUsageSummary.ts。
 - 拟建归属：如果现有 metadataJson 不能覆盖非导演调用，新增 owned platform/llm 来源记录存储与查询能力，数据库增量模型及 SQLite/PostgreSQL 迁移由根集成人审查；这是待选型，不声称通用持久调用仓库已存在。
 - 非范围：不制造第二 Token统计或成本账本，不实现预算硬门禁，不改变重试次数与备用策略，不将无 usage 返回解释成免费调用。
@@ -262,12 +262,48 @@
 
 数据安全与失败恢复：增量迁移先在临时 SQLite/PostgreSQL兼容环境验证；不 reset 或回填伪造历史。遥测重试只补证据，永不重发创作请求；内容结果与观测失败分开保存。
 
-交付证据：每个入口覆盖清单、attempt 链样例、重启后查询、并发与缺失证据结果、迁移/兼容检查及未覆盖风险。
+交付证据：每个入口覆盖清单、attempt 链样例、重启后查询、并发与缺失证据结果、迁移/兼容检查及未覆盖风险。完整父里程碑仅在 04b1～04b4 全部 Done 后完成。
+
+### S2-04b1：通用 attempt store 与 repository
+
+- 用户价值：模型用量未知、进程重启或默认模型改变后，真实调用尝试仍有不可伪造的持久证据。
+- 状态：**Ready**；3 点。根集成人独占 PostgreSQL/SQLite schema 与迁移；模型平台 Agent 拥有 repository adapter 与聚合读取。
+- 范围：按 04b0 ADR 增加独立 `ModelAttemptEvidence` 表、双库增量迁移、幂等 start/finalize、唯一 adopted 事务约束和按 request/novel 的重建读取。
+- 非范围：不接真实 transport、不改 Prompt Runner、不建用户 UI、不回填 Token 表或 live 历史、不自动清理旧证据。
+- AC：两套迁移在隔离库通过；null usage、started orphan、重复 start/finalize、冲突终态、单 request 唯一 adopted、重启重建和敏感字段缺失均有行为证据。
+- 验证：临时 SQLite 与 PostgreSQL 兼容环境的增量 migration/repository 测试；禁止 reset 用户库，任何数据清理另走备份和批准规则。
+
+### S2-04b2：Prompt execution 边界拆分
+
+- 用户价值：后续记录真实调用时不会继续扩大超长核心文件或改变既有生成、重试和流式体验。
+- 状态：**Ready**；3 点。Prompt 平台 Agent 独占 `prompting/core/execution/` 与 `promptRunner.ts`；不与 transport 接线并行改同文件。
+- 范围：按 04b0 合同提取 execution context、text invoke/stream 和 structured coordination；保留 facade exports，`promptRunner.ts` 降至 1300 行以下，目标 1000～1200 行。
+- 非范围：不写 attempt store、不改 retry/fallback/repair/semantic 策略、不新增 Prompt、不调整模型参数。
+- AC：外部 import 与 text/structured invoke/stream、live、usage、repair、semantic retry 行为等价；依赖方向只经 execution facade，不创建 generic helper。
+- 验证：server build、现有 Prompt/structured invoke/live 定向回归和文件行数；本卡纯重构不声称调用证据已持久化。
+
+### S2-04b3：真实 transport attempt 接线
+
+- 用户价值：重试、结构策略切换、JSON 修复、语义重试和备用模型的每次真实调用都能分开记录，并明确最终采用者。
+- 状态：**Not Ready**；5 点，依赖 04b1 与 04b2 Done。模型平台 Agent 串行拥有 recorder、structured invoke/repair 和拆分后的 text execution hooks。
+- 范围：建立 request/attempt ID 生命周期，在每次物理 invoke/stream 前 start、终态 finalize；把 strategy/transport/fallback/repair/semantic lineage 与 04a 脱敏选择证据关联。
+- 非范围：不改重试次数/模型路由、不因观测失败重发生成、不做公开 API/UI、不扩独立世界库或 batch 身份。
+- AC：invoke/stream、null usage、失败→重试→备用成功、repair/semantic、取消与崩溃 started 行通过 production seam mock；repository 故障不改变模型调用次数、正文结果、任务状态或人工暂停。
+- 验证：mock transport + 持久 repository 的行为测试，并发 request 不串线；普通读取零模型调用且持久行无凭证、地址、Prompt 或输出正文。
+
+### S2-04b4：首批身份归因与读投影
+
+- 用户价值：自动导演、本书世界生成和章节改稿预览的调用证据归属正确作品与任务，缺失时明确显示未记录。
+- 状态：**Not Ready**；3 点，依赖 04b3 Done。模型平台 Agent 拥有 attempt context/read service；根集成人独占共享 DTO、HTTP/API 和挂载。
+- 范围：接自动导演 runtime frame、本书世界 `novel-world-generate`、章节 `ai-revision-preview`；后者先显式补齐 novelId/chapterId/entrypoint。读取返回 request 聚合、唯一 adopted 与 `complete|partial|missing`。
+- 非范围：独立世界库、batch、多小说请求归因、公开 UI；不得从 label、当前 URL、当前设置或 live interaction 猜身份。
+- AC：三入口身份与两个小说并发隔离；runtime frame 冲突不做字段拼接；not-found 与 observation missing 分开；修改默认模型不改变旧记录。
+- 验证：身份矩阵、API/read service 聚合、重启读取和零模型调用检查；未覆盖入口保持 unattributed，不宣称全系统透明。
 
 ## S2-04c：预计模型与实际来源的只读显示
 
 - 用户价值：提交前知道选择意图，运行后看到实际调用与备用原因，技术参数保持按需查看。
-- 状态：Blocked by S2-04a/04b；根集成人冻结 API/live 字段后 Ready。
+- 状态：Blocked by S2-04b4；04a 已完成，持久 read DTO 冻结后才能 Ready。
 - 点数：3；Owner：Agent B，04a完成后可设计纯展示模型；由根集成人接线共享/全局组件保留范围。
 - 真实源码：client/src/components/common/LLMSelector.tsx、components/layout/Navbar.tsx、components/liveExecution/LiveExecutionDialog.tsx、hooks/useLlmLiveFeed.ts、pages/novels/components/NovelTaskDrawer.tsx、pages/tasks/TaskCenterPage.tsx。以上跨作品/全局文件由根集成人逐项授权，Agent 不默认抢占。
 - 拟建归属：client/src/components/common/ 下明确模型来源展示能力及行为测试；不复制来源解析业务，不新增全局执行按钮。
