@@ -19,6 +19,7 @@ import OutlineTab from "../components/OutlineTab";
 import PipelineTab from "../components/PipelineTab";
 import StoryMacroPlanTab from "../components/StoryMacroPlanTab";
 import StructuredOutlineTab from "../components/StructuredOutlineTab";
+import SingleBookPrimaryActionPanel from "../components/SingleBookPrimaryActionPanel";
 import VersionHistoryTab from "../components/VersionHistoryTab";
 import type { NovelEditViewProps } from "../components/NovelEditView.types";
 import {
@@ -51,6 +52,7 @@ export default function MobileNovelEditView(props: NovelEditViewProps) {
     takeover,
     taskDrawer,
     singleBookDisplay,
+    singleBookPrimaryAction,
     activeStepTakeoverEntry,
   } = props;
   const [isToolsOpen, setIsToolsOpen] = useState(false);
@@ -129,9 +131,6 @@ export default function MobileNovelEditView(props: NovelEditViewProps) {
             </p>
             {singleBookDisplay.qualityDebtCount > 0 ? (
               <p className="mt-1 text-xs text-muted-foreground">局部质量项 {singleBookDisplay.qualityDebtCount} 条，不影响后续章节继续推进</p>
-            ) : null}
-            {singleBookDisplay.primaryAction ? (
-              <p className="mt-1 text-xs text-muted-foreground">建议下一步：{singleBookDisplay.primaryAction.label}</p>
             ) : null}
           </div>
           <Dialog open={isToolsOpen} onOpenChange={setIsToolsOpen}>
@@ -242,6 +241,11 @@ export default function MobileNovelEditView(props: NovelEditViewProps) {
       </header>
 
       <main className="space-y-3 pt-3">
+        <SingleBookPrimaryActionPanel
+          display={singleBookDisplay}
+          control={singleBookPrimaryAction}
+        />
+
         {!hideTakeoverEntry ? (
           <div className="rounded-xl border border-border/70 bg-muted/20 p-3">
             {isTakeoverLoading ? (

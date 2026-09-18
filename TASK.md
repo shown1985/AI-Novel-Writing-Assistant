@@ -181,12 +181,12 @@ Review 与 Retrospective 见 [R1-S2C Sprint 承诺](./docs/plans/r1-s2c-sprint-c
 | Story | 点数 | 状态 | Owner | 验收边界 |
 | --- | ---: | --- | --- | --- |
 | R1-PROMPT01 结构化调用瞬态传输失败重试 | 2 | Done | Prompt 平台 owner | [瞬态分类与 retry/空响应/取消回归通过](./docs/plans/r1-prompt01-structured-transport-retry.md)；不改策略 |
-| S2-03b 来源现场推荐动作与反馈接线 | 3 | Ready | 单书交互 owner | 同任务动作、pending 防重、失败/刷新/跨书与 Computer Use；运行记录只读 |
+| S2-03b 来源现场推荐动作与反馈接线 | 3 | Done | 单书交互 owner | [41 项定向检查与隔离环境 Computer Use 通过](./docs/plans/s2-03b-source-action-feedback.md)；一次真实 POST、正式投影回读、运行记录只读 |
 | S3-01 世界 Prompt 维护能力边界 | 3 | Done | 世界 Prompt owner | 14 个资产逐字等价迁移；33 行兼容门面、Registry loader 与消费合同通过 |
 
 承诺容量：8 点。Stretch：无。权威合同见 [R1-S2E Sprint 承诺](./docs/plans/r1-s2e-sprint-commitment.md)。
 
-当前完成 `5/8` 点；S2-03b 仍为 Ready，Sprint Goal 尚未达成。
+完成 `8/8` 点，无 Story carryover。Sprint Goal 达成：来源页能按严格小说/任务身份执行唯一书级推荐动作，世界 Prompt 能力边界已收敛，结构化调用恢复瞬态传输重试。Review 与 Retrospective 见 [R1-S2E Sprint 承诺](./docs/plans/r1-s2e-sprint-commitment.md)。
 
 未承诺：S2-04b3 的 transport retry 基线阻断已解除并回到 Ready，但只能进入下一次 Planning。04b4/04c、S3-02a/b 及 Release 2 均不顺手扩入。
 

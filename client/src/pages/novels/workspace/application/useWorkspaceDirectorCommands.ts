@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { QueryClient } from "@tanstack/react-query";
 import type {
@@ -21,11 +21,6 @@ import { queryKeys } from "@/api/queryKeys";
 import { toast } from "@/components/ui/toast";
 import { useDirectorChapterTitleRepair } from "@/hooks/useDirectorChapterTitleRepair";
 import { useLLMStore } from "@/store/llmStore";
-import {
-  getDirectorCockpitActionHref,
-  getDirectorCockpitContinuationMode,
-  isDirectorCockpitContinuationAction,
-} from "@/lib/directorCockpitActions";
 import { resolveInternalNavigationTarget } from "@/lib/internalNavigation";
 import {
   resolveDirectorContinueMode,
@@ -41,6 +36,14 @@ import {
 } from "../../novelWorkspaceNavigation";
 import type { useWorkspaceDirectorState } from "./useWorkspaceDirectorState";
 import { useBookScopedMutation } from "./useBookScopedMutation";
+import {
+  acquireSingleBookPrimaryAction,
+  buildSingleBookPrimaryActionRequestKey,
+  dispatchSingleBookPrimaryAction,
+  releaseSingleBookPrimaryAction,
+  resolveSingleBookPrimaryActionCommand,
+  type SingleBookPrimaryActionLock,
+} from "./singleBookPrimaryAction";
 
 interface CommandInput {
  id: string; activeTab: string; selectedChapterId: string; payoffLedgerChapterOrder: number | undefined;
@@ -59,8 +62,15 @@ export function useWorkspaceDirectorCommands({ id, activeTab, selectedChapterId,
   activeDirectorSession,
   bookAutomationProjection,
   displayAutoDirectorTask,
+  selectedDirectorTaskId,
   visibleDirectorTask,
  } = director;
+  const projectedActionLock = useRef<SingleBookPrimaryActionLock>({ current: null });
+  const [projectedActionState, setProjectedActionState] = useState<{
+    novelId: string;
+    feedback: string | null;
+    error: string | null;
+  } | null>(null);
   const openAutoDirectorTaskCenter = (directorTaskId?: string) => {
     const targetId = directorTaskId || actionTargetDirectorTaskId || activeAutoDirectorTask?.id;
     if (targetId) {
@@ -253,24 +263,43 @@ export function useWorkspaceDirectorCommands({ id, activeTab, selectedChapterId,
   });
   const continueProjectedDirectorActionMutation = useBookScopedMutation(id, {
     mutationFn: async (input: {
+      novelId: string;
       taskId: string;
       mode?: DirectorContinuationMode;
-    }) => continueNovelWorkflow(
-      input.taskId,
-      input.mode ? { continuationMode: input.mode } : undefined,
-    ),
+      requestKey: string;
+    }) => {
+      if (input.novelId !== id) {
+        throw new Error("推荐动作不属于当前小说，请刷新后重试。");
+      }
+      return continueNovelWorkflow(
+        input.taskId,
+        input.mode ? { continuationMode: input.mode } : undefined,
+      );
+    },
     onSuccess: async (response, input) => {
       setDirectorTaskId(response.data?.taskId ?? input.taskId);
-      void invalidateAutoDirectorTaskState(response.data?.taskId ?? input.taskId);
+      await invalidateAutoDirectorTaskState(response.data?.taskId ?? input.taskId);
       const feedback = resolveWorkflowContinuationFeedback(response.data, {
         mode: input.mode,
         scopeLabel: activeAutoExecutionScopeLabel,
       });
       if (feedback.tone === "error") {
+        setProjectedActionState({
+          novelId: input.novelId,
+          feedback: null,
+          error: feedback.message,
+        });
+        releaseSingleBookPrimaryAction(projectedActionLock.current, input.novelId, input.requestKey);
         toast.error(feedback.message);
         return;
       }
       alignToAutoDirectorResumeTarget(input.taskId === visibleDirectorTask?.id ? visibleDirectorTask : activeAutoDirectorTask);
+      setProjectedActionState({
+        novelId: input.novelId,
+        feedback: "请求已提交，已重新读取本书最新任务状态。",
+        error: null,
+      });
+      releaseSingleBookPrimaryAction(projectedActionLock.current, input.novelId, input.requestKey);
       toast.success(feedback.message);
     },
     onError: (error, input) => {
@@ -279,6 +308,12 @@ export function useWorkspaceDirectorCommands({ id, activeTab, selectedChapterId,
         : input.mode === "auto_execute_range"
           ? `继续自动执行${activeAutoExecutionScopeLabel}失败。`
           : "继续自动导演失败。";
+      setProjectedActionState({
+        novelId: input.novelId,
+        feedback: null,
+        error: message,
+      });
+      releaseSingleBookPrimaryAction(projectedActionLock.current, input.novelId, input.requestKey);
       toast.error(message);
     },
   });
@@ -358,39 +393,56 @@ export function useWorkspaceDirectorCommands({ id, activeTab, selectedChapterId,
     }
     toast.success(targetVolumeId ? "已定位到当前卷拆章，可直接修复标题。" : "已切到节奏 / 拆章，可直接修复标题。");
   };
-  const handleTaskDrawerProjectionAction = (action: DirectorBookAutomationAction) => {
-    if (!bookAutomationProjection) {
-      return;
-    }
-    const taskId = action.commandPayload?.taskId
-      ?? action.target.taskId
-      ?? bookAutomationProjection.latestTask?.id
-      ?? activeAutoDirectorTask?.id;
-    if (taskId && isDirectorCockpitContinuationAction(action)) {
-      continueProjectedDirectorActionMutation.mutate({
-        taskId,
-        mode: getDirectorCockpitContinuationMode(action),
+  const handleSingleBookPrimaryAction = (action: DirectorBookAutomationAction) => {
+    const command = resolveSingleBookPrimaryActionCommand({
+      novelId: id,
+      directorTaskId: selectedDirectorTaskId || null,
+      projection: bookAutomationProjection,
+      action,
+    });
+    if (!command) {
+      setProjectedActionState({
+        novelId: id,
+        feedback: null,
+        error: "这条建议已失效，请刷新本书状态后再试。",
       });
       return;
     }
-    if (action.type === "confirm_candidate") {
-      openCandidateSelection(taskId);
-      return;
-    }
-    if (action.type === "open_chapter") {
-      openChapterExecution(taskId === visibleDirectorTask?.id ? visibleDirectorTask : undefined);
-      return;
-    }
-    if (action.type === "open_quality_repair") {
-      openQualityRepair(taskId === visibleDirectorTask?.id ? visibleDirectorTask : undefined);
-      return;
-    }
-    if (action.type === "open_details") {
-      openAutoDirectorTaskCenter(taskId);
-      return;
-    }
-    setIsTaskDrawerOpen(false);
-    navigate(getDirectorCockpitActionHref(bookAutomationProjection, action));
+    setProjectedActionState(null);
+    dispatchSingleBookPrimaryAction(command, {
+      continue: (continuation) => {
+        const requestKey = buildSingleBookPrimaryActionRequestKey(continuation);
+        if (!acquireSingleBookPrimaryAction(projectedActionLock.current, id, requestKey)) {
+          return;
+        }
+        setProjectedActionState({
+          novelId: id,
+          feedback: "正在提交推荐操作，请稍候。",
+          error: null,
+        });
+        continueProjectedDirectorActionMutation.mutate({
+          novelId: id,
+          taskId: continuation.taskId,
+          mode: continuation.mode,
+          requestKey,
+        });
+      },
+      confirmCandidate: openCandidateSelection,
+      openChapter: (taskId) => openChapterExecution(
+        taskId === visibleDirectorTask?.id ? visibleDirectorTask : undefined,
+      ),
+      openQualityRepair: (taskId) => openQualityRepair(
+        taskId === visibleDirectorTask?.id ? visibleDirectorTask : undefined,
+      ),
+      openDetails: (taskId) => {
+        setDirectorTaskId(taskId);
+        setIsTaskDrawerOpen(true);
+      },
+      navigate: (href) => {
+        setIsTaskDrawerOpen(false);
+        navigate(href);
+      },
+    });
   };
   const handleDrawerFollowUpAction = (action: AutoDirectorAction) => {
     if (action.kind === "navigation") {
@@ -508,5 +560,10 @@ export function useWorkspaceDirectorCommands({ id, activeTab, selectedChapterId,
       toast.error(message);
     },
   });
-  return { openAutoDirectorTaskCenter, invalidateAutoDirectorTaskState, invalidateWorkspaceDataForTabs, invalidateVisibleWorkspaceData, alignToAutoDirectorResumeTarget, continueAutoDirectorMutation, calibrateDirectorStepMutation, acceptManualChangesAndContinueMutation, continueAutoExecutionMutation, continueProjectedDirectorActionMutation, executeFollowUpActionMutation, reviewScope, reviewTab, openReviewStage, openCandidateSelection, openChapterExecution, openQualityRepair, openChapterTitleRepair, handleTaskDrawerProjectionAction, handleDrawerFollowUpAction, chapterTitleRepairMutation, retryableAutoDirectorTask, retryAutoDirectorWithCurrentModelMutation, retryAutoDirectorWithTaskModelMutation, cancelAutoDirectorMutation, archiveCompletedAutoDirectorMutation };
+  const projectedActionStateForCurrentBook = projectedActionState?.novelId === id
+    ? projectedActionState
+    : null;
+  const singleBookPrimaryActionPending = continueProjectedDirectorActionMutation.isPending
+    && continueProjectedDirectorActionMutation.variables?.novelId === id;
+  return { openAutoDirectorTaskCenter, invalidateAutoDirectorTaskState, invalidateWorkspaceDataForTabs, invalidateVisibleWorkspaceData, alignToAutoDirectorResumeTarget, continueAutoDirectorMutation, calibrateDirectorStepMutation, acceptManualChangesAndContinueMutation, continueAutoExecutionMutation, continueProjectedDirectorActionMutation, executeFollowUpActionMutation, reviewScope, reviewTab, openReviewStage, openCandidateSelection, openChapterExecution, openQualityRepair, openChapterTitleRepair, handleSingleBookPrimaryAction, singleBookPrimaryActionPending, singleBookPrimaryActionFeedback: projectedActionStateForCurrentBook?.feedback ?? null, singleBookPrimaryActionError: projectedActionStateForCurrentBook?.error ?? null, handleDrawerFollowUpAction, chapterTitleRepairMutation, retryableAutoDirectorTask, retryAutoDirectorWithCurrentModelMutation, retryAutoDirectorWithTaskModelMutation, cancelAutoDirectorMutation, archiveCompletedAutoDirectorMutation };
 }

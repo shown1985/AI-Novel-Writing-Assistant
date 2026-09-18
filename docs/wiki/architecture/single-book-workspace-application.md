@@ -23,7 +23,11 @@
 11. 页面至多展示一个可执行导演主动作。唯一候选是通过同 `novelId`、同 `directorTaskId` 和 fresh 查询验证的 `bookAutomationProjection.primaryAction`；dashboard、runtime、局部 callback 和自由文案只能提供说明或既有命令适配，不能按 label、关键词或正则重新推断动作。
 12. stale、loading、error、empty 或身份不匹配都输出零可执行动作。相同小说与已验证任务的旧保存成果可以继续只读并明确标记刷新或读取失败，但另一小说、另一任务的旧事实不得复用。
 13. 明确 `replan_required`、`pendingManualRecovery` 和 quality-first `pause_for_manual` 优先于普通 running/completed；`defer_and_continue` 等局部质量债仍是可继续警告，不能在展示层升级为全书失败或重规划。
-14. 三层进度、严重度、质量债数量和主动作候选必须先收敛为同一个只读 `SingleBookDisplayModel`，再由桌面与移动端消费。视图不能各自重算章数、目标、任务严重度或动作；03a 的动作只展示，不绑定命令。
+14. 三层进度、严重度、质量债数量和主动作候选必须先收敛为同一个只读 `SingleBookDisplayModel`，再由桌面与移动端消费。视图不能各自重算章数、目标、任务严重度或动作。
+15. 来源页执行主动作前必须再次校验当前 `novelId`、书级投影 `novelId`、`latestTask.id`、动作 target 与 command payload 中的任务身份；动作 label 只用于展示，不能参与命令路由。
+16. 同一本书同一请求只能持有一个 pending lock；切到另一部作品后可以发起新作品动作，但旧作品的成功、失败和锁释放都不能覆盖当前作品反馈。
+17. `continue`、`auto_execute_range` 等动作必须复用既有来源页命令。成功反馈只能表示请求已提交并已重新读取正式投影，不能宣称后台步骤已经完成；后台随后失败时，应保留成果并显示服务端给出的恢复动作。
+18. 动作反馈与动作本体在同一来源页位置呈现，至少包含影响范围、已保存成果保留说明、pending、提交成功或明确错误。任务抽屉与运行记录可以展示事实、诊断和来源导航，但不得从书级投影复制第二个主动作。
 
 ## 失败模式
 
@@ -35,6 +39,8 @@
 - 桌面与移动分别组装任务事实，会逐渐形成两套恢复解释；两者必须继续消费同一个 `NovelEditViewProps`。
 - 从多个 action 字段或按钮文案仲裁“最像下一步”的动作，会形成第二套产品语义；应先检查书级投影身份和 freshness，不满足时宁可无动作并保留只读事实。
 - 用局部 task progress、规划章节数或 UI 默认值补造整书目标，会把单次任务成功误报成作品完成；三个进度层必须分别呈现。
+- 只在 mutation `onSuccess` 显示“已完成”，会把后台接收命令误报为业务完成；提交后必须失效并重读当前书的正式投影。
+- 用全局 boolean 保存 pending，或由旧书 settled 无条件清锁，会让 A → B → A 切换后的按钮与反馈串书；锁和反馈都必须带作品与请求身份。
 
 ## 相关模块
 
@@ -50,5 +56,6 @@
 - [S2-01a 完成证据](../../plans/s2-01a-single-book-application-facade.md)
 - [S2-01b 完成证据](../../plans/s2-01b-single-book-presentation.md)
 - [S2-03a0 单书展示事实与动作权威合同](../../plans/s2-03a-single-book-display-authority-contract.md)
+- [S2-03b 来源现场动作完成证据](../../plans/s2-03b-source-action-feedback.md)
 - [R1-S2A Sprint 承诺](../../plans/r1-s2a-sprint-commitment.md)
 - [Agent Sprint 2 实施卡](../../plans/agent-collaboration-sprint-2.md)

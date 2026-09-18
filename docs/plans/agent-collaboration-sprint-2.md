@@ -166,7 +166,7 @@
 ## S2-03b：来源现场推荐动作与反馈接线
 
 - 用户价值：点击推荐后知道影响范围、看到处理中反馈，并能在同一创作现场完成恢复。
-- 状态：**Ready**；S2-03a 与 S2-01b 已 Done，既有来源页命令与本卡非范围已冻结，等待后续 Sprint Planning。
+- 状态：**Done（R1-S2E）**；同任务动作、pending 防重、正式投影回读、跨书隔离与隔离环境 Computer Use 验收通过，见 [完成证据](./s2-03b-source-action-feedback.md)。
 - 点数：3；Owner：Agent A，与 03a 串行；根集成人接线共享 API。
 - 真实源码：client/src/pages/novels/components/NovelEditView.tsx、mobile/MobileNovelEditView.tsx、NovelTaskDrawer.tsx、hooks/useNovelEditWorkflow.ts、client/src/api/novelWorkflow.ts、novelDirector.ts（API facade 保留根 owner）。
 - 非范围：不在 Creative Hub/运行记录增加执行按钮，不新增第二 continue/repair API，不修改自动导演 issue policy，不以 toast 代替持久状态。

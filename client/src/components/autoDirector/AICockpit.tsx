@@ -27,6 +27,7 @@ export interface AICockpitProps {
   fallbackSummary?: string | null;
   fallbackStatusLabel?: string | null;
   isActionPending?: boolean;
+  showPrimaryAction?: boolean;
   showDetailsAction?: boolean;
   onAction?: (projection: DirectorBookAutomationProjection, action: DirectorBookAutomationAction) => void;
   onOpenDetails?: (projection: DirectorBookAutomationProjection) => void;
@@ -314,6 +315,7 @@ export default function AICockpit(props: AICockpitProps) {
     mode = "focusedNovel",
     fallbackStatusLabel,
     isActionPending = false,
+    showPrimaryAction = true,
     showDetailsAction = true,
     onAction,
     onOpenDetails,
@@ -424,9 +426,11 @@ export default function AICockpit(props: AICockpitProps) {
             {displayStateLabel(focusProjection.displayState)}
           </Badge>
         </div>
-        <Button type="button" size="sm" variant="outline" className="mt-3 w-full" onClick={handleCompactOpen}>
-          查看
-        </Button>
+        {showPrimaryAction ? (
+          <Button type="button" size="sm" variant="outline" className="mt-3 w-full" onClick={handleCompactOpen}>
+            查看
+          </Button>
+        ) : null}
       </div>
     );
   }
@@ -469,13 +473,15 @@ export default function AICockpit(props: AICockpitProps) {
             </div>
           </div>
           <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
-            <Button type="button" size="sm" onClick={handlePrimaryAction} disabled={isActionPending}>
-              {isActionPending ? "处理中..." : renderActionLabel(primaryAction ?? {
-                type: "open_novel",
-                label: "打开小说",
-                target: { novelId: focusProjection.novelId },
-              }, focusProjection.displayState)}
-            </Button>
+            {showPrimaryAction ? (
+              <Button type="button" size="sm" onClick={handlePrimaryAction} disabled={isActionPending}>
+                {isActionPending ? "处理中..." : renderActionLabel(primaryAction ?? {
+                  type: "open_novel",
+                  label: "打开小说",
+                  target: { novelId: focusProjection.novelId },
+                }, focusProjection.displayState)}
+              </Button>
+            ) : null}
             {canOpenDetails ? (
               <Button type="button" size="sm" variant="secondary" onClick={handleDetails}>
                 <ExternalLink className="h-4 w-4" />

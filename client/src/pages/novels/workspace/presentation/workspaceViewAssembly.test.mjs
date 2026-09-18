@@ -143,7 +143,6 @@ function createDrawerInput(overrides = {}) {
     projection: { marker: "projection" },
     currentUiModel: { provider: "openai", model: "gpt-test", temperature: 0.5 },
     actions: [],
-    onProjectionAction: noop,
     followUp: null,
     onFollowUpAction: noop,
     executingFollowUpAction: false,
@@ -224,15 +223,13 @@ test("planning assembly keeps manual saves and system generation on their origin
   ]);
 });
 
-test("task drawer assembly preserves system and manual actions without eager commands", () => {
+test("task drawer assembly preserves contextual and manual actions without a second projected primary action", () => {
   const invoked = [];
   const systemContinue = () => invoked.push(["system-continue"]);
   const manualConfirm = (proposalId) => invoked.push(["manual-confirm", proposalId]);
-  const projectionAction = (action) => invoked.push(["projection", action]);
   const taskDrawer = buildNovelEditTaskDrawer(createDrawerInput({
     actions: [{ label: "继续", onClick: systemContinue }],
     onConfirmResourceProposal: manualConfirm,
-    onProjectionAction: projectionAction,
     followUp: { marker: "follow-up" },
     canCancel: true,
   }));
@@ -240,7 +237,6 @@ test("task drawer assembly preserves system and manual actions without eager com
   assert.deepEqual(invoked, []);
   assert.equal(taskDrawer.actions[0].onClick, systemContinue);
   assert.equal(taskDrawer.onConfirmResourceProposal, manualConfirm);
-  assert.equal(taskDrawer.onProjectionAction, projectionAction);
   assert.deepEqual(taskDrawer.projection, { marker: "projection" });
   assert.deepEqual(taskDrawer.capabilities, {
     availableActions: true,
@@ -252,18 +248,11 @@ test("task drawer assembly preserves system and manual actions without eager com
     canArchive: true,
   });
 
-  const projectedAction = {
-    type: "continue",
-    label: "继续",
-    target: { novelId: "book-a", taskId: "director-a" },
-  };
   taskDrawer.actions[0].onClick();
   taskDrawer.onConfirmResourceProposal("proposal-a");
-  taskDrawer.onProjectionAction(projectedAction);
   assert.deepEqual(invoked, [
     ["system-continue"],
     ["manual-confirm", "proposal-a"],
-    ["projection", projectedAction],
   ]);
 });
 

@@ -605,7 +605,6 @@ export interface NovelTaskDrawerState {
     temperature: number;
   };
   actions: AITakeoverAction[];
-  onProjectionAction?: (action: DirectorBookAutomationAction) => void;
   resourceProposals?: CharacterResourceProposalSummary[];
   onOpenResourceProposalSource?: (proposal: CharacterResourceProposalSummary) => void;
   onConfirmResourceProposal?: (proposalId: string) => void;
@@ -663,11 +662,19 @@ export interface NovelEditViewProps {
   pipelineTab: PipelineTabViewProps;
   characterTab: CharacterTabViewProps;
   singleBookDisplay: SingleBookDisplayModel;
+  singleBookPrimaryAction: SingleBookPrimaryActionControl;
   takeover?: NovelEditTakeoverState | null;
   taskDrawer?: NovelTaskDrawerState | null;
   activeStepTakeoverEntry?: ReactNode;
   onSwitchToSimpleMode?: () => void;
   isSwitchingToSimpleMode?: boolean;
+}
+
+export interface SingleBookPrimaryActionControl {
+  onExecute: (action: DirectorBookAutomationAction) => void;
+  isPending: boolean;
+  feedback: string | null;
+  error: string | null;
 }
 
 export type SingleBookFactFreshness = "fresh" | "stale" | "loading" | "error" | "empty";

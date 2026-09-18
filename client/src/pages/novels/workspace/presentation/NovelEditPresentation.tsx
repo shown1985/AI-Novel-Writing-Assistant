@@ -583,7 +583,6 @@ export function NovelEditPresentation(props: NovelEditPresentationProps) {
     projection: director.bookAutomationProjection,
     currentUiModel: model,
     actions: directorInteraction.taskDrawerActions,
-    onProjectionAction: directorCommands.handleTaskDrawerProjectionAction,
     followUp: director.activeAutoDirectorFollowUp,
     onFollowUpAction: directorCommands.handleDrawerFollowUpAction,
     executingFollowUpAction: directorCommands.executeFollowUpActionMutation.isPending,
@@ -692,6 +691,12 @@ export function NovelEditPresentation(props: NovelEditPresentationProps) {
       isSwitchingToSimpleMode: switchToSimple.isPending,
       taskDrawer,
       singleBookDisplay,
+      singleBookPrimaryAction: {
+        onExecute: directorCommands.handleSingleBookPrimaryAction,
+        isPending: directorCommands.singleBookPrimaryActionPending,
+        feedback: directorCommands.singleBookPrimaryActionFeedback,
+        error: directorCommands.singleBookPrimaryActionError,
+      },
     },
     tabs: {
       basic: basicTab,

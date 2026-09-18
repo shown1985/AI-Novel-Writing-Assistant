@@ -23,6 +23,7 @@ import OutlineTab from "./OutlineTab";
 import PipelineTab from "./PipelineTab";
 import StoryMacroPlanTab from "./StoryMacroPlanTab";
 import StructuredOutlineTab from "./StructuredOutlineTab";
+import SingleBookPrimaryActionPanel from "./SingleBookPrimaryActionPanel";
 import VersionHistoryTab from "./VersionHistoryTab";
 import BasicInfoTab from "./BasicInfoTab";
 import WorldSetupTab from "./WorldSetupTab";
@@ -67,6 +68,7 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
     takeover,
     taskDrawer,
     singleBookDisplay,
+    singleBookPrimaryAction,
     activeStepTakeoverEntry,
     onSwitchToSimpleMode,
     isSwitchingToSimpleMode = false,
@@ -211,9 +213,6 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
               <span>{singleBookDisplay.bookTarget.label}</span>
               {singleBookDisplay.qualityDebtCount > 0 ? (
                 <span>局部质量项 {singleBookDisplay.qualityDebtCount} 条</span>
-              ) : null}
-              {singleBookDisplay.primaryAction ? (
-                <span className="font-medium text-foreground">建议下一步：{singleBookDisplay.primaryAction.label}</span>
               ) : null}
             </>
           )}
@@ -390,6 +389,11 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
           )}
         />
       ) : null}
+
+      <SingleBookPrimaryActionPanel
+        display={singleBookDisplay}
+        control={singleBookPrimaryAction}
+      />
 
       <div className="space-y-4 pt-1">
         {takeover ? (

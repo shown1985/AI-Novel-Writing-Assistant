@@ -44,7 +44,6 @@ export function buildNovelEditTaskDrawer(input: {
   projection: NovelTaskDrawerState["projection"];
   currentUiModel: NovelTaskDrawerState["currentUiModel"];
   actions: NovelTaskDrawerState["actions"];
-  onProjectionAction: NovelTaskDrawerState["onProjectionAction"];
   followUp: NovelTaskDrawerState["followUp"];
   onFollowUpAction: NovelTaskDrawerState["onFollowUpAction"];
   executingFollowUpAction: boolean;
@@ -78,7 +77,6 @@ export function buildNovelEditTaskDrawer(input: {
     projection: task?.status === "cancelled" ? null : input.projection,
     currentUiModel: input.currentUiModel,
     actions: input.actions,
-    onProjectionAction: input.onProjectionAction,
     followUp: input.followUp,
     onFollowUpAction: input.onFollowUpAction,
     executingFollowUpAction: input.executingFollowUpAction,
