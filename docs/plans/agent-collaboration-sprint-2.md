@@ -124,16 +124,16 @@
 ## S2-03a0：单书展示事实与动作权威 Spike
 
 - 用户价值：后续展示不会把局部任务成功误称整书完成，也不会从按钮文案或互相冲突的投影猜测下一步。
-- 状态：Ready（R1-S2C）；3 点；Owner：单书 Contract Agent。
+- 状态：**Done（R1-S2C）**；3 点；Owner：单书 Contract Agent。验收与源码交叉证据见 [单书展示事实与动作权威合同](./s2-03a-single-book-display-authority-contract.md)。
 - 交付：冻结三层进度来源、导演任务身份、状态严重度、唯一可执行动作来源、stale/error/empty 降级和 03a/03b ownership；产出完整矩阵与决定证据。
 - 权威方向：持久章节、当前任务范围、整书目标分别解释；只有同小说同导演任务的 book projection primaryAction 可成为动作候选；dashboard/runtime/local actions 只作说明或命令绑定；禁止 label/keyword/regex 推断。
 - 非范围：不修改生产 UI、共享类型、API/query keys、Runtime 或命令；不宣称推荐动作已经交付。
-- 检查与完整合同：[R1-S2C Sprint 承诺](./r1-s2c-sprint-commitment.md#s2-03a0)；完成时另交付权威合同和源码交叉证据。
+- 检查与完整合同：[R1-S2C Sprint 承诺](./r1-s2c-sprint-commitment.md#s2-03a0)；三层进度、身份 gate、结构化严重度、fresh/stale/error/empty 降级和后续 ownership 已冻结。本卡未修改生产 UI。
 
 ## S2-03a：单书成果、进度与推荐动作展示模型
 
 - 用户价值：作者能判断已经得到什么、AI 正在做什么和唯一推荐下一步，不将普通提醒误判为全书失败。
-- 状态：Refinement / Not Ready；S2-01a/01b 已完成，继续等待 S2-03a0 冻结纯展示合同。
+- 状态：**Ready**；S2-01a/01b 已完成，S2-03a0 已冻结纯展示合同。尚未换入当前 Sprint，不得把合同完成视为页面能力已交付。
 - 点数：3；Owner：Agent A，单书 presentation 独占。
 - 真实源码：client/src/pages/novels/components/NovelEditView.tsx、NovelTaskDrawer.tsx、NovelAutoDirectorProgressPanel.tsx、novelEditAutomationStatus.ts、novelWorkspaceNavigation.ts；shared/types/directorRuntime.ts 为根集成人保留。
 - 拟建归属：novels/workspace/presentation/ 的纯展示模型；展示通过 client/src/components/workspace/ 现有 primitives。

@@ -134,13 +134,13 @@ Review 与 Retrospective 见 [R1-S2B Sprint 承诺](./docs/plans/r1-s2b-sprint-c
 
 | Story | 点数 | 状态 | Owner | 验收边界 |
 | --- | ---: | --- | --- | --- |
-| S2-03a0 单书展示事实与动作权威 Spike | 3 | Ready | 单书 Contract Agent | 三层进度、身份、严重度、唯一动作源和 stale/error 矩阵冻结；不改生产 UI |
+| S2-03a0 单书展示事实与动作权威 Spike | 3 | Done | 单书 Contract Agent | [三层进度、身份、严重度、唯一动作源和降级矩阵已冻结](./docs/plans/s2-03a-single-book-display-authority-contract.md)；不改生产 UI |
 | S2-04b0 实际模型调用尝试证据 Spike | 3 | Ready | 模型平台 Contract Agent | attempt/store/身份/live/API/失败降级与 seam proof；不改生产 schema |
 | S3-00 世界 Prompt 静态登记一致性门 | 2 | Done | 根集成人 | [9 处声明对齐、全量 key 一致且唯一检查通过](./docs/plans/s3-00-world-prompt-registry-alignment.md) |
 
 承诺容量：8 点。Stretch：无。权威合同见 [R1-S2C Sprint 承诺](./docs/plans/r1-s2c-sprint-commitment.md)。
 
-未承诺：S2-03a/03b 等待展示合同签认；S2-04b 等待 Spike 后拆分为不超过 5 点的生产卡，04c 继续等待持久证据；S3-01 已解除静态版本门但未换入本 Sprint。不得把 Spike、静态登记修复或测试当作这些用户能力已交付。新发现的 `ComicFactService` inline Prompt 治理债进入后续 Refinement（未估点、未建 Story），不在本 Sprint 顺手扩围。
+未承诺：S2-03a 已由展示合同解锁为 Ready，03b 仍等待 03a 生产实现；S2-04b 等待 Spike 后拆分为不超过 5 点的生产卡，04c 继续等待持久证据；S3-01 已解除静态版本门但未换入本 Sprint。不得把 Spike、静态登记修复或测试当作这些用户能力已交付。新发现的 `ComicFactService` inline Prompt 治理债进入后续 Refinement（未估点、未建 Story），不在本 Sprint 顺手扩围。
 
 ## Release 1 后续队列
 

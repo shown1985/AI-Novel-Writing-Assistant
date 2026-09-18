@@ -14,7 +14,7 @@
 
 | Story | 点数 | 当前状态 | Owner | 依赖 | 交付结果 |
 | --- | ---: | --- | --- | --- | --- |
-| S2-03a0 单书展示事实与动作权威 Spike | 3 | Ready | 单书 Contract Agent | S2-01a/b Done | 冻结三层进度、任务身份、状态严重度、唯一动作来源和 stale/error 策略；产出可执行矩阵，不声称 UI 已联通 |
+| S2-03a0 单书展示事实与动作权威 Spike | 3 | Done | 单书 Contract Agent | S2-01a/b Done | [三层进度、身份 gate、严重度、唯一动作和降级矩阵已冻结](./s2-03a-single-book-display-authority-contract.md)；生产 UI 未改 |
 | S2-04b0 实际模型调用尝试证据 Spike | 3 | Ready | 模型平台 Contract Agent | S2-04a Done | 冻结 request/attempt lineage、通用存储、身份归因、live/API、失败降级和首批非导演入口；产出 seam proof，不改生产 schema |
 | S3-00 世界 Prompt 静态登记一致性门 | 2 | Done | 根集成人 | S1-06 Done | [9 处 loader/资产版本对齐，全量 key 一致且唯一检查通过](./s3-00-world-prompt-registry-alignment.md) |
 
@@ -76,7 +76,7 @@ Wave 2
 
 ## 未承诺与退出门
 
-- `S2-03a/03b`：等待 03a0 的展示权威合同签认后再重新进入 Ready/实施；当前页面仍保留既有行为。
+- `S2-03a/03b`：03a0 已完成并使 03a 进入 Ready；03b 仍等待 03a 生产实现和既有命令清单冻结。当前页面仍保留既有行为。
 - `S2-04b`：由 04b0 重新拆成每张不超过 5 点的生产卡；在通用 store、promptRunner 边界和非导演身份未冻结前保持 Not Ready。
 - `S2-04c`：继续等待实际 attempt 持久证据；不按当前配置重算历史。
 - `S3-01`：S3-00 通过后才能进入 Ready；届时只迁 `world.prompts.ts` 的 14 个资产，`worldDraft.prompts.ts` 不在 3 点范围。
