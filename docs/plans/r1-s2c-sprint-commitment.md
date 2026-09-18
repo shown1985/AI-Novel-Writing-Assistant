@@ -83,3 +83,22 @@ Wave 2
 - `S1-03` 与世界 Runtime 生产卡保持 Refinement/Backlog，不与本窗口交叉写共享 schema。
 
 Sprint 退出时必须记录 Goal、`8/8` 或实际完成点数、carryover 原因、两个 Spike 是否真正解除生产 DoR、S3-00 静态检查结果、文档/Wiki/发布判断和最多两项流程改进。只有后续生产 Story 通过行为验收，才可宣称用户能力完成。
+
+## Sprint Review
+
+- Sprint Goal：**达成**。单书展示三层事实、导演身份和唯一动作权威已冻结；模型 request/attempt、通用 store、归因与失败降级已冻结；世界 Prompt 静态版本漂移已由全量门消除。
+- 承诺 / 完成：`8 / 8` 点；Story `3 / 3` Done；carryover 0，Stretch 0。
+- S2-03a0：合同覆盖局部成功、running、局部质量债、replan、人工暂停、无 URL 真实任务、身份不匹配、loading/error/stale/empty 与多动作源；03a 进入 Ready，03b 仍等待 03a 生产实现。
+- S2-04b0：server build 与隔离 seam proof `8/8` 通过；store 完全不可用为 missing，start 成功/finalize 失败为 partial，且观测失败不重复模型调用。原 S2-04b 已替换为 04b1～04b4；仅 04b1/04b2 Ready。
+- S3-00：server build 通过；全量 loader 声明与资产 key 一致且唯一检查 `1/1`，世界模型选择与 Registry 相关测试 `53 passed / 2 skipped / 0 failed`。共对齐 9 处既有版本漂移，S3-01 进入 Ready。
+- 发现但未换入：`ComicFactService` 的 inline Prompt 治理债只进入后续 Refinement；未估点、未建 Story，未扩大本 Sprint。
+- 逸出缺陷：0。评审内发现 attempt `partial` 判定缺口，在 Story Done 前补测试并修正。
+- UI 验收：不适用。本 Sprint 没有生产 UI 或用户操作变化；后续 S2-03a/03b 和 04c 仍需各自 UI 验收。
+- 文档：单书 application 与模型选择 Wiki 已记录稳定边界，Prompt Registry Wiki 已记录 loader 静态门。三阶段均无用户可见产品行为，按发布说明工作流明确跳过 README/Release Notes。
+
+## Sprint Retrospective
+
+- 做得好：先用合同 Spike 消除展示和 attempt 存储的多事实源，再拆生产卡，避免把错误方向固化进 UI、schema 或巨型 Prompt Runner；共享文件始终由根集成人串行提交。
+- 影响：两个协作 Agent 后段受到外部用量上限，其中 S2-04b0 未返回完成消息；根集成人基于工作区产物重新审阅并完成验证，没有把 Agent 状态当作 Done 证据。
+- 流程改进 1：静态登记类修复默认建立全量不变量检查，不只修首个已知样例；本轮因此一次发现并关闭另外 8 处漂移。
+- 流程改进 2：观测 side-channel 的 seam proof 必须分别覆盖 complete、partial、missing，不能只验证全成功和全失败两端。

@@ -3,7 +3,7 @@
 更新时间：2026-09-18
 当前分支：`codex/r1-s2c-next-action-evidence`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S2C 已启动；8 点承诺、无 Stretch
+当前状态：R1-S2C 已完成（8/8 点）；下一 Sprint 待 Planning
 
 ## 权威文档
 
@@ -124,7 +124,7 @@ Review 与 Retrospective 见 [R1-S2A Sprint 承诺](./docs/plans/r1-s2a-sprint-c
 
 Review 与 Retrospective 见 [R1-S2B Sprint 承诺](./docs/plans/r1-s2b-sprint-commitment.md)：承诺/完成 `9/9` 点，carryover 0，逸出缺陷 0；评审内发现的问题均在 Story Done 前关闭。
 
-## 当前 Sprint：R1-S2C
+## 已完成 Sprint：R1-S2C
 
 ### Sprint Goal
 
@@ -142,10 +142,14 @@ Review 与 Retrospective 见 [R1-S2B Sprint 承诺](./docs/plans/r1-s2b-sprint-c
 
 未承诺：S2-03a 已由展示合同解锁为 Ready，03b 仍等待 03a 生产实现；S2-04b 已拆为 04b1～04b4，只有 04b1/04b2 Ready 且均未换入本 Sprint，04c 继续等待 04b4；S3-01 已解除静态版本门但未换入本 Sprint。不得把 Spike、静态登记修复或测试当作这些用户能力已交付。新发现的 `ComicFactService` inline Prompt 治理债进入后续 Refinement（未估点、未建 Story），不在本 Sprint 顺手扩围。
 
+完成 `8/8` 点，无 Story carryover。Sprint Goal 达成：展示事实、实际模型 attempt 和世界 Prompt 静态版本三条后续生产边界均已冻结。S2-03a、S2-04b1、S2-04b2 与 S3-01 已分别解除对应前置门，但均须经过下一次 Sprint Planning 才能实施。
+
+Review 与 Retrospective 见 [R1-S2C Sprint 承诺](./docs/plans/r1-s2c-sprint-commitment.md)：S2-04b0 server build 与 seam proof 8/8 通过；S3-00 全量静态门与相关 Prompt 测试通过；本窗口无生产 UI，UI 验收不适用。
+
 ## Release 1 后续队列
 
 1. R1-S1：配置、诊断、阅读恢复和世界归属安全（已完成，15/15 点）。
-2. R1-S2：R1-S2A 可信单书现场已结束（14/14 点）；R1-S2B 主动诊断与可信装配已结束（9/9 点）；R1-S2C 正在冻结剩余事实权威并解除世界 Prompt 静态门（8 点）。
+2. R1-S2：R1-S2A 可信单书现场已结束（14/14 点）；R1-S2B 主动诊断与可信装配已结束（9/9 点）；R1-S2C 事实权威与世界 Prompt 解锁已结束（8/8 点）。
 3. R1-S3～4：可信世界、提案采用和失败复核；S3-01 已由 S3-00 解锁为 Ready，等待后续 Sprint Planning。
 4. R1-S5～6：本机Agent委托、预算、记忆和资产。
 5. R1-S7：十章长链、有限撤回和导航收束。
