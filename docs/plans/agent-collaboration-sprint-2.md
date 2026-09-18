@@ -133,7 +133,7 @@
 ## S2-03a：单书成果、进度与推荐动作展示模型
 
 - 用户价值：作者能判断已经得到什么、AI 正在做什么和唯一推荐下一步，不将普通提醒误判为全书失败。
-- 状态：**Ready**；S2-01a/01b 已完成，S2-03a0 已冻结纯展示合同。尚未换入当前 Sprint，不得把合同完成视为页面能力已交付。
+- 状态：**Ready（R1-S2D）**；S2-01a/01b 已完成，S2-03a0 已冻结纯展示合同。合同完成不等于页面能力已交付。
 - 点数：3；Owner：Agent A，单书 presentation 独占。
 - 真实源码：client/src/pages/novels/components/NovelEditView.tsx、NovelTaskDrawer.tsx、NovelAutoDirectorProgressPanel.tsx、novelEditAutomationStatus.ts、novelWorkspaceNavigation.ts；shared/types/directorRuntime.ts 为根集成人保留。
 - 拟建归属：novels/workspace/presentation/ 的纯展示模型；展示通过 client/src/components/workspace/ 现有 primitives。
@@ -267,7 +267,7 @@
 ### S2-04b1：通用 attempt store 与 repository
 
 - 用户价值：模型用量未知、进程重启或默认模型改变后，真实调用尝试仍有不可伪造的持久证据。
-- 状态：**Ready**；3 点。根集成人独占 PostgreSQL/SQLite schema 与迁移；模型平台 Agent 拥有 repository adapter 与聚合读取。
+- 状态：**Ready（R1-S2D）**；3 点。根集成人独占 PostgreSQL/SQLite schema 与迁移；模型平台 Agent 拥有 repository adapter 与聚合读取。
 - 范围：按 04b0 ADR 增加独立 `ModelAttemptEvidence` 表、双库增量迁移、幂等 start/finalize、唯一 adopted 事务约束和按 request/novel 的重建读取。
 - 非范围：不接真实 transport、不改 Prompt Runner、不建用户 UI、不回填 Token 表或 live 历史、不自动清理旧证据。
 - AC：两套迁移在隔离库通过；null usage、started orphan、重复 start/finalize、冲突终态、单 request 唯一 adopted、重启重建和敏感字段缺失均有行为证据。
@@ -276,7 +276,7 @@
 ### S2-04b2：Prompt execution 边界拆分
 
 - 用户价值：后续记录真实调用时不会继续扩大超长核心文件或改变既有生成、重试和流式体验。
-- 状态：**Ready**；3 点。Prompt 平台 Agent 独占 `prompting/core/execution/` 与 `promptRunner.ts`；不与 transport 接线并行改同文件。
+- 状态：**Ready（R1-S2D）**；3 点。Prompt 平台 Agent 独占 `prompting/core/execution/` 与 `promptRunner.ts`；不与 transport 接线并行改同文件。
 - 范围：按 04b0 合同提取 execution context、text invoke/stream 和 structured coordination；保留 facade exports，`promptRunner.ts` 降至 1300 行以下，目标 1000～1200 行。
 - 非范围：不写 attempt store、不改 retry/fallback/repair/semantic 策略、不新增 Prompt、不调整模型参数。
 - AC：外部 import 与 text/structured invoke/stream、live、usage、repair、semantic retry 行为等价；依赖方向只经 execution facade，不创建 generic helper。

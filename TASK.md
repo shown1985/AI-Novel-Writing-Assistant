@@ -1,9 +1,9 @@
 # 当前项目看板：Release 1 单机成书版
 
 更新时间：2026-09-18
-当前分支：`codex/r1-s2c-next-action-evidence`
+当前分支：`codex/r1-s2d-evidence-foundations`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S2C 已完成（8/8 点）；下一 Sprint 待 Planning
+当前状态：R1-S2D 已启动；9 点承诺、无 Stretch
 
 ## 权威文档
 
@@ -146,10 +146,28 @@ Review 与 Retrospective 见 [R1-S2B Sprint 承诺](./docs/plans/r1-s2b-sprint-c
 
 Review 与 Retrospective 见 [R1-S2C Sprint 承诺](./docs/plans/r1-s2c-sprint-commitment.md)：S2-04b0 server build 与 seam proof 8/8 通过；S3-00 全量静态门与相关 Prompt 测试通过；本窗口无生产 UI，UI 验收不适用。
 
+## 当前 Sprint：R1-S2D
+
+### Sprint Goal
+
+让单书页面形成可信的成果/进度/唯一推荐动作展示模型，同时建立真实模型 attempt 的双库持久底座并拆清 Prompt 执行边界，为来源页动作和真实 transport 接线解除依赖。
+
+### 承诺 Backlog
+
+| Story | 点数 | 状态 | Owner | 验收边界 |
+| --- | ---: | --- | --- | --- |
+| S2-03a 单书成果、进度与推荐动作展示模型 | 3 | Ready | 单书 Presentation owner | 三层进度、结构化严重度、freshness、至多一个 verified primaryAction；不执行命令 |
+| S2-04b1 通用 attempt store 与 repository | 3 | Ready | 根数据集成人 + 模型平台 owner | 双库增量迁移、幂等/唯一 adopted、重启读取、脱敏；不接 transport |
+| S2-04b2 Prompt execution 边界拆分 | 3 | Ready | Prompt 平台 owner | facade 等价、text/structured owned 模块、核心文件低于 1300 行；不接 attempt store |
+
+承诺容量：9 点。Stretch：无。权威合同见 [R1-S2D Sprint 承诺](./docs/plans/r1-s2d-sprint-commitment.md)。
+
+未承诺：S2-03b 等待 03a；S2-04b3 等待 04b1/04b2；04b4/04c 继续等待真实接线与读投影；S3-01 虽 Ready 但按 Release 顺序留在后续窗口。不得在前置卡完成后顺手扩入。
+
 ## Release 1 后续队列
 
 1. R1-S1：配置、诊断、阅读恢复和世界归属安全（已完成，15/15 点）。
-2. R1-S2：R1-S2A 可信单书现场已结束（14/14 点）；R1-S2B 主动诊断与可信装配已结束（9/9 点）；R1-S2C 事实权威与世界 Prompt 解锁已结束（8/8 点）。
+2. R1-S2：R1-S2A 可信单书现场已结束（14/14 点）；R1-S2B 主动诊断与可信装配已结束（9/9 点）；R1-S2C 事实权威与世界 Prompt 解锁已结束（8/8 点）；R1-S2D 展示与调用证据底座进行中（9 点）。
 3. R1-S3～4：可信世界、提案采用和失败复核；S3-01 已由 S3-00 解锁为 Ready，等待后续 Sprint Planning。
 4. R1-S5～6：本机Agent委托、预算、记忆和资产。
 5. R1-S7：十章长链、有限撤回和导航收束。
