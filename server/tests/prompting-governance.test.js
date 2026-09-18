@@ -9,6 +9,12 @@ const PROMPT_ROOT = path.join(SOURCE_ROOT, "prompting", "prompts");
 const {
   listRegisteredPromptAssets,
 } = require("../dist/prompting/registry.js");
+const {
+  promptAssetLoaderEntries,
+} = require("../dist/prompting/registry/promptAssetLoaderEntries.js");
+const {
+  buildPromptAssetKey,
+} = require("../dist/prompting/core/promptTypes.js");
 
 const GOVERNED_DIRECTORIES = [
   path.join(SOURCE_ROOT, "services"),
@@ -169,6 +175,19 @@ test("prompt governance keeps registered prompt assets auditable", () => {
     .map((asset) => `${asset.id || "<missing-id>"}@${asset.version || "<missing-version>"}`);
 
   assert.deepEqual(incomplete, []);
+});
+
+test("prompt loader declarations match the assets they load and remain unique", () => {
+  const declaredKeys = new Set();
+  for (const entry of promptAssetLoaderEntries) {
+    assert.equal(
+      entry.key,
+      buildPromptAssetKey(entry.load()),
+      `loader declaration ${entry.key} must match its PromptAsset id and version`,
+    );
+    assert.equal(declaredKeys.has(entry.key), false, `duplicate prompt loader key: ${entry.key}`);
+    declaredKeys.add(entry.key);
+  }
 });
 
 test("core prompt management surfaces expose context and low-risk slot metadata", () => {

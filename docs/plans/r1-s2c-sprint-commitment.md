@@ -16,7 +16,7 @@
 | --- | ---: | --- | --- | --- | --- |
 | S2-03a0 单书展示事实与动作权威 Spike | 3 | Ready | 单书 Contract Agent | S2-01a/b Done | 冻结三层进度、任务身份、状态严重度、唯一动作来源和 stale/error 策略；产出可执行矩阵，不声称 UI 已联通 |
 | S2-04b0 实际模型调用尝试证据 Spike | 3 | Ready | 模型平台 Contract Agent | S2-04a Done | 冻结 request/attempt lineage、通用存储、身份归因、live/API、失败降级和首批非导演入口；产出 seam proof，不改生产 schema |
-| S3-00 世界 Prompt 静态登记一致性门 | 2 | Ready | 根集成人 | S1-06 Done | `generate_from_theme` loader、资产与测试统一到有意升级的 v3，并用全量静态检查阻止再次漂移 |
+| S3-00 世界 Prompt 静态登记一致性门 | 2 | Done | 根集成人 | S1-06 Done | [9 处 loader/资产版本对齐，全量 key 一致且唯一检查通过](./s3-00-world-prompt-registry-alignment.md) |
 
 三张卡均以当前源码完成只读 DoR 复核。`S2-03a`、`S2-04b`、`S3-01` 继续保持未承诺；本 Sprint 的 Spike、登记门和测试不能冒充这些生产能力已经完成。
 

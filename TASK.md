@@ -75,7 +75,7 @@ S1-00 聚焦证据：shared build、诊断合同测试 3/3、client typecheck �
 
 S1-04 聚焦证据：阅读状态行为测试 8/8、简易创作治理回归 5/5、client typecheck 通过；隔离 SQLite 下的刷新、普通重进、跨作品隔离、浏览器前进/后退和暂停态阅读均通过 Computer Use 验收，浏览器无告警或错误。
 
-S1-06 聚焦证据：世界维护门面、五类 revision、CAS/幂等、lease 恢复、旧数据、Prompt 与来源页边界完成三方签认；S3-01 仍受静态 Prompt 版本登记漂移阻断，未被误标 Ready。
+S1-06 聚焦证据：世界维护门面、五类 revision、CAS/幂等、lease 恢复、旧数据、Prompt 与来源页边界完成三方签认；其静态 Prompt 版本登记前置门已由 S3-00 解除，S3-01 等待后续 Sprint Planning。
 
 R1-S1 Review 与 Retrospective 见 [Sprint 承诺](./docs/plans/r1-s1-sprint-commitment.md)：Sprint Goal 达成，承诺/完成 `15/15` 点，无 carryover；S1-04 五项 UI 验收通过，后续 UI 数值证据先锁定真实滚动容器。
 
@@ -136,17 +136,17 @@ Review 与 Retrospective 见 [R1-S2B Sprint 承诺](./docs/plans/r1-s2b-sprint-c
 | --- | ---: | --- | --- | --- |
 | S2-03a0 单书展示事实与动作权威 Spike | 3 | Ready | 单书 Contract Agent | 三层进度、身份、严重度、唯一动作源和 stale/error 矩阵冻结；不改生产 UI |
 | S2-04b0 实际模型调用尝试证据 Spike | 3 | Ready | 模型平台 Contract Agent | attempt/store/身份/live/API/失败降级与 seam proof；不改生产 schema |
-| S3-00 世界 Prompt 静态登记一致性门 | 2 | Ready | 根集成人 | theme loader/资产/测试统一 v3，全量 key 一致性检查 |
+| S3-00 世界 Prompt 静态登记一致性门 | 2 | Done | 根集成人 | [9 处声明对齐、全量 key 一致且唯一检查通过](./docs/plans/s3-00-world-prompt-registry-alignment.md) |
 
 承诺容量：8 点。Stretch：无。权威合同见 [R1-S2C Sprint 承诺](./docs/plans/r1-s2c-sprint-commitment.md)。
 
-未承诺：S2-03a/03b 等待展示合同；S2-04b 等待 Spike 后拆分为不超过 5 点的生产卡，04c 继续等待持久证据；S3-01 等待 S3-00 通过。不得把 Spike、静态登记修复或测试当作这些用户能力已交付。
+未承诺：S2-03a/03b 等待展示合同签认；S2-04b 等待 Spike 后拆分为不超过 5 点的生产卡，04c 继续等待持久证据；S3-01 已解除静态版本门但未换入本 Sprint。不得把 Spike、静态登记修复或测试当作这些用户能力已交付。新发现的 `ComicFactService` inline Prompt 治理债进入后续 Refinement（未估点、未建 Story），不在本 Sprint 顺手扩围。
 
 ## Release 1 后续队列
 
 1. R1-S1：配置、诊断、阅读恢复和世界归属安全（已完成，15/15 点）。
 2. R1-S2：R1-S2A 可信单书现场已结束（14/14 点）；R1-S2B 主动诊断与可信装配已结束（9/9 点）；R1-S2C 正在冻结剩余事实权威并解除世界 Prompt 静态门（8 点）。
-3. R1-S3～4：可信世界、提案采用和失败复核；S3-01 仅在 S3-00 通过后进入 Ready。
+3. R1-S3～4：可信世界、提案采用和失败复核；S3-01 已由 S3-00 解锁为 Ready，等待后续 Sprint Planning。
 4. R1-S5～6：本机Agent委托、预算、记忆和资产。
 5. R1-S7：十章长链、有限撤回和导航收束。
 6. R1-RC：桌面升级、备份恢复、包装与用户验收。

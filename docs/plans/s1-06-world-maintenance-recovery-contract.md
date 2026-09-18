@@ -32,7 +32,7 @@
 | 通用小说 workflow 不适合世界样本维护 | `NovelWorkflowLane` 只有 `manual_create / auto_director / creation_studio`，恢复逻辑专用于小说/导演 | 世界样本任务不得冒充导演任务或占用 `directorTaskId` |
 | 运行记录已能只读投影世界生成 | `WorldGenerationTaskAdapter` 返回 `sourceRoute`，retry/cancel/archive 均拒绝并要求回来源页 | 世界维护应沿用“运行记录只读、来源页操作”的产品边界 |
 | 世界 Prompt 已进入 Registry，但文件超过硬阈值 | `world.prompts.ts` 约 1316 行，含深化、一致性、结构、生成、导入和可视化多职责 | 扩展维护 Prompt 前必须先拆分 owned 子模块 |
-| 当前 Prompt 静态登记存在版本漂移 | loader 声明 `novel.world.generate_from_theme@v2`，资产源码声明 `v3`；Registry 加载时会按资产实际 key 重绑定到 `v3`，现有测试没有单独把 `v2` 固定为预期 | 运行时自修复不能代替静态治理；S3-01 开工前须由 Prompt/根集成人统一 loader 与资产 key |
+| Prompt 静态登记曾存在版本漂移 | S1-06 审阅时 loader 声明 `novel.world.generate_from_theme@v2`、资产源码声明 `v3`；[S3-00](./s3-00-world-prompt-registry-alignment.md) 已统一全部 loader key 与实际资产并建立全量唯一性检查 | 运行时自修复不能代替静态治理；后续有意版本升级须同步资产、loader 与按版本消费的测试 |
 
 ## 冻结的模块 ownership 与依赖方向
 
@@ -420,7 +420,7 @@ server/src/prompting/prompts/world/
 冻结规则：
 
 - 迁移既有资产时保留兼容 export 和已确认的 asset id/version；不能因拆文件无故升级版本。
-- 当前 `novel.world.generate_from_theme` 的静态 loader key 为 `v2`、资产实际版本为 `v3`；Registry 虽会在加载时按资产实际 key 重绑定，S3-01 仍须先统一静态声明与资产版本，不能依赖运行时容错掩盖治理漂移。
+- [S3-00](./s3-00-world-prompt-registry-alignment.md) 已把 `novel.world.generate_from_theme` 的静态 loader key 与资产实际版本统一为 `v3`，并覆盖全部 loader entry 的 key 一致性与唯一性；S3-01 不能依赖运行时容错掩盖后续治理漂移。
 - maintenance Prompt 只负责 AI 语义：评估风险、问题身份候选、方案生成、答案结构化整合、提交后语义复核。
 - Runtime 负责 target ownership、版本、权限/保护、引用存在、patch 应用、CAS、幂等、租约和事务；Prompt 不得返回“已提交”事实。
 - 评估输入必须包含 canonical source + source confidence、contentRevision、decision set/revision、目标范围、模型来源要求；输出必须有 completed/incomplete、证据、实体引用和影响，失败不能伪造 pass。
@@ -453,7 +453,7 @@ Runtime / Prompt / UI 已完成合同审阅。签认只解除合同未知项，�
 
 | Story | 签认后的状态判断 |
 | --- | --- |
-| S3-01 | `Not Ready`，直到 `novel.world.generate_from_theme` 的 loader key 与资产实际版本统一；其余模块边界已冻结 |
+| S3-01 | `Ready`；[S3-00](./s3-00-world-prompt-registry-alignment.md) 已统一全部 loader key 与资产真实版本并建立静态门，模块边界已冻结；3 点范围只迁 `world.prompts.ts` 的 14 个资产，`worldDraft.prompts.ts` 留在原位 |
 | S3-02a | 可进入 `Ready`；仍需根集成人冻结增量 schema/迁移与共享 DTO |
 | S3-02b | `Not Ready`，依赖 S3-02a 行为通过；写入口清单已冻结 |
 | S3-03a | `Not Ready`，依赖 S3-02a 与 NovelWorld 增量 migration 接线 |
@@ -481,7 +481,7 @@ Runtime / Prompt / UI 已完成合同审阅。签认只解除合同未知项，�
 
 ### Prompt owner（根集成人按 Prompt Governance 签认）
 
-- [x] 已确认静态 loader `v2` 与资产实际 `v3` 漂移；统一工作归 S3-01，不能依赖 Registry 运行时重绑定掩盖。
+- [x] [S3-00](./s3-00-world-prompt-registry-alignment.md) 已统一静态 loader 与资产真实版本并建立全量检查；S3-01 不得依赖 Registry 运行时重绑定掩盖新漂移。
 - [x] 同意先拆 `world.prompts.ts`，保留兼容 export，不以 generic helper 替代 owned 模块。
 - [x] 同意评估/问题身份/提案/复核分别使用职责单一的结构化资产。
 - [x] 同意空决定集合和未来决定分类进入 required input，intentional blank 不被补成事实。

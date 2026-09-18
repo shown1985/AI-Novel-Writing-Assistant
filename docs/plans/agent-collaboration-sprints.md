@@ -166,7 +166,7 @@ Sprint Goal：世界内容有可靠版本；AI 检查读取可信内容并保留
 
 | Story | 点数 | 用户故事 / 验收重点 | 依赖 |
 | --- | --- | --- | --- |
-| S3-00 世界 Prompt 静态登记一致性门 | 2 | loader、资产和测试使用同一真实版本；全量静态检查阻止运行时容错掩盖漂移 | S1-06；R1-S2C |
+| S3-00 世界 Prompt 静态登记一致性门 | 2 | Done：[9 处 loader/资产版本统一，全量静态检查阻止运行时容错掩盖漂移](./s3-00-world-prompt-registry-alignment.md) | S1-06；R1-S2C |
 | S3-01 世界 Prompt 按能力归属拆分 | 3 | 抽出评估/维护能力至 owned 子目录；旧门面兼容；Registry 元数据完整；不新增 inline Prompt | S1-06、S3-00；world.prompts.ts 扩展前完成 |
 | S3-02 世界样本的版本安全写入 | 5 | 普通编辑、AI 编辑递增内容 revision；同 revision 并发只一方成功；明确旧客户端策略；事务证据和提交重放幂等 | S1-06；共享 schema/迁移冻结 |
 | S3-03 本书实例与同步的版本保护 | 5 | 本书内容 revision 与来源 syncBaseVersion 分开；push/pull 对两边校验；分区同步不静默丢失跨实体引用；缓存刷新不改内容 revision；不会自动同步 | S3-02；WorldContextGateway 与现有同步门面 |

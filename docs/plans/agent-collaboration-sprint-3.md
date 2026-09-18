@@ -30,8 +30,8 @@ S3-04 读取 S1-06 冻结的可空决定集合，不等待 S3-06 的写操作。
 
 作为作者，我希望世界生成使用唯一、可审计的 Prompt 版本，避免静态登记错误被运行时容错掩盖。
 
-- 点数2，P0；Ready（R1-S2C）；根集成人独占 Registry loader 与 Prompt 治理测试。
-- 当前事实：`novel.world.generate_from_theme` 资产因战力体系输入已升级为 v3，loader 和既有测试仍声明 v2；运行时重绑不能替代静态治理。
+- 点数2，P0；**Done（R1-S2C）**；根集成人独占 Registry loader 与 Prompt 治理测试。验收见 [S3-00 静态登记一致性门](./s3-00-world-prompt-registry-alignment.md)。
+- 完成事实：`novel.world.generate_from_theme` 资产、loader 和测试统一为 v3；全量静态门同时对齐另外 8 处历史版本漂移，运行时重绑不再掩盖这些声明错误。
 - 子任务：loader/测试统一到 v3；增加全部 loader 声明 key 与实际加载资产 key 一致且唯一的静态检查；确认 Registry/模型选择行为不变。
 - 非范围：不修改 Prompt 文案/schema，不拆 `world.prompts.ts`，不迁 `worldDraft.prompts.ts`，不补 maintenance 能力，不调用真实模型。
 - AC：静态 key 不再漂移；重复 key 失败；现有 Prompt 资产和消费者继续加载同一实际版本；检查不靠运行时自修复通过。
@@ -41,7 +41,7 @@ S3-04 读取 S1-06 冻结的可空决定集合，不等待 S3-06 的写操作。
 
 作为作者，我希望相同世界在检查与修改中遵守同一套约束，避免不同按钮生成互相矛盾的设定。
 
-- 点数3，P0；Not Ready，依赖 S1-06 与 S3-00。Prompt Agent 独占现有 `world.prompts.ts`、`world.promptTypes.ts`、`world.promptSchemas.ts` 与拟建 maintenance Prompt 子目录；Registry/catalog 交根集成人。为守住 3 点，`worldDraft.prompts.ts` 留在原位且不改。
+- 点数3，P0；**Ready**，S1-06 与 S3-00 均已完成。Prompt Agent 独占现有 `world.prompts.ts`、`world.promptTypes.ts`、`world.promptSchemas.ts` 与拟建能力责任子目录；Registry/catalog 交根集成人。为守住 3 点，只迁现有 `world.prompts.ts` 的 14 个资产，`worldDraft.prompts.ts` 留在原位且不改。
 - 子任务：列出旧文件的参考、骨架、分层、评估、导入、可视化职责；抽出维护/评估能力并保留旧 export；同步类型、schema和资产加载；补模块边界说明。
 - 非范围：改变模型默认策略、生成世界正文、新增业务能力、放宽旧 schema。
 - AC1：旧世界生成、深化、评估消费者可继续从兼容门面导入，资产 ID/版本不无故改变。
