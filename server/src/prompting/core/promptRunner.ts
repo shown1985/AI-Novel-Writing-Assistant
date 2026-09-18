@@ -1,11 +1,8 @@
-import { HumanMessage, type BaseMessage, type BaseMessageChunk } from "@langchain/core/messages";
+import type { BaseMessage, BaseMessageChunk } from "@langchain/core/messages";
 import type { LLMProvider } from "@ai-novel/shared/types/llm";
 import { getLLM, getResolvedLLMClientOptionsFromInstance } from "../../llm/factory";
 import {
   invokeStructuredLlmDetailed,
-  parseStructuredLlmRawContentDetailed,
-  formatLivePrompt,
-  type StructuredInvokeResult,
 } from "../../llm/structuredInvoke";
 import {
   buildStructuredResponseFormat,
@@ -13,18 +10,10 @@ import {
   resolveStructuredOutputProfile,
   selectStructuredOutputStrategy,
 } from "../../llm/structuredOutput";
-import {
-  extractLlmTokenUsage,
-  mergeStreamTokenUsage,
-  type LlmTokenUsageSnapshot,
-} from "../../llm/usageTracking";
+import type { LlmTokenUsageSnapshot } from "../../llm/usageTracking";
 import { logMemoryUsage } from "../../runtime/memoryTelemetry";
 import { toText } from "../../services/novel/novelP0Utils";
 import { beginLlmLiveSession } from "../../platform/llm/live/llmLiveSession";
-import { ReasoningStreamCollector } from "../../llm/reasoning";
-import { hasRegisteredPromptAsset } from "../registry";
-import { CUSTOM_SLOT_CONTEXT_GROUP } from "../slots/slotResolution";
-import { promptSlotOverrideService } from "../slots/PromptSlotOverrideService";
 import { resolveAdvancedPromptMessages } from "../templates/templateRuntime";
 import { selectContextBlocks } from "./contextSelection";
 import {
@@ -32,6 +21,16 @@ import {
   type PromptQualityFailureKind,
 } from "./promptQualityTelemetry";
 import { appendStructuredOutputHintMessages } from "./structuredOutputHint";
+import {
+  captureStreamOutput,
+  executeTextPrompt,
+  executeTextPromptStream,
+  preparePromptExecution,
+  resolvePromptOverlaysForAsset,
+  resolveStructuredOutput,
+  resolveStructuredRepairAttempts,
+  resolveStructuredStreamOutput,
+} from "./execution";
 import {
   evaluateLlmRequestBudget,
   LlmRequestBudgetError,
@@ -52,98 +51,6 @@ type PromptRunnerStructuredInvoker = typeof invokeStructuredLlmDetailed;
 let promptRunnerLLMFactory: PromptRunnerLLMFactory = getLLM;
 let promptRunnerStructuredInvoker: PromptRunnerStructuredInvoker = invokeStructuredLlmDetailed;
 
-function buildRenderContext(
-  asset: PromptAsset<unknown, unknown, unknown>,
-  rawBlocks: Parameters<typeof selectContextBlocks>[0],
-  resolvedSlots?: import("../slots/slotTypes").ResolvedSlots,
-): PromptRenderContext {
-  const selection = selectContextBlocks(rawBlocks, asset.contextPolicy);
-  return {
-    blocks: selection.selectedBlocks,
-    selectedBlockIds: selection.selectedBlocks.map((block) => block.id),
-    droppedBlockIds: selection.droppedBlockIds,
-    summarizedBlockIds: selection.summarizedBlockIds,
-    estimatedInputTokens: selection.estimatedTokens,
-    slots: resolvedSlots,
-  };
-}
-
-function assertRegistered(asset: PromptAsset<unknown, unknown, unknown>): void {
-  if (!hasRegisteredPromptAsset(asset.id, asset.version)) {
-    throw new Error(`Prompt asset is not registered: ${asset.id}@${asset.version}`);
-  }
-}
-
-function buildPromptInvocationMeta(
-  asset: PromptAsset<unknown, unknown, unknown>,
-  context: PromptRenderContext,
-  repairUsed: boolean,
-  repairAttempts: number,
-  semanticRetryUsed: boolean,
-  semanticRetryAttempts: number,
-  options?: PromptExecutionOptions,
-): PromptInvocationMeta {
-  return {
-    promptId: asset.id,
-    promptVersion: asset.version,
-    taskType: asset.taskType,
-    novelId: options?.novelId,
-    chapterId: options?.chapterId,
-    volumeId: options?.volumeId,
-    taskId: options?.taskId,
-    stage: options?.stage,
-    itemKey: options?.itemKey,
-    scope: options?.scope,
-    entrypoint: options?.entrypoint,
-    sceneIndex: options?.sceneIndex,
-    roundIndex: options?.roundIndex,
-    triggerReason: options?.triggerReason,
-    contextBlockIds: context.selectedBlockIds,
-    droppedContextBlockIds: context.droppedBlockIds,
-    summarizedContextBlockIds: context.summarizedBlockIds,
-    customAddendumBlockIds: context.selectedBlockIds.filter((id) => id.startsWith(`${CUSTOM_SLOT_CONTEXT_GROUP}:`)),
-    estimatedInputTokens: context.estimatedInputTokens,
-    repairUsed,
-    repairAttempts,
-    semanticRetryUsed,
-    semanticRetryAttempts,
-  };
-}
-
-async function resolvePromptOverlaysForAsset(input: {
-  asset: PromptAsset<unknown, unknown, unknown>;
-  contextBlocks?: Parameters<typeof selectContextBlocks>[0];
-  options?: PromptExecutionOptions;
-}): Promise<{
-  blocks: Parameters<typeof selectContextBlocks>[0];
-  resolvedSlots?: import("../slots/slotTypes").ResolvedSlots;
-}> {
-  const baseBlocks = input.contextBlocks ?? [];
-  const slotDefs = input.asset.slots;
-  if (!slotDefs || slotDefs.length === 0) {
-    return { blocks: baseBlocks };
-  }
-
-  const overlays = await promptSlotOverrideService.resolveForRuntime({
-    promptId: input.asset.id,
-    novelId: input.options?.novelId,
-  });
-
-  const allBlocks = overlays.appendBlocks.length > 0
-    ? [...baseBlocks, ...overlays.appendBlocks]
-    : baseBlocks;
-
-  return { blocks: allBlocks, resolvedSlots: overlays.inlineSlots };
-}
-
-function resolveStructuredRepairAttempts(asset: PromptAsset<unknown, unknown, unknown>): number {
-  return Math.max(0, asset.repairPolicy?.maxAttempts ?? 1);
-}
-
-function resolveStructuredSemanticRetryAttempts(asset: PromptAsset<unknown, unknown, unknown>): number {
-  return Math.max(0, asset.semanticRetryPolicy?.maxAttempts ?? 0);
-}
-
 function stringifyPromptError(error: unknown): string {
   if (error instanceof Error && error.message.trim().length > 0) {
     return error.message.trim();
@@ -162,14 +69,6 @@ function safeJsonStringify(value: unknown): string {
   }
 }
 
-function buildPromptCallOptions(options?: PromptExecutionOptions): Record<string, unknown> {
-  const callOptions: Record<string, unknown> = {};
-  if (options?.signal) {
-    callOptions.signal = options.signal;
-  }
-  return callOptions;
-}
-
 function estimateRenderedPromptChars(messages: BaseMessage[]): number {
   return messages.reduce((sum, message) => sum + toText(message.content).length, 0);
 }
@@ -183,20 +82,6 @@ function estimateOutputChars(output: unknown): number {
 
 function isPromptOutputEmpty(output: unknown): boolean {
   return typeof output === "string" && output.trim().length === 0;
-}
-
-function markPromptQualityFailure(error: unknown, failureKind: PromptQualityFailureKind): unknown {
-  if (error && typeof error === "object") {
-    try {
-      Object.defineProperty(error, "promptQualityFailureKind", {
-        value: failureKind,
-        configurable: true,
-      });
-    } catch {
-      // Ignore non-extensible errors.
-    }
-  }
-  return error;
 }
 
 function classifyPromptQualityFailure(error: unknown): PromptQualityFailureKind {
@@ -230,88 +115,7 @@ function classifyPromptQualityFailure(error: unknown): PromptQualityFailureKind 
   return "llm_error";
 }
 
-function buildDefaultSemanticRetryMessages<I, R>(input: {
-  baseMessages: BaseMessage[];
-  attempt: number;
-  parsedOutput: R;
-  validationError: string;
-}): BaseMessage[] {
-  return [
-    ...input.baseMessages,
-    new HumanMessage([
-      `上一次输出虽然通过了 JSON 结构校验，但没有通过业务校验。这是第 ${input.attempt} 次语义重试。`,
-      `失败原因：${input.validationError}`,
-      "",
-      "上一次的 JSON 输出：",
-      safeJsonStringify(input.parsedOutput),
-      "",
-      "请基于同一任务重新生成完整 JSON 对象。",
-      "硬要求：",
-      "1. 只输出最终 JSON 对象。",
-      "2. 不要输出 Markdown、解释、注释或额外文本。",
-      "3. 必须修正上面的业务校验失败点。",
-    ].join("\n")),
-  ];
-}
-
-function buildSemanticRetryMessages<I, O, R>(input: {
-  asset: PromptAsset<I, O, R>;
-  promptInput: I;
-  context: PromptRenderContext;
-  baseMessages: BaseMessage[];
-  parsedOutput: R;
-  validationError: string;
-  attempt: number;
-}): BaseMessage[] {
-  return input.asset.semanticRetryPolicy?.buildMessages?.({
-    promptId: input.asset.id,
-    promptVersion: input.asset.version,
-    attempt: input.attempt,
-    promptInput: input.promptInput,
-    context: input.context,
-    baseMessages: input.baseMessages,
-    parsedOutput: input.parsedOutput,
-    validationError: input.validationError,
-  }) ?? buildDefaultSemanticRetryMessages(input);
-}
-
-export function preparePromptExecution<I, O, R = O>(input: {
-  asset: PromptAsset<I, O, R>;
-  promptInput: I;
-  contextBlocks?: Parameters<typeof selectContextBlocks>[0];
-  options?: PromptExecutionOptions;
-  resolvedSlots?: import("../slots/slotTypes").ResolvedSlots;
-}): {
-  messages: ReturnType<PromptAsset<I, O, R>["render"]>;
-  context: PromptRenderContext;
-  invocation: PromptInvocationMeta;
-} {
-  assertRegistered(input.asset as PromptAsset<unknown, unknown, unknown>);
-  const context = buildRenderContext(
-    input.asset as PromptAsset<unknown, unknown, unknown>,
-    input.contextBlocks ?? [],
-    input.resolvedSlots,
-  );
-  const renderedMessages = input.asset.render(input.promptInput, context);
-  return {
-    messages: appendStructuredOutputHintMessages({
-      asset: input.asset,
-      promptInput: input.promptInput,
-      context,
-      messages: renderedMessages,
-    }),
-    context,
-    invocation: buildPromptInvocationMeta(
-      input.asset as PromptAsset<unknown, unknown, unknown>,
-      context,
-      false,
-      0,
-      false,
-      0,
-      input.options,
-    ),
-  };
-}
+export { preparePromptExecution };
 
 function logPromptCompletion(input: {
   meta: PromptInvocationMeta;
@@ -470,60 +274,6 @@ function recordPromptFailure(input: {
   });
 }
 
-function captureStreamOutput(
-  rawStream: AsyncIterable<BaseMessageChunk>,
-  onChunk?: (content: string) => void,
-  onReasoning?: (content: string) => void,
-): {
-  stream: AsyncIterable<BaseMessageChunk>;
-  completedText: Promise<string>;
-  completedUsage: Promise<LlmTokenUsageSnapshot | null>;
-} {
-  let resolveText!: (value: string) => void;
-  let rejectText!: (reason?: unknown) => void;
-  let resolveUsage!: (value: LlmTokenUsageSnapshot | null) => void;
-  let rejectUsage!: (reason?: unknown) => void;
-  const completedText = new Promise<string>((resolve, reject) => {
-    resolveText = resolve;
-    rejectText = reject;
-  });
-  const completedUsage = new Promise<LlmTokenUsageSnapshot | null>((resolve, reject) => {
-    resolveUsage = resolve;
-    rejectUsage = reject;
-  });
-
-  const stream = {
-    async *[Symbol.asyncIterator]() {
-      const chunks: string[] = [];
-      let usage: LlmTokenUsageSnapshot | null = null;
-      const reasoningCollector = new ReasoningStreamCollector();
-      try {
-        for await (const chunk of rawStream) {
-          const content = toText(chunk.content);
-          chunks.push(content);
-          onChunk?.(content);
-          onReasoning?.(reasoningCollector.push(chunk, content));
-          usage = mergeStreamTokenUsage(usage, extractLlmTokenUsage(chunk));
-          yield chunk;
-        }
-        onReasoning?.(reasoningCollector.flush());
-        resolveText(chunks.join(""));
-        resolveUsage(usage);
-      } catch (error) {
-        rejectText(error);
-        rejectUsage(error);
-        throw error;
-      }
-    },
-  };
-
-  return {
-    stream,
-    completedText,
-    completedUsage,
-  };
-}
-
 function buildPromptRunResult<T>(input: {
   asset: PromptAsset<unknown, unknown, unknown>;
   output: T;
@@ -569,197 +319,6 @@ function buildPromptRunResult<T>(input: {
     meta,
     context: input.context,
   };
-}
-
-function applyPromptPostValidate<I, O, R = O>(input: {
-  asset: PromptAsset<I, O, R>;
-  promptInput: I;
-  context: PromptRenderContext;
-  rawOutput: R;
-}): O {
-  return input.asset.postValidate
-    ? input.asset.postValidate(input.rawOutput, input.promptInput, input.context)
-    : input.rawOutput as unknown as O;
-}
-
-async function resolveStructuredOutput<I, O, R = O>(input: {
-  asset: PromptAsset<I, O, R>;
-  promptInput: I;
-  context: PromptRenderContext;
-  baseMessages: BaseMessage[];
-  outputSchema: NonNullable<PromptAsset<I, O, R>["outputSchema"]>;
-  initialResult: StructuredInvokeResult<R>;
-  options?: PromptExecutionOptions;
-}): Promise<{
-  output: O;
-  invocation: PromptInvocationMeta;
-  postValidateFailureRecovered: boolean;
-}> {
-  const asset = input.asset as PromptAsset<unknown, unknown, unknown>;
-  let currentMessages = input.baseMessages;
-  let currentResult = input.initialResult;
-  let totalRepairAttempts = currentResult.repairAttempts;
-  let repairUsed = currentResult.repairUsed;
-  let semanticRetryAttempts = 0;
-  const maxSemanticRetryAttempts = resolveStructuredSemanticRetryAttempts(asset);
-
-  while (true) {
-    try {
-      const output = applyPromptPostValidate({
-        asset: input.asset,
-        promptInput: input.promptInput,
-        context: input.context,
-        rawOutput: currentResult.data,
-      });
-      return {
-        output,
-        invocation: buildPromptInvocationMeta(
-          asset,
-          input.context,
-          repairUsed,
-          totalRepairAttempts,
-          semanticRetryAttempts > 0,
-          semanticRetryAttempts,
-          input.options,
-        ),
-        postValidateFailureRecovered: false,
-      };
-    } catch (error) {
-      if (semanticRetryAttempts >= maxSemanticRetryAttempts) {
-        if (input.asset.postValidateFailureRecovery) {
-          logPromptEvent({
-            event: "semantic_retry_recovered",
-            asset: asset as PromptAsset<unknown, unknown, unknown>,
-            context: input.context,
-            provider: input.options?.provider,
-            model: input.options?.model,
-            attempt: semanticRetryAttempts,
-            validationError: stringifyPromptError(error),
-          });
-          recordPromptQualityEvent({
-            event: "semantic_retry_recovered",
-            promptId: asset.id,
-            promptVersion: asset.version,
-            taskType: asset.taskType,
-            mode: asset.mode,
-            provider: input.options?.provider,
-            model: input.options?.model,
-            stage: input.options?.stage,
-            entrypoint: input.options?.entrypoint,
-            estimatedInputTokens: input.context.estimatedInputTokens,
-            semanticRetryUsed: semanticRetryAttempts > 0,
-            semanticRetryAttempts,
-            postValidateFailureRecovered: true,
-          });
-          return {
-            output: input.asset.postValidateFailureRecovery({
-              promptInput: input.promptInput,
-              context: input.context,
-              rawOutput: currentResult.data,
-              validationError: stringifyPromptError(error),
-              semanticRetryAttempts,
-            }),
-            invocation: buildPromptInvocationMeta(
-              asset,
-              input.context,
-              repairUsed,
-              totalRepairAttempts,
-              semanticRetryAttempts > 0,
-              semanticRetryAttempts,
-              input.options,
-            ),
-            postValidateFailureRecovered: true,
-          };
-        }
-        throw markPromptQualityFailure(error, "post_validate_failed");
-      }
-
-      semanticRetryAttempts += 1;
-      recordPromptQualityEvent({
-        event: "semantic_retry_start",
-        promptId: asset.id,
-        promptVersion: asset.version,
-        taskType: asset.taskType,
-        mode: asset.mode,
-        provider: input.options?.provider,
-        model: input.options?.model,
-        stage: input.options?.stage,
-        entrypoint: input.options?.entrypoint,
-        estimatedInputTokens: input.context.estimatedInputTokens,
-        semanticRetryUsed: true,
-        semanticRetryAttempts,
-      });
-      logPromptEvent({
-        event: "semantic_retry_start",
-        asset: asset as PromptAsset<unknown, unknown, unknown>,
-        context: input.context,
-        provider: input.options?.provider,
-        model: input.options?.model,
-        attempt: semanticRetryAttempts,
-        validationError: stringifyPromptError(error),
-      });
-      currentMessages = buildSemanticRetryMessages({
-        asset: input.asset,
-        promptInput: input.promptInput,
-        context: input.context,
-        baseMessages: currentMessages,
-        parsedOutput: currentResult.data,
-        validationError: stringifyPromptError(error),
-        attempt: semanticRetryAttempts,
-      });
-      currentResult = await promptRunnerStructuredInvoker<R>({
-        label: `${input.asset.id}@${input.asset.version}#semantic-retry-${semanticRetryAttempts}`,
-        provider: input.options?.provider,
-        model: input.options?.model,
-        baseURL: input.options?.baseURL,
-        temperature: input.options?.temperature,
-        maxTokens: input.options?.maxTokens,
-        timeoutMs: input.options?.timeoutMs,
-        signal: input.options?.signal,
-        sessionId: input.options?.sessionId,
-        reasoningEffort: input.options?.reasoningEffort,
-        taskType: input.asset.taskType,
-        messages: currentMessages,
-        schema: input.outputSchema,
-        maxRepairAttempts: resolveStructuredRepairAttempts(asset),
-        promptMeta: buildPromptInvocationMeta(
-          asset,
-          input.context,
-          repairUsed,
-          totalRepairAttempts,
-          true,
-          semanticRetryAttempts,
-          input.options,
-        ),
-      });
-      logPromptEvent({
-        event: "semantic_retry_done",
-        asset: asset as PromptAsset<unknown, unknown, unknown>,
-        context: input.context,
-        provider: input.options?.provider,
-        model: input.options?.model,
-        attempt: semanticRetryAttempts,
-      });
-      recordPromptQualityEvent({
-        event: "semantic_retry_done",
-        promptId: asset.id,
-        promptVersion: asset.version,
-        taskType: asset.taskType,
-        mode: asset.mode,
-        provider: input.options?.provider,
-        model: input.options?.model,
-        stage: input.options?.stage,
-        entrypoint: input.options?.entrypoint,
-        estimatedInputTokens: input.context.estimatedInputTokens,
-        repairUsed: currentResult.repairUsed,
-        repairAttempts: currentResult.repairAttempts,
-        semanticRetryUsed: true,
-        semanticRetryAttempts,
-      });
-      totalRepairAttempts += currentResult.repairAttempts;
-      repairUsed = repairUsed || currentResult.repairUsed;
-    }
-  }
 }
 
 export async function runStructuredPrompt<I, O, R = O>(input: {
@@ -872,6 +431,7 @@ export async function runStructuredPrompt<I, O, R = O>(input: {
       baseMessages: messages,
       outputSchema,
       initialResult: result,
+      structuredInvoker: promptRunnerStructuredInvoker,
       options: input.options,
     });
     logMemoryUsage({
@@ -926,109 +486,11 @@ export async function runTextPrompt<I>(input: {
   contextBlocks?: Parameters<typeof selectContextBlocks>[0];
   options?: PromptExecutionOptions;
 }): Promise<PromptRunResult<string>> {
-  if (input.asset.mode !== "text") {
-    throw new Error(`Prompt asset ${input.asset.id}@${input.asset.version} is not a text prompt.`);
-  }
-
-  const overlays = await resolvePromptOverlaysForAsset({
-    asset: input.asset as PromptAsset<unknown, unknown, unknown>,
-    contextBlocks: input.contextBlocks,
-    options: input.options,
+  return executeTextPrompt(input, {
+    llmFactory: promptRunnerLLMFactory,
+    buildResult: buildPromptRunResult,
+    recordFailure: recordPromptFailure,
   });
-  const prepared = preparePromptExecution({
-    ...input,
-    contextBlocks: overlays.blocks,
-    resolvedSlots: overlays.resolvedSlots,
-  });
-  const startedAt = Date.now();
-  const messages = await resolveAdvancedPromptMessages({
-    asset: input.asset,
-    promptInput: input.promptInput,
-    context: prepared.context,
-    officialMessages: prepared.messages,
-    novelId: input.options?.novelId,
-  });
-  const renderedPromptChars = estimateRenderedPromptChars(messages);
-  const liveSession = beginLlmLiveSession({
-    label: input.asset.id + "@" + input.asset.version,
-    mode: "text",
-    promptMeta: prepared.invocation,
-    provider: input.options?.provider,
-    model: input.options?.model,
-    promptText: formatLivePrompt(messages),
-  });
-  try {
-    const llm = await promptRunnerLLMFactory(input.options?.provider, {
-      fallbackProvider: "deepseek",
-      model: input.options?.model,
-      baseURL: input.options?.baseURL,
-      temperature: input.options?.temperature,
-      reasoningEnabled: input.options?.reasoningEnabled,
-      reasoningEffort: input.options?.reasoningEffort,
-      maxTokens: input.options?.maxTokens,
-      timeoutMs: input.options?.timeoutMs,
-      sessionId: input.options?.sessionId,
-      taskType: input.asset.taskType,
-      promptMeta: prepared.invocation,
-    });
-    liveSession.phase("streaming", "模型正在返回内容");
-    const stream = await llm.stream(messages, buildPromptCallOptions(input.options));
-    let rawOutput = "";
-    let tokenUsage: LlmTokenUsageSnapshot | null = null;
-    const reasoningCollector = new ReasoningStreamCollector();
-    for await (const chunk of stream) {
-      const content = toText(chunk.content);
-      rawOutput += content;
-      liveSession.delta(content);
-      liveSession.reasoning(reasoningCollector.push(chunk, content));
-      tokenUsage = mergeStreamTokenUsage(tokenUsage, extractLlmTokenUsage(chunk));
-    }
-    liveSession.reasoning(reasoningCollector.flush());
-    liveSession.phase("validating", "正在整理生成结果");
-    const output = applyPromptPostValidate({
-      asset: input.asset,
-      promptInput: input.promptInput,
-      context: prepared.context,
-      rawOutput,
-    });
-    liveSession.usage(tokenUsage ? {
-      ...tokenUsage,
-      reasoningTokens: tokenUsage.reasoningTokens ?? null,
-    } : null);
-    liveSession.complete();
-    return buildPromptRunResult({
-      asset: input.asset as PromptAsset<unknown, unknown, unknown>,
-      output,
-      context: prepared.context,
-      provider: input.options?.provider,
-      model: input.options?.model,
-      latencyMs: Date.now() - startedAt,
-      invocation: buildPromptInvocationMeta(
-        input.asset as PromptAsset<unknown, unknown, unknown>,
-        prepared.context,
-        false,
-        0,
-        false,
-        0,
-        input.options,
-      ),
-      renderedPromptChars,
-      tokenUsage,
-    });
-  } catch (error) {
-    liveSession.fail(error);
-    recordPromptFailure({
-      asset: input.asset as PromptAsset<unknown, unknown, unknown>,
-      context: prepared.context,
-      invocation: prepared.invocation,
-      provider: input.options?.provider,
-      model: input.options?.model,
-      latencyMs: Date.now() - startedAt,
-      renderedPromptChars,
-      error,
-    });
-    throw error;
-  }
 }
 
 export async function streamTextPrompt<I>(input: {
@@ -1037,127 +499,11 @@ export async function streamTextPrompt<I>(input: {
   contextBlocks?: Parameters<typeof selectContextBlocks>[0];
   options?: PromptExecutionOptions;
 }): Promise<PromptStreamRunResult<string>> {
-  if (input.asset.mode !== "text") {
-    throw new Error(`Prompt asset ${input.asset.id}@${input.asset.version} is not a text prompt.`);
-  }
-
-  const overlays = await resolvePromptOverlaysForAsset({
-    asset: input.asset as PromptAsset<unknown, unknown, unknown>,
-    contextBlocks: input.contextBlocks,
-    options: input.options,
+  return executeTextPromptStream(input, {
+    llmFactory: promptRunnerLLMFactory,
+    buildResult: buildPromptRunResult,
+    recordFailure: recordPromptFailure,
   });
-  const prepared = preparePromptExecution({
-    ...input,
-    contextBlocks: overlays.blocks,
-    resolvedSlots: overlays.resolvedSlots,
-  });
-  const startedAt = Date.now();
-  const messages = await resolveAdvancedPromptMessages({
-    asset: input.asset,
-    promptInput: input.promptInput,
-    context: prepared.context,
-    officialMessages: prepared.messages,
-    novelId: input.options?.novelId,
-  });
-  const renderedPromptChars = estimateRenderedPromptChars(messages);
-  const liveSession = beginLlmLiveSession({
-    label: input.asset.id + "@" + input.asset.version,
-    mode: "text",
-    promptMeta: prepared.invocation,
-    provider: input.options?.provider,
-    model: input.options?.model,
-    promptText: formatLivePrompt(prepared.messages),
-  });
-  let captured: ReturnType<typeof captureStreamOutput>;
-  try {
-    const llm = await promptRunnerLLMFactory(input.options?.provider, {
-      fallbackProvider: "deepseek",
-      model: input.options?.model,
-      baseURL: input.options?.baseURL,
-      temperature: input.options?.temperature,
-      reasoningEnabled: input.options?.reasoningEnabled,
-      reasoningEffort: input.options?.reasoningEffort,
-      maxTokens: input.options?.maxTokens,
-      timeoutMs: input.options?.timeoutMs,
-      sessionId: input.options?.sessionId,
-      taskType: input.asset.taskType,
-      promptMeta: prepared.invocation,
-    });
-    liveSession.phase("streaming", "模型正在返回内容");
-    const rawStream = await llm.stream(messages, buildPromptCallOptions(input.options));
-    captured = captureStreamOutput(
-      rawStream as AsyncIterable<BaseMessageChunk>,
-      (content) => liveSession.delta(content),
-      (content) => liveSession.reasoning(content),
-    );
-  } catch (error) {
-    liveSession.fail(error);
-    recordPromptFailure({
-      asset: input.asset as PromptAsset<unknown, unknown, unknown>,
-      context: prepared.context,
-      invocation: prepared.invocation,
-      provider: input.options?.provider,
-      model: input.options?.model,
-      latencyMs: Date.now() - startedAt,
-      renderedPromptChars,
-      error,
-    });
-    throw error;
-  }
-
-  return {
-    stream: captured.stream,
-    complete: captured.completedText.then(async (content) => {
-      liveSession.phase("validating", "正在整理生成结果");
-      const output = applyPromptPostValidate({
-        asset: input.asset,
-        promptInput: input.promptInput,
-        context: prepared.context,
-        rawOutput: content,
-      });
-      const tokenUsage = await captured.completedUsage.catch(() => null);
-      const result = buildPromptRunResult({
-        asset: input.asset as PromptAsset<unknown, unknown, unknown>,
-        output,
-        context: prepared.context,
-        provider: input.options?.provider,
-        model: input.options?.model,
-        latencyMs: Date.now() - startedAt,
-        invocation: buildPromptInvocationMeta(
-          input.asset as PromptAsset<unknown, unknown, unknown>,
-          prepared.context,
-          false,
-          0,
-          false,
-          0,
-          input.options,
-        ),
-        renderedPromptChars,
-        tokenUsage,
-      });
-      liveSession.usage(tokenUsage ? {
-        ...tokenUsage,
-        reasoningTokens: tokenUsage.reasoningTokens ?? null,
-      } : null);
-      liveSession.complete();
-      return result;
-    }).catch((error) => {
-      liveSession.fail(error);
-      recordPromptFailure({
-        asset: input.asset as PromptAsset<unknown, unknown, unknown>,
-        context: prepared.context,
-        invocation: prepared.invocation,
-        provider: input.options?.provider,
-        model: input.options?.model,
-        latencyMs: Date.now() - startedAt,
-        renderedPromptChars,
-        error,
-      });
-      throw error;
-    }),
-    context: prepared.context,
-    invocation: prepared.invocation,
-  };
 }
 
 export async function streamStructuredPrompt<I, O, R = O>(input: {
@@ -1252,46 +598,19 @@ export async function streamStructuredPrompt<I, O, R = O>(input: {
     stream: captured.stream,
     complete: captured.completedText.then(async (rawContent) => {
       liveSession.phase("validating", "正在检查生成结果");
-      let repairStarted = false;
-      const parsed = rawContent.trim()
-        ? await parseStructuredLlmRawContentDetailed({
-          rawContent,
-          schema: outputSchema,
-          provider: input.options?.provider,
-          model: input.options?.model,
-          temperature: input.options?.temperature,
-          maxTokens: input.options?.maxTokens,
-          timeoutMs: input.options?.timeoutMs,
-          signal: input.options?.signal,
-          taskType: input.asset.taskType,
-          label: `${input.asset.id}@${input.asset.version}`,
-          maxRepairAttempts: resolveStructuredRepairAttempts(input.asset as PromptAsset<unknown, unknown, unknown>),
-          promptMeta: prepared.invocation,
-          onRepairOutputDelta: (content) => {
-            if (!repairStarted) {
-              repairStarted = true;
-              liveSession.phase("repairing", "正在修复生成结果");
-            }
-            liveSession.delta(content);
-          },
-          strategy,
-          profile,
-        })
-        : await promptRunnerStructuredInvoker<R>({
-          label: `${input.asset.id}@${input.asset.version}#empty-stream-fallback`,
-          provider: input.options?.provider,
-          model: input.options?.model,
-          temperature: input.options?.temperature,
-          maxTokens: input.options?.maxTokens,
-          timeoutMs: input.options?.timeoutMs,
-          signal: input.options?.signal,
-          taskType: input.asset.taskType,
-          messages: prepared.messages,
-          schema: outputSchema,
-          structuredStrategy: "prompt_json",
-          maxRepairAttempts: resolveStructuredRepairAttempts(input.asset as PromptAsset<unknown, unknown, unknown>),
-          promptMeta: prepared.invocation,
-        });
+      const parsed = await resolveStructuredStreamOutput({
+        rawContent,
+        asset: input.asset,
+        messages: prepared.messages,
+        outputSchema,
+        invocation: prepared.invocation,
+        structuredInvoker: promptRunnerStructuredInvoker,
+        strategy,
+        profile,
+        options: input.options,
+        onRepairStart: () => liveSession.phase("repairing", "正在修复生成结果"),
+        onRepairOutputDelta: (content) => liveSession.delta(content),
+      });
       const resolved = await resolveStructuredOutput({
         asset: input.asset,
         promptInput: input.promptInput,
@@ -1299,6 +618,7 @@ export async function streamStructuredPrompt<I, O, R = O>(input: {
         baseMessages: prepared.messages,
         outputSchema,
         initialResult: parsed,
+        structuredInvoker: promptRunnerStructuredInvoker,
         options: input.options,
       });
       const tokenUsage = parsed.tokenUsage ?? await captured.completedUsage.catch(() => null);

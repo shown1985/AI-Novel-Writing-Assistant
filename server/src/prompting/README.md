@@ -69,6 +69,14 @@
 - 流式结构化输出使用 `streamStructuredPrompt`
 - 调用方继续保留原 service 的 public method、数据库写入和返回 shape
 
+### Execution Module Boundary
+
+- `core/promptRunner.ts` 是外部调用的稳定 facade，负责公开入口、请求预算、质量遥测和测试注入；业务模块不得绕过它深导入 execution 内部文件。
+- `core/execution/promptExecutionContext.ts` 负责注册校验、上下文选择、slot overlay 与调用元数据组装。
+- `core/execution/textPromptExecution.ts` 负责 text invoke/stream、live session、reasoning 与 token usage 汇聚。
+- `core/execution/structuredPromptExecution.ts` 负责结构化解析协调、postValidate、repair 计数与 semantic retry。
+- execution 模块只承接 Prompt 运行职责，不生成或伪造实际模型 attempt；真实 transport 证据必须由后续独立 recorder 接线。
+
 说明：
 
 - `repairPolicy` 负责 JSON 解析 / schema 校验失败后的 repair

@@ -276,11 +276,19 @@
 ### S2-04b2：Prompt execution 边界拆分
 
 - 用户价值：后续记录真实调用时不会继续扩大超长核心文件或改变既有生成、重试和流式体验。
-- 状态：**Ready（R1-S2D）**；3 点。Prompt 平台 Agent 独占 `prompting/core/execution/` 与 `promptRunner.ts`；不与 transport 接线并行改同文件。
+- 状态：**Done（R1-S2D）**；3 点。[facade 等价、context/text/structured owned 模块与 57/57 有效回归已通过](./s2-04b2-prompt-execution-boundaries.md)。Prompt 平台 Agent 独占 `prompting/core/execution/` 与 `promptRunner.ts`；UI 验收不适用。
 - 范围：按 04b0 合同提取 execution context、text invoke/stream 和 structured coordination；保留 facade exports，`promptRunner.ts` 降至 1300 行以下，目标 1000～1200 行。
 - 非范围：不写 attempt store、不改 retry/fallback/repair/semantic 策略、不新增 Prompt、不调整模型参数。
 - AC：外部 import 与 text/structured invoke/stream、live、usage、repair、semantic retry 行为等价；依赖方向只经 execution facade，不创建 generic helper。
 - 验证：server build、现有 Prompt/structured invoke/live 定向回归和文件行数；本卡纯重构不声称调用证据已持久化。
+
+### R1-PROMPT01：结构化空响应 transport retry 基线缺陷
+
+- 用户价值：服务商过载等传输异常不会被误判为空正文并跳过已配置的同模型重试。
+- 状态：**Refinement（未估点、未进入 R1-S2D）**。
+- 已知事实：`structuredInvoke.test.js` 的 transport retry 用例在 S2-04b2 基线持续失败；`structuredInvoke.ts`、parser 与该测试均不在 S2-04b2 diff，不能并入纯边界拆分冒充修复。
+- 待细化：冻结 transport 异常与真实空正文的分类边界、retry 与 strategy degradation 的顺序、失败/备用矩阵和最窄回归；完成 DoR 后再由 Sprint Planning 承诺。
+- 非范围：S2-04b2 不改变 retry 次数、fallback、结构化策略或错误分类。
 
 ### S2-04b3：真实 transport attempt 接线
 

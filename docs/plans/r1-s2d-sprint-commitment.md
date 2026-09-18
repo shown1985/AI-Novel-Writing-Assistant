@@ -16,7 +16,7 @@
 | --- | ---: | --- | --- | --- | --- |
 | S2-03a 单书成果、进度与推荐动作展示模型 | 3 | User Acceptance | 单书 Presentation owner；`client/src/pages/novels/workspace/presentation/` 及经授权的既有单书展示消费点 | S2-01a/b、S2-03a0 Done | [代码级行为与桌面/移动消费已通过](./s2-03a-single-book-display-model.md)；等待用户 UI 验收，不执行命令 |
 | S2-04b1 通用 attempt store 与 repository | 3 | Done | 根数据集成人独占两套 Prisma schema/migration；模型平台 repository 位于 `server/src/platform/llm/provenance/attempts/` | S2-04a、S2-04b0 Done | [双库精确增量与真实 Prisma adapter 持久证据通过](./s2-04b1-model-attempt-store.md)；不接 transport，UI 验收不适用 |
-| S2-04b2 Prompt execution 边界拆分 | 3 | Ready | Prompt 平台 owner 独占 `promptRunner.ts` 与拟建 `prompting/core/execution/` | S2-04b0 Done | facade/import/运行行为等价，text/structured execution 有明确归属，`promptRunner.ts` 回到 1300 行以下 |
+| S2-04b2 Prompt execution 边界拆分 | 3 | Done | Prompt 平台 owner 独占 `promptRunner.ts` 与 `prompting/core/execution/` | S2-04b0 Done | [facade/import 等价与 57/57 有效回归通过](./s2-04b2-prompt-execution-boundaries.md)；`promptRunner.ts` 为 668 行，UI 验收不适用 |
 
 三张卡均满足稳定 ID、用户价值、范围/非范围、依赖、AC、owner 和最窄验证。`S2-03b`、`S2-04b3` 虽可在本 Sprint 完成后转 Ready，但不是本窗口承诺，也不能因前置卡提前结束而顺手实施。
 

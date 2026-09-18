@@ -158,11 +158,13 @@ Review 与 Retrospective 见 [R1-S2C Sprint 承诺](./docs/plans/r1-s2c-sprint-c
 | --- | ---: | --- | --- | --- |
 | S2-03a 单书成果、进度与推荐动作展示模型 | 3 | User Acceptance | 单书 Presentation owner | [纯模型、桌面/移动消费和 21/21 行为回归已通过](./docs/plans/s2-03a-single-book-display-model.md)；等待用户 UI 验收，不执行命令 |
 | S2-04b1 通用 attempt store 与 repository | 3 | Done | 根数据集成人 + 模型平台 owner | [双库增量迁移、真实 adapter、幂等/唯一 adopted、重启读取与脱敏证据通过](./docs/plans/s2-04b1-model-attempt-store.md)；不接 transport，UI 验收不适用 |
-| S2-04b2 Prompt execution 边界拆分 | 3 | Ready | Prompt 平台 owner | facade 等价、text/structured owned 模块、核心文件低于 1300 行；不接 attempt store |
+| S2-04b2 Prompt execution 边界拆分 | 3 | Done | Prompt 平台 owner | [facade 等价、三类 execution 边界与 57/57 有效回归通过](./docs/plans/s2-04b2-prompt-execution-boundaries.md)；核心文件 668 行，不接 attempt store，UI 验收不适用 |
 
 承诺容量：9 点。Stretch：无。权威合同见 [R1-S2D Sprint 承诺](./docs/plans/r1-s2d-sprint-commitment.md)。
 
 未承诺：S2-03b 等待 03a；S2-04b3 等待 04b1/04b2；04b4/04c 继续等待真实接线与读投影；S3-01 虽 Ready 但按 Release 顺序留在后续窗口。不得在前置卡完成后顺手扩入。
+
+新发现的 `R1-PROMPT01` 结构化空响应 transport retry 基线缺陷进入 Refinement；它不在本 Sprint 承诺内，不并入 S2-04b2 纯拆分范围。
 
 ## Release 1 后续队列
 
