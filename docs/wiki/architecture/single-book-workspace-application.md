@@ -23,6 +23,7 @@
 11. 页面至多展示一个可执行导演主动作。唯一候选是通过同 `novelId`、同 `directorTaskId` 和 fresh 查询验证的 `bookAutomationProjection.primaryAction`；dashboard、runtime、局部 callback 和自由文案只能提供说明或既有命令适配，不能按 label、关键词或正则重新推断动作。
 12. stale、loading、error、empty 或身份不匹配都输出零可执行动作。相同小说与已验证任务的旧保存成果可以继续只读并明确标记刷新或读取失败，但另一小说、另一任务的旧事实不得复用。
 13. 明确 `replan_required`、`pendingManualRecovery` 和 quality-first `pause_for_manual` 优先于普通 running/completed；`defer_and_continue` 等局部质量债仍是可继续警告，不能在展示层升级为全书失败或重规划。
+14. 三层进度、严重度、质量债数量和主动作候选必须先收敛为同一个只读 `SingleBookDisplayModel`，再由桌面与移动端消费。视图不能各自重算章数、目标、任务严重度或动作；03a 的动作只展示，不绑定命令。
 
 ## 失败模式
 

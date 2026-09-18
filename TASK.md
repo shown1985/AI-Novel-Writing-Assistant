@@ -156,7 +156,7 @@ Review 与 Retrospective 见 [R1-S2C Sprint 承诺](./docs/plans/r1-s2c-sprint-c
 
 | Story | 点数 | 状态 | Owner | 验收边界 |
 | --- | ---: | --- | --- | --- |
-| S2-03a 单书成果、进度与推荐动作展示模型 | 3 | Ready | 单书 Presentation owner | 三层进度、结构化严重度、freshness、至多一个 verified primaryAction；不执行命令 |
+| S2-03a 单书成果、进度与推荐动作展示模型 | 3 | User Acceptance | 单书 Presentation owner | [纯模型、桌面/移动消费和 21/21 行为回归已通过](./docs/plans/s2-03a-single-book-display-model.md)；等待用户 UI 验收，不执行命令 |
 | S2-04b1 通用 attempt store 与 repository | 3 | Ready | 根数据集成人 + 模型平台 owner | 双库增量迁移、幂等/唯一 adopted、重启读取、脱敏；不接 transport |
 | S2-04b2 Prompt execution 边界拆分 | 3 | Ready | Prompt 平台 owner | facade 等价、text/structured owned 模块、核心文件低于 1300 行；不接 attempt store |
 

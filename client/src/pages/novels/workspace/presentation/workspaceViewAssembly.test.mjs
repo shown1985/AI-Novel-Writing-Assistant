@@ -324,6 +324,7 @@ test("final view assembly maps the actual planning tabs, shell, and task drawer"
       exportControls: { marker: "export" },
       takeover: { marker: "takeover" },
       taskDrawer,
+      singleBookDisplay: { marker: "single-book-display" },
     },
     tabs: {
       basic: planningTabs.basicTab,
@@ -349,6 +350,7 @@ test("final view assembly maps the actual planning tabs, shell, and task drawer"
   assert.equal(result.pipelineTab, pipelineTab);
   assert.equal(result.characterTab, characterTab);
   assert.equal(result.taskDrawer, taskDrawer);
+  assert.equal(result.singleBookDisplay.marker, "single-book-display");
   assert.equal(result.taskDrawer.actions[0].onClick, systemContinue);
 });
 

@@ -133,7 +133,7 @@
 ## S2-03a：单书成果、进度与推荐动作展示模型
 
 - 用户价值：作者能判断已经得到什么、AI 正在做什么和唯一推荐下一步，不将普通提醒误判为全书失败。
-- 状态：**Ready（R1-S2D）**；S2-01a/01b 已完成，S2-03a0 已冻结纯展示合同。合同完成不等于页面能力已交付。
+- 状态：**User Acceptance（R1-S2D）**；[纯模型、桌面/移动消费与代码级行为证据已通过](./s2-03a-single-book-display-model.md)，等待用户 UI 验收。未验收前不记 Done，也不解锁 03b。
 - 点数：3；Owner：Agent A，单书 presentation 独占。
 - 真实源码：client/src/pages/novels/components/NovelEditView.tsx、NovelTaskDrawer.tsx、NovelAutoDirectorProgressPanel.tsx、novelEditAutomationStatus.ts、novelWorkspaceNavigation.ts；shared/types/directorRuntime.ts 为根集成人保留。
 - 拟建归属：novels/workspace/presentation/ 的纯展示模型；展示通过 client/src/components/workspace/ 现有 primitives。

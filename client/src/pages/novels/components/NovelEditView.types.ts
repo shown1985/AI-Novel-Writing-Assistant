@@ -662,9 +662,53 @@ export interface NovelEditViewProps {
   chapterTab: ChapterTabViewProps;
   pipelineTab: PipelineTabViewProps;
   characterTab: CharacterTabViewProps;
+  singleBookDisplay: SingleBookDisplayModel;
   takeover?: NovelEditTakeoverState | null;
   taskDrawer?: NovelTaskDrawerState | null;
   activeStepTakeoverEntry?: ReactNode;
   onSwitchToSimpleMode?: () => void;
   isSwitchingToSimpleMode?: boolean;
+}
+
+export type SingleBookFactFreshness = "fresh" | "stale" | "loading" | "error" | "empty";
+
+export interface SingleBookProgressFact {
+  state: SingleBookFactFreshness;
+  value: number | null;
+  label: string;
+  description: string | null;
+}
+
+export type SingleBookDisplaySeverity =
+  | "replan_required"
+  | "quality_pause"
+  | "manual_recovery"
+  | "blocked"
+  | "in_progress"
+  | "quality_debt"
+  | "task_completed"
+  | "idle"
+  | "unknown";
+
+export interface SingleBookDisplayModel {
+  identity: {
+    status: "verified" | "missing" | "mismatch";
+    directorTaskId: string | null;
+  };
+  savedProgress: SingleBookProgressFact;
+  taskProgress: {
+    state: SingleBookFactFreshness;
+    label: string;
+    description: string | null;
+  };
+  bookTarget: SingleBookProgressFact;
+  severity: {
+    kind: SingleBookDisplaySeverity;
+    tone: "neutral" | "info" | "success" | "warning" | "danger";
+    title: string;
+    description: string;
+  };
+  qualityDebtCount: number;
+  primaryAction: DirectorBookAutomationAction | null;
+  primaryActionReason: string | null;
 }

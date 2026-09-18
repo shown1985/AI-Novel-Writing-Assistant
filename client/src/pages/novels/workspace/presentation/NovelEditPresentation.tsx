@@ -1,5 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { BOOK_ANALYSIS_SECTIONS } from "@ai-novel/shared/types/bookAnalysis";
+import { readChapterQualityDebtDetails } from "@ai-novel/shared/types/chapterQualityLoop";
+import { DIRECTOR_ISSUE_CATALOG_BY_CODE } from "@ai-novel/shared/types/directorIssue";
 import type {
   Chapter,
   PipelineRepairMode,
@@ -42,6 +44,10 @@ import type {
 } from "../application";
 import type { useSSE } from "@/hooks/useSSE";
 import { buildNovelEditPlanningTabs } from "./planningTabs";
+import {
+  buildSingleBookDisplayModel,
+  resolveSingleBookFactFreshness,
+} from "./singleBookDisplayModel";
 import {
   assembleNovelEditViewProps,
   buildNovelEditTaskDrawer,
@@ -607,6 +613,72 @@ export function NovelEditPresentation(props: NovelEditPresentationProps) {
     onOpenFullTaskCenter: directorCommands.openAutoDirectorTaskCenter,
   });
 
+  const novelDetail = resources.novelDetailQuery.data?.data ?? null;
+  const novelDetailFreshness = resolveSingleBookFactFreshness({
+    enabled: Boolean(id),
+    hasValue: Boolean(novelDetail),
+    isError: resources.novelDetailQuery.isError,
+    isFetching: resources.novelDetailQuery.isFetching,
+    isPending: resources.novelDetailQuery.isPending,
+    isSuccess: resources.novelDetailQuery.isSuccess,
+  });
+  const chapterQualityDebt = resources.chapters.flatMap((chapter) => {
+    const debt = readChapterQualityDebtDetails(chapter.riskFlags);
+    return debt ? [debt] : [];
+  });
+  const qualityPauseForManual = director.activeDirectorRuntimeProjection?.recentIssues?.some((item) => (
+    item.decision?.action === "pause_for_manual"
+    && DIRECTOR_ISSUE_CATALOG_BY_CODE[item.occurrence.issueCode].category === "quality"
+  )) ?? false;
+  const singleBookDisplay = buildSingleBookDisplayModel({
+    novelId: id,
+    resolvedDirectorTaskId: director.selectedDirectorTaskId || null,
+    novel: novelDetail,
+    savedChapters: resources.chapters,
+    bookAutomationProjection: director.bookAutomationProjection,
+    directorTask: director.requestedDirectorTask,
+    directorSnapshot: director.activeDirectorSnapshot,
+    runtimeProjection: director.activeDirectorRuntimeProjection,
+    chapterQualityDebt,
+    qualityPauseForManual,
+    freshness: {
+      novel: novelDetailFreshness,
+      savedChapters: novelDetailFreshness,
+      bookProjection: resolveSingleBookFactFreshness({
+        enabled: Boolean(id),
+        hasValue: Boolean(director.bookAutomationProjection),
+        isError: director.bookAutomationQuery.isError,
+        isFetching: director.bookAutomationQuery.isFetching,
+        isPending: director.bookAutomationQuery.isPending,
+        isSuccess: director.bookAutomationQuery.isSuccess,
+      }),
+      directorTask: resolveSingleBookFactFreshness({
+        enabled: Boolean(director.requestedDirectorTaskId),
+        hasValue: Boolean(director.requestedDirectorTask),
+        isError: director.requestedDirectorTaskQuery.isError,
+        isFetching: director.requestedDirectorTaskQuery.isFetching,
+        isPending: director.requestedDirectorTaskQuery.isPending,
+        isSuccess: director.requestedDirectorTaskQuery.isSuccess,
+      }),
+      snapshot: resolveSingleBookFactFreshness({
+        enabled: Boolean(director.selectedDirectorTaskId),
+        hasValue: Boolean(director.activeDirectorSnapshot),
+        isError: director.directorTaskSnapshotQuery.isError,
+        isFetching: director.directorTaskSnapshotQuery.isFetching,
+        isPending: director.directorTaskSnapshotQuery.isPending,
+        isSuccess: director.directorTaskSnapshotQuery.isSuccess,
+      }),
+      runtime: resolveSingleBookFactFreshness({
+        enabled: Boolean(director.selectedDirectorTaskId),
+        hasValue: Boolean(director.activeDirectorRuntimeProjection),
+        isError: director.directorTaskSnapshotQuery.isError,
+        isFetching: director.directorTaskSnapshotQuery.isFetching,
+        isPending: director.directorTaskSnapshotQuery.isPending,
+        isSuccess: director.directorTaskSnapshotQuery.isSuccess,
+      }),
+    },
+  });
+
   const viewProps = assembleNovelEditViewProps({
     shell: {
       id,
@@ -619,6 +691,7 @@ export function NovelEditPresentation(props: NovelEditPresentationProps) {
       onSwitchToSimpleMode: () => switchToSimple.mutate(),
       isSwitchingToSimpleMode: switchToSimple.isPending,
       taskDrawer,
+      singleBookDisplay,
     },
     tabs: {
       basic: basicTab,
