@@ -2,16 +2,16 @@
 
 ## 目标、范围与容量
 
-本页细分[路线图](./agent-collaboration-sprints.md)中的 S2-01～04，并作为滚动状态合同维护。S2-01a 与 S2-02 已在 R1-S2A 完成；S2-01b 与 S2-04a 已在 [R1-S2B](./r1-s2b-sprint-commitment.md) 完成，其余卡按依赖保持 Ready、Blocked 或 Refinement。目标是让作者在原作品现场读到成果、按需展开协作、处理一个明确下一步，并区分预计使用模型和本次实际调用。
+本页细分[路线图](./agent-collaboration-sprints.md)中的 S2-01～04，并作为滚动状态合同维护。S2-01a 与 S2-02 已在 R1-S2A 完成；S2-01b 与 S2-04a 已在 [R1-S2B](./r1-s2b-sprint-commitment.md) 完成；当前审计发现 S2-03a 和 S2-04b 的事实权威仍会改变方案，因此在 [R1-S2C](./r1-s2c-sprint-commitment.md) 新增各自 3 点合同 Spike，不把未冻结生产卡直接承诺。目标是让作者在原作品现场读到成果、按需展开协作、处理一个明确下一步，并区分预计使用模型和本次实际调用。
 
 当前源码已提供章节修改预览、候选、差异、正文保存和审校；本 Sprint 复用这些能力。全局 Creative Hub 和运行记录保持只读，运行中的任务恢复仍走现有来源页命令。简易体验的用户写门禁和不可逆转专业语义继续生效。
 
-细分后为 8 张卡、28 点候选容量；路线图原 18 点是初始概要估计，新增拆分显式计入超长总控收敛、调用证据持久化和独立接线成本。28 点不作为一个 1～2 周窗口的固定承诺，按下面的验收窗口安排：
+细分后为 10 张卡、34 点候选容量；路线图原 18 点是初始概要估计，新增拆分显式计入超长总控收敛、展示事实权威、调用证据持久化和独立接线成本。34 点不作为一个 1～2 周窗口的固定承诺，按下面的验收窗口安排：
 
 | 窗口 | 候选卡 | 点数 | 退出条件 |
 | --- | --- | --- | --- |
-| S2-A 创作现场 | S2-01a、01b、02、03a、03b | 17 | 总控收敛、正文开关、推荐与来源恢复联通；S1-X 已通过则减去 S2-02 的 3 点 |
-| S2-B 模型透明度 | S2-04a、04b、04c | 11 | 来源合同、实际调用证据与只读显示联通；存储 Spike 若超出 5 点另拆卡，不缩减历史保护验收 |
+| S2-A 创作现场 | S2-01a、01b、02、03a0、03a、03b | 20 | 总控收敛、正文开关、先冻结展示权威，再让推荐与来源恢复联通；S1-X 已通过则减去 S2-02 的 3 点 |
+| S2-B 模型透明度 | S2-04a、04b0、04b、04c | 14 | 来源合同、attempt 持久化合同、实际调用证据与只读显示联通；生产卡按 Spike 结论拆分，不缩减历史保护验收 |
 
 仅接纳已冻结依赖的卡。模型透明度合同可与总控拆分并行设计；未冻结的持久化和客户端接线均为 Not Ready。点数代表相对复杂度，具体开发基线由根集成人开工时记录。
 
@@ -21,8 +21,8 @@
 | --- | --- | --- |
 | S2-01 | S2-01a / S2-01b | 查询与导演编排、阶段展示装配分别归属；同一 owner 串行完成 |
 | S2-02 | S2-02 | 对应 S1-X；已交付且未被后续修改失效时只复用验收证据，不重复实现 |
-| S2-03 | S2-03a / S2-03b | 先冻结纯展示模型，再绑定既有来源页动作 |
-| S2-04 | S2-04a / S2-04b / S2-04c | 来源合同、实际尝试证据、提交前与运行显示分别验收 |
+| S2-03 | S2-03a0 / S2-03a / S2-03b | 先冻结事实与动作权威，再实现纯展示模型并绑定既有来源页动作 |
+| S2-04 | S2-04a / S2-04b0 / S2-04b / S2-04c | 来源合同、attempt 存储合同、实际尝试证据、提交前与运行显示分别验收 |
 
 父 ID 是里程碑映射，不是额外实施卡，不重复计点；原概要估算只保留为历史，承诺以细分卡 refinement 后的容量为准。
 
@@ -121,10 +121,19 @@
 
 交付证据：[S2-02 完成证据](./s2-02-professional-chapter-assist-panels.md)记录状态保留、初始零 workspace 请求、首次显式展开一次请求、折叠重开与纯选区零重复请求，以及宽/窄屏 UI 结果。
 
+## S2-03a0：单书展示事实与动作权威 Spike
+
+- 用户价值：后续展示不会把局部任务成功误称整书完成，也不会从按钮文案或互相冲突的投影猜测下一步。
+- 状态：Ready（R1-S2C）；3 点；Owner：单书 Contract Agent。
+- 交付：冻结三层进度来源、导演任务身份、状态严重度、唯一可执行动作来源、stale/error/empty 降级和 03a/03b ownership；产出完整矩阵与决定证据。
+- 权威方向：持久章节、当前任务范围、整书目标分别解释；只有同小说同导演任务的 book projection primaryAction 可成为动作候选；dashboard/runtime/local actions 只作说明或命令绑定；禁止 label/keyword/regex 推断。
+- 非范围：不修改生产 UI、共享类型、API/query keys、Runtime 或命令；不宣称推荐动作已经交付。
+- 检查与完整合同：[R1-S2C Sprint 承诺](./r1-s2c-sprint-commitment.md#s2-03a0)；完成时另交付权威合同和源码交叉证据。
+
 ## S2-03a：单书成果、进度与推荐动作展示模型
 
 - 用户价值：作者能判断已经得到什么、AI 正在做什么和唯一推荐下一步，不将普通提醒误判为全书失败。
-- 状态：Refinement / 未承诺；S2-01a/01b 依赖已完成，须在后续 Sprint Planning 复核纯展示合同后才能进入 Ready。
+- 状态：Refinement / Not Ready；S2-01a/01b 已完成，继续等待 S2-03a0 冻结纯展示合同。
 - 点数：3；Owner：Agent A，单书 presentation 独占。
 - 真实源码：client/src/pages/novels/components/NovelEditView.tsx、NovelTaskDrawer.tsx、NovelAutoDirectorProgressPanel.tsx、novelEditAutomationStatus.ts、novelWorkspaceNavigation.ts；shared/types/directorRuntime.ts 为根集成人保留。
 - 拟建归属：novels/workspace/presentation/ 的纯展示模型；展示通过 client/src/components/workspace/ 现有 primitives。
@@ -215,10 +224,18 @@
 
 交付证据：来源矩阵、脱敏 schema、实际 resolver 样例、持久化选型与非导演覆盖清单、明确 Ready/Not Ready 入口。
 
+## S2-04b0：实际模型调用尝试证据 Spike
+
+- 用户价值：后续历史能说明每次真实模型尝试和最终采用者，不把 Token 聚合、短期 live 状态或当前配置误称实际来源。
+- 状态：Ready（R1-S2C）；3 点；Owner：模型平台 Contract Agent。
+- 交付：冻结 request/attempt lineage、通用 attempt store、SQLite/PostgreSQL 增量迁移草案、身份归因、live/API、失败降级、首批非导演入口和 `promptRunner` 拆分先决方案；用 mock transport + in-memory repository 给出 executable seam proof。
+- 非范围：不改生产 schema/路由/重试/备用/预算，不实现 04c UI，不真实调用模型，不写用户库，不把缺 usage 当免费或回填历史。
+- 检查与完整合同：[R1-S2C Sprint 承诺](./r1-s2c-sprint-commitment.md#s2-04b0)；完成后重新拆分并估算 04b 生产卡。
+
 ## S2-04b：实际调用尝试的来源证据
 
 - 用户价值：即使重试、修复或切备用模型，作者能看到真正完成该次工作的模型，而非提交前猜测。
-- 状态：Refinement / Not Ready；S2-04a 已完成，持久化/迁移/出口、失败降级和非导演入口覆盖仍需冻结后才能 Ready。
+- 状态：Refinement / Not Ready；S2-04a 已完成，等待 S2-04b0 冻结持久化/迁移/出口、失败降级、`promptRunner` 架构门和非导演入口覆盖后重新拆卡。
 - 点数：5；Owner：Agent C，平台调用/观测模块独占；根集成人拥有 schema、共享类型与挂载。
 - 真实源码：server/src/llm/factory.ts、usageTracking.ts、structuredInvoke.ts；server/src/platform/llm/live/llmLiveSession.ts、LlmLiveBroker.ts、http/llmLiveRoutes.ts；server/src/services/novel/director/runtime/DirectorUsageTelemetryQueryService.ts；server/src/services/task/taskTokenUsageSummary.ts。
 - 拟建归属：如果现有 metadataJson 不能覆盖非导演调用，新增 owned platform/llm 来源记录存储与查询能力，数据库增量模型及 SQLite/PostgreSQL 迁移由根集成人审查；这是待选型，不声称通用持久调用仓库已存在。

@@ -2,13 +2,14 @@
 
 ## 范围、状态与估点
 
-本页展开[路线图](./agent-collaboration-sprints.md)的 S3-01～S3-06，目标是可靠内容版本、可信评估来源、持续问题历史和作者留白。业务代码尚未实施。全部卡片在 S1-06 的版本、来源、运行承接和可空决定合同冻结前为 **Not Ready**；下文的依赖还必须分别通过。
+本页展开[路线图](./agent-collaboration-sprints.md)的 S3-00～S3-06，目标是可靠 Prompt 登记、内容版本、可信评估来源、持续问题历史和作者留白。除静态登记门外，业务代码尚未实施。各生产卡在 S1-06 的版本、来源、运行承接和可空决定合同冻结前为 **Not Ready**；下文的依赖还必须分别通过。
 
-原候选总量为 28 点。展开后对版本接线、双侧同步、历史兼容和上下文消费分别验收，重新估算为 **34 相对点**，不是单个验收窗口的承诺或工时。每张不超过 5 点；拆分不会把原 Story 的保护条件移出 Done。
+原候选总量为 28 点。展开后对 Prompt 静态登记门、版本接线、双侧同步、历史兼容和上下文消费分别验收，重新估算为 **36 相对点**，不是单个验收窗口的承诺或工时。每张不超过 5 点；拆分不会把原 Story 的保护条件移出 Done。
 
 | 原 ID | 任务卡 | 点数 | Owner | 解锁依赖 |
 | --- | --- | --- | --- | --- |
-| S3-01 | S3-01 Prompt 维护能力边界 | 3 | Prompt Agent | S1-06 |
+| S3-00 | S3-00 世界 Prompt 静态登记一致性门 | 2 | 根集成人 | S1-06；R1-S2C |
+| S3-01 | S3-01 Prompt 维护能力边界 | 3 | Prompt Agent | S1-06、S3-00 |
 | S3-02 | S3-02a 样本安全提交；S3-02b 既有写入口收敛 | 3 + 3 | Runtime Agent | S1-06；02b 依赖 02a |
 | S3-03 | S3-03a 本书内容版本；S3-03b 双侧同步保护 | 3 + 5 | Runtime Agent | S3-02a；03b 依赖 03a、02b |
 | S3-04 | S3-04 AI 结构化评估 | 5 | Prompt + Runtime 串行接线 | S3-01、02b；S2-04a/b来源合同与存储；S1-06 可空决定合同 |
@@ -25,11 +26,22 @@ S3-04 读取 S1-06 冻结的可空决定集合，不等待 S3-06 的写操作。
 
 根集成人独占 `shared/types/world.ts`、`shared/types/novelWorld.ts`、拟建共享维护合同、`server/src/prisma/schema.prisma`、迁移、Registry/catalog loader、HTTP挂载和 API facade。子 Agent 提出结构化接线请求；Prompt 输出 schema 与共享 API schema 的边界由根集成人冻结，避免重复事实源。
 
+## S3-00：世界 Prompt 静态登记一致性门
+
+作为作者，我希望世界生成使用唯一、可审计的 Prompt 版本，避免静态登记错误被运行时容错掩盖。
+
+- 点数2，P0；Ready（R1-S2C）；根集成人独占 Registry loader 与 Prompt 治理测试。
+- 当前事实：`novel.world.generate_from_theme` 资产因战力体系输入已升级为 v3，loader 和既有测试仍声明 v2；运行时重绑不能替代静态治理。
+- 子任务：loader/测试统一到 v3；增加全部 loader 声明 key 与实际加载资产 key 一致且唯一的静态检查；确认 Registry/模型选择行为不变。
+- 非范围：不修改 Prompt 文案/schema，不拆 `world.prompts.ts`，不迁 `worldDraft.prompts.ts`，不补 maintenance 能力，不调用真实模型。
+- AC：静态 key 不再漂移；重复 key 失败；现有 Prompt 资产和消费者继续加载同一实际版本；检查不靠运行时自修复通过。
+- 最窄验证：Prompt governance、世界模型选择、Registry loader 一致性和相关世界 Prompt 测试；零数据库写入。
+
 ## S3-01：Prompt 维护能力边界
 
 作为作者，我希望相同世界在检查与修改中遵守同一套约束，避免不同按钮生成互相矛盾的设定。
 
-- 点数3，P0；Not Ready → S1-06 冻结后 Ready。Prompt Agent 独占现有 `world.prompts.ts`、`world.promptTypes.ts`、`world.promptSchemas.ts` 与拟建 maintenance Prompt 子目录；Registry/catalog 交根集成人。
+- 点数3，P0；Not Ready，依赖 S1-06 与 S3-00。Prompt Agent 独占现有 `world.prompts.ts`、`world.promptTypes.ts`、`world.promptSchemas.ts` 与拟建 maintenance Prompt 子目录；Registry/catalog 交根集成人。为守住 3 点，`worldDraft.prompts.ts` 留在原位且不改。
 - 子任务：列出旧文件的参考、骨架、分层、评估、导入、可视化职责；抽出维护/评估能力并保留旧 export；同步类型、schema和资产加载；补模块边界说明。
 - 非范围：改变模型默认策略、生成世界正文、新增业务能力、放宽旧 schema。
 - AC1：旧世界生成、深化、评估消费者可继续从兼容门面导入，资产 ID/版本不无故改变。
