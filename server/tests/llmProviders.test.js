@@ -576,3 +576,33 @@ test("structured failure classification separates native-json, thinking and sche
   );
   assert.equal(classifyStructuredOutputFailure({ rawContent: "" }), "empty_content");
 });
+
+test("structured failure classification separates transient transport errors from true empty content", () => {
+  const transientCases = [
+    new Error("Our servers are currently overloaded. Please try again later."),
+    Object.assign(new Error("Too Many Requests"), { status: 429 }),
+    Object.assign(new Error("Service unavailable"), { response: { status: 503 } }),
+    Object.assign(new Error("socket closed"), { code: "ECONNRESET" }),
+    Object.assign(new Error("request failed"), { code: "UND_ERR_CONNECT_TIMEOUT" }),
+    new Error("Request timed out while contacting provider"),
+  ];
+
+  for (const error of transientCases) {
+    assert.equal(classifyStructuredOutputFailure({ error }), "transport_error", error.message);
+  }
+
+  assert.equal(classifyStructuredOutputFailure({ rawContent: "" }), "empty_content");
+  assert.equal(
+    classifyStructuredOutputFailure({
+      error: Object.assign(new Error("context_length_exceeded: prompt is too long"), {
+        status: 400,
+        code: "context_length_exceeded",
+      }),
+    }),
+    "request_too_large",
+  );
+  assert.equal(
+    classifyStructuredOutputFailure({ error: new Error("schema validation failed") }),
+    "schema_mismatch",
+  );
+});

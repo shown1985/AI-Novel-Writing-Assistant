@@ -652,6 +652,93 @@ test("invokeStructuredLlmDetailed retries transport failures using the configure
   }
 });
 
+test("invokeStructuredLlmDetailed does not retry transport failures when disabled or aborted", async () => {
+  const originalResolveOptions = factory.resolveLLMClientOptions;
+  const originalCreateLLM = factory.createLLMFromResolvedOptions;
+  const originalGetFallbackSettings = structuredFallbackSettings.getStructuredFallbackSettings;
+  const calls = [];
+  let abortController = null;
+
+  factory.resolveLLMClientOptions = async (provider, options = {}) => {
+    const resolvedProvider = provider ?? "openai";
+    const resolvedModel = options.model ?? "gpt-4o-mini";
+    const baseURL = options.baseURL ?? "https://api.openai.com/v1";
+    return {
+      provider: resolvedProvider,
+      providerName: resolvedProvider,
+      model: resolvedModel,
+      temperature: options.temperature ?? 0.3,
+      apiKey: "test-key",
+      baseURL,
+      maxTokens: options.maxTokens,
+      reasoningEnabled: true,
+      modelKwargs: undefined,
+      includeRawResponse: false,
+      executionMode: options.executionMode ?? "plain",
+      structuredProfile: options.executionMode === "structured"
+        ? resolveStructuredOutputProfile({
+          provider: resolvedProvider,
+          model: resolvedModel,
+          baseURL,
+          executionMode: "structured",
+        })
+        : null,
+      structuredStrategy: options.structuredStrategy ?? null,
+      reasoningForcedOff: false,
+      taskType: options.taskType,
+      promptMeta: options.promptMeta,
+    };
+  };
+  factory.createLLMFromResolvedOptions = () => ({
+    stream: async function* () {
+      calls.push("invoke");
+      abortController?.abort();
+      throw new Error("Our servers are currently overloaded. Please try again later.");
+    },
+  });
+
+  const invoke = (signal) => structuredInvoke.invokeStructuredLlmDetailed({
+    provider: "openai",
+    model: "gpt-4o-mini",
+    label: "structured.invoke.compat.transport-no-retry",
+    taskType: "planner",
+    schema: z.object({ value: z.string() }),
+    systemPrompt: "只返回 JSON。",
+    userPrompt: "给我一个 value。",
+    signal,
+  });
+
+  try {
+    structuredFallbackSettings.getStructuredFallbackSettings = async () => ({
+      enabled: false,
+      provider: "deepseek",
+      model: "deepseek-chat",
+      temperature: 0.2,
+      maxTokens: null,
+      retryCount: 0,
+    });
+    await assert.rejects(() => invoke(undefined), /STRUCTURED_OUTPUT:transport_error/);
+    assert.equal(calls.length, 1);
+
+    calls.length = 0;
+    abortController = new AbortController();
+    structuredFallbackSettings.getStructuredFallbackSettings = async () => ({
+      enabled: false,
+      provider: "deepseek",
+      model: "deepseek-chat",
+      temperature: 0.2,
+      maxTokens: null,
+      retryCount: 2,
+    });
+    await assert.rejects(() => invoke(abortController.signal), /aborted/i);
+    assert.equal(calls.length, 1);
+  } finally {
+    factory.resolveLLMClientOptions = originalResolveOptions;
+    factory.createLLMFromResolvedOptions = originalCreateLLM;
+    structuredFallbackSettings.getStructuredFallbackSettings = originalGetFallbackSettings;
+  }
+});
+
 test("invokeStructuredLlmDetailed preserves explicit Anthropic protocol through repair calls", async () => {
   const originalResolveOptions = factory.resolveLLMClientOptions;
   const originalCreateLLM = factory.createLLMFromResolvedOptions;

@@ -4,7 +4,7 @@
 
 - Release / Epic：Release 1 / 模型调用可靠性。
 - Sprint：R1-S2E。
-- 点数 / 优先级 / 状态：2 点 / P0 / Ready。
+- 点数 / 优先级 / 状态：2 点 / P0 / Done。
 - 用户价值：当模型服务商短暂过载或返回可重试的传输错误时，作者的结构化生成会按既有配置重试，而不会被误报成“模型没有返回正文”。
 - Owner：Prompt 平台 owner 独占 `server/src/llm/structuredOutput.ts` 与 `server/tests/structuredInvoke.test.js`；不与 S3-01 共用文件。
 
@@ -41,3 +41,11 @@
 - 定向分类测试覆盖状态码、错误码、消息、空正文和取消。
 - 无 UI，UI 验收不适用；纯可靠性修复有用户可见影响，提交前更新发布说明。
 - 若分类合同形成稳定维护知识，更新 Prompt/调试 Wiki；不得把本卡并入 S2-04b3。
+
+## 完成证据
+
+- 瞬态分类覆盖服务过载、HTTP 429/503、`ECONNRESET`、连接超时和请求超时；真实空正文仍为 `empty_content`，context limit 与 schema 分类保持原优先级。
+- 已配置 retry 的过载请求第一次失败、第二次成功；retryCount=0 和已取消信号均只有一次 transport 调用。
+- `pnpm --filter @ai-novel/server build` 通过。
+- 定向分类 2/2、transport/fallback/retry/取消 3/3 通过。
+- `llmProviders.test.js` 全文件另有 2 项与本 Story 无关的既有 provider profile 失败；本次未改 provider profile、factory 或对应断言，不将其伪报为本卡回归。

@@ -285,7 +285,7 @@
 ### R1-PROMPT01：结构化空响应 transport retry 基线缺陷
 
 - 用户价值：服务商过载等传输异常不会被误判为空正文并跳过已配置的同模型重试。
-- 状态：**Ready（R1-S2E 已承诺）**；2 点。[稳定分类、范围与验证合同](./r1-prompt01-structured-transport-retry.md)已冻结。
+- 状态：**Done（R1-S2E）**；2 点。[稳定分类与 retry/空响应/取消行为证据](./r1-prompt01-structured-transport-retry.md)已通过。
 - 已知事实：`structuredInvoke.test.js` 的 transport retry 用例在 S2-04b2 基线持续失败；`structuredInvoke.ts`、parser 与该测试均不在 S2-04b2 diff，不能并入纯边界拆分冒充修复。
 - 范围：只修瞬态 transport 状态/错误码/消息与真实空正文的分类边界，并验证 retry、空响应、取消和既有高优先级分类。
 - 非范围：不改变 retry 次数、fallback、结构化策略、repair/semantic 行为，不接 attempt store。
@@ -293,7 +293,7 @@
 ### S2-04b3：真实 transport attempt 接线
 
 - 用户价值：重试、结构策略切换、JSON 修复、语义重试和备用模型的每次真实调用都能分开记录，并明确最终采用者。
-- 状态：**Not Ready**；5 点，04b1 与 04b2 已 Done，但 `R1-PROMPT01` 证明既有 transport retry 基线仍失败。模型平台 Agent 串行拥有 recorder、structured invoke/repair 和拆分后的 text execution hooks；重试基线修复并通过后再回到 Ready。
+- 状态：**Ready**；5 点，04b1、04b2 与 `R1-PROMPT01` 已 Done。模型平台 Agent 串行拥有 recorder、structured invoke/repair 和拆分后的 text execution hooks；等待后续 Sprint Planning。
 - 范围：建立 request/attempt ID 生命周期，在每次物理 invoke/stream 前 start、终态 finalize；把 strategy/transport/fallback/repair/semantic lineage 与 04a 脱敏选择证据关联。
 - 非范围：不改重试次数/模型路由、不因观测失败重发生成、不做公开 API/UI、不扩独立世界库或 batch 身份。
 - AC：invoke/stream、null usage、失败→重试→备用成功、repair/semantic、取消与崩溃 started 行通过 production seam mock；repository 故障不改变模型调用次数、正文结果、任务状态或人工暂停。

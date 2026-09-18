@@ -172,6 +172,7 @@ Open-source AI novel writing assistant and long-form production studio.
 
 #### 修复
 
+- 修复模型服务短暂过载、限流、超时或连接中断时可能被误判为“没有返回正文”的问题；结构化生成会按模型路由中设置的次数有限重试，真正的空响应仍按兼容格式处理，取消操作不会触发额外调用。
 - 模型连通性检测不再自动改写任务路由的请求协议或结构化输出方式；检测建议与正式配置保持分离，避免查看状态时产生隐藏配置变更。
 
 完整历史更新见 [docs/releases/release-notes.md](./docs/releases/release-notes.md)。

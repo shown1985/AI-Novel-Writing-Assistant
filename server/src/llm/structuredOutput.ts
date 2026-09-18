@@ -476,6 +476,21 @@ export function classifyStructuredOutputFailure(input: {
   ) {
     return "transport_error";
   }
+  const numericStatus = typeof status === "number"
+    ? status
+    : typeof status === "string" && /^\d{3}$/.test(status)
+      ? Number(status)
+      : null;
+  const retryableTransportStatus = numericStatus === 408
+    || numericStatus === 429
+    || (numericStatus !== null && numericStatus >= 500 && numericStatus <= 599);
+  const retryableTransportCode = /(?:^|\s)(?:econnreset|econnrefused|etimedout|eai_again|und_err_connect_timeout|und_err_socket|rate_limit(?:ed)?|too_many_requests|server_overloaded|service_unavailable|gateway_timeout)(?:\s|$)/i
+    .test(providerCode.replace(/[-.]/g, "_"));
+  const retryableTransportMessage = /(?:servers? (?:are |is )?currently overloaded|server overloaded|temporar(?:ily|y) unavailable|service unavailable|too many requests|rate limit(?:ed| exceeded)?|gateway timeout|connection (?:reset|refused|timed out)|socket hang up|network error|fetch failed|request timed out|request timeout)/i
+    .test(metadataHaystack);
+  if (retryableTransportStatus || retryableTransportCode || retryableTransportMessage) {
+    return "transport_error";
+  }
   if (
     haystack.includes("未检测到完整 json 值")
     || haystack.includes("unexpected end of json input")

@@ -14,7 +14,7 @@
 
 | Story | 点数 | 状态 | Owner / 文件域 | 依赖 | 验收边界 |
 | --- | ---: | --- | --- | --- | --- |
-| R1-PROMPT01 结构化调用瞬态传输失败重试 | 2 | Ready | Prompt 平台 owner；`structuredOutput.ts` 与 `structuredInvoke.test.js` | 既有失败基线已复现 | [分类与重试合同](./r1-prompt01-structured-transport-retry.md)；不改 retry/fallback 策略 |
+| R1-PROMPT01 结构化调用瞬态传输失败重试 | 2 | Done | Prompt 平台 owner；`structuredOutput.ts` 与 `structuredInvoke.test.js` | 既有失败基线已复现 | [分类、retry/空响应/取消回归通过](./r1-prompt01-structured-transport-retry.md)；不改 retry/fallback 策略 |
 | S2-03b 来源现场推荐动作与反馈接线 | 3 | Ready | 单书交互 owner；单书 desktop/mobile 展示消费点与 `useWorkspaceDirectorCommands` | S2-03a、S2-01b Done | 同 taskId、pending 防重、失败/刷新/跨书、来源页动作；运行记录保持只读 |
 | S3-01 世界 Prompt 维护能力边界 | 3 | Ready | 世界 Prompt owner；`prompting/prompts/world/` | S1-06、S3-00 Done | 14 个既有资产按责任拆分、旧门面兼容、Registry 元数据等价；无业务语义变化 |
 
