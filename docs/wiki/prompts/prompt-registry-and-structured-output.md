@@ -74,6 +74,7 @@
 - 旧未纳管 prompt 路径被触碰时，默认先迁入 registry，再扩展能力。
 - 推进模式库的“扩展”属于正式产品 AI 能力：它必须由注册 PromptAsset 同时读取选定根模式、现有同级模式和整库摘要，再输出可直接落库的完整 profile 候选。不能在前端按名称相似度或固定类别补齐，更不能把“扩展”退化为只换名称的子类生成。候选保存仍必须通过既有两级树、重复名称与 profile 校验。
 - 小说封面 Prompt 的默认产品目标是“带准确书名的完整竖版封面”，不是无文字主画面。Prompt 必须同时提供唯一书名、简体中文准确渲染、清晰高对比度排版和禁止副标题/作者名/水印的约束；负面提示词只能拦截乱码、错误书名等文字质量问题，不能把“文字/书名”整体列为禁止项。
+- 世界 Prompt 的公共消费边界是 `prompts/world/world.prompts.ts` 兼容门面。实现按灵感、生成、结构、维护、导入和展示能力归属到明确子目录；业务 service 与 Registry 只通过门面导入，不能深导入子目录。共享输入和 schema 继续由 `world.promptTypes.ts`、`world.promptSchemas.ts` 负责，能力私有的 postValidate 留在所属模块，不建立无所有权 helper。纯目录迁移必须证明资产 id/version/schema、Prompt 文本、Runner、budget/telemetry 与 repair 策略等价。
 
 批准例外：
 

@@ -182,9 +182,11 @@ Review 与 Retrospective 见 [R1-S2C Sprint 承诺](./docs/plans/r1-s2c-sprint-c
 | --- | ---: | --- | --- | --- |
 | R1-PROMPT01 结构化调用瞬态传输失败重试 | 2 | Done | Prompt 平台 owner | [瞬态分类与 retry/空响应/取消回归通过](./docs/plans/r1-prompt01-structured-transport-retry.md)；不改策略 |
 | S2-03b 来源现场推荐动作与反馈接线 | 3 | Ready | 单书交互 owner | 同任务动作、pending 防重、失败/刷新/跨书与 Computer Use；运行记录只读 |
-| S3-01 世界 Prompt 维护能力边界 | 3 | Ready | 世界 Prompt owner | 14 个资产按责任拆分、旧导入兼容、Registry/Schema 等价；无业务变化 |
+| S3-01 世界 Prompt 维护能力边界 | 3 | Done | 世界 Prompt owner | 14 个资产逐字等价迁移；33 行兼容门面、Registry loader 与消费合同通过 |
 
 承诺容量：8 点。Stretch：无。权威合同见 [R1-S2E Sprint 承诺](./docs/plans/r1-s2e-sprint-commitment.md)。
+
+当前完成 `5/8` 点；S2-03b 仍为 Ready，Sprint Goal 尚未达成。
 
 未承诺：S2-04b3 的 transport retry 基线阻断已解除并回到 Ready，但只能进入下一次 Planning。04b4/04c、S3-02a/b 及 Release 2 均不顺手扩入。
 
@@ -192,7 +194,7 @@ Review 与 Retrospective 见 [R1-S2C Sprint 承诺](./docs/plans/r1-s2c-sprint-c
 
 1. R1-S1：配置、诊断、阅读恢复和世界归属安全（已完成，15/15 点）。
 2. R1-S2：R1-S2A 可信单书现场已结束（14/14 点）；R1-S2B 主动诊断与可信装配已结束（9/9 点）；R1-S2C 事实权威与世界 Prompt 解锁已结束（8/8 点）；R1-S2D 展示与调用证据底座已结束（9/9 点）。
-3. R1-S3～4：可信世界、提案采用和失败复核；S3-01 已由 S3-00 解锁为 Ready，等待后续 Sprint Planning。
+3. R1-S3～4：可信世界、提案采用和失败复核；S3-01 已在 R1-S2E 完成，后续 Runtime Story 仍按依赖顺序进入 Planning。
 4. R1-S5～6：本机Agent委托、预算、记忆和资产。
 5. R1-S7：十章长链、有限撤回和导航收束。
 6. R1-RC：桌面升级、备份恢复、包装与用户验收。

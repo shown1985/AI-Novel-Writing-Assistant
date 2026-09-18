@@ -16,9 +16,9 @@
 | --- | ---: | --- | --- | --- | --- |
 | R1-PROMPT01 结构化调用瞬态传输失败重试 | 2 | Done | Prompt 平台 owner；`structuredOutput.ts` 与 `structuredInvoke.test.js` | 既有失败基线已复现 | [分类、retry/空响应/取消回归通过](./r1-prompt01-structured-transport-retry.md)；不改 retry/fallback 策略 |
 | S2-03b 来源现场推荐动作与反馈接线 | 3 | Ready | 单书交互 owner；单书 desktop/mobile 展示消费点与 `useWorkspaceDirectorCommands` | S2-03a、S2-01b Done | 同 taskId、pending 防重、失败/刷新/跨书、来源页动作；运行记录保持只读 |
-| S3-01 世界 Prompt 维护能力边界 | 3 | Ready | 世界 Prompt owner；`prompting/prompts/world/` | S1-06、S3-00 Done | 14 个既有资产按责任拆分、旧门面兼容、Registry 元数据等价；无业务语义变化 |
+| S3-01 世界 Prompt 维护能力边界 | 3 | Done | 世界 Prompt owner；`prompting/prompts/world/` | S1-06、S3-00 Done | 14 个资产逐字等价迁移；兼容门面、Registry loader、模型选择与 schema 合同通过 |
 
-三张卡均有稳定 ID、Release、用户价值、范围/非范围、依赖、AC、owner 与最窄验证。`S2-04b3` 因 `R1-PROMPT01` 基线失败暂回 Not Ready；本 Sprint 修复完成后也只进入下一次 Planning，不顺手接线。
+三张卡均有稳定 ID、Release、用户价值、范围/非范围、依赖、AC、owner 与最窄验证。`S2-04b3` 的 `R1-PROMPT01` 基线阻断已解除并回到 Ready，但本 Sprint 仍不顺手接线，只能进入下一次 Planning。
 
 ## 波次与 ownership
 
@@ -33,13 +33,14 @@ Wave 2
 ```
 
 - `server/src/prompting/registry/`、共享类型/API、根计划、README/Release Notes 由根集成人单 owner。
+- 当前完成 `5/8` 点：R1-PROMPT01 与 S3-01 Done；S2-03b 保持 Ready，未完成前不宣告 Sprint Goal 达成。
 - S3-01 不修改 `worldDraft.prompts.ts`，不新增业务 Prompt，不改变资产 id/version/schema。
 - S2-03b 只消费 S2-03a 已验证的唯一动作，禁止在展示层另建动作分支表；现有来源页命令是唯一执行路径。
 - 子 Agent 额度不可用时由根集成人串行推进，不降低 AC，也不把失败委托计为进展。
 
 ## 未承诺与退出门
 
-- S2-04b3：等待 R1-PROMPT01 Done 后重新确认 transport retry 基线，再进入后续 Sprint Planning。
+- S2-04b3：transport retry 基线已重新确认并回到 Ready；保持未承诺，等待后续 Sprint Planning。
 - S2-04b4 / 04c：继续等待 04b3 与读投影，不提前做 UI mock。
 - S3-02a/b 及后续世界 Runtime：不因 S3-01 提前完成而换入。
 - R1-S2E 退出需记录 Goal、`8/8` 或实际完成点数、S2-03b Computer Use 状态、Prompt 资产映射与兼容证据、retry 分类矩阵、carryover、逸出缺陷、Wiki/发布判断和最多两项流程改进。

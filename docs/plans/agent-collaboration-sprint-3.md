@@ -41,7 +41,7 @@ S3-04 读取 S1-06 冻结的可空决定集合，不等待 S3-06 的写操作。
 
 作为作者，我希望相同世界在检查与修改中遵守同一套约束，避免不同按钮生成互相矛盾的设定。
 
-- 点数3，P0；**Ready（R1-S2E 已承诺）**，S1-06 与 S3-00 均已完成。Prompt Agent 独占现有 `world.prompts.ts`、`world.promptTypes.ts`、`world.promptSchemas.ts` 与拟建能力责任子目录；Registry/catalog 交根集成人。为守住 3 点，只迁现有 `world.prompts.ts` 的 14 个资产，`worldDraft.prompts.ts` 留在原位且不改。
+- 点数3，P0；**Done（R1-S2E）**，S1-06 与 S3-00 均已完成。Prompt Agent 独占现有 `world.prompts.ts`、`world.promptTypes.ts`、`world.promptSchemas.ts` 与拟建能力责任子目录；Registry/catalog 交根集成人。为守住 3 点，只迁现有 `world.prompts.ts` 的 14 个资产，`worldDraft.prompts.ts` 留在原位且不改。
 - 子任务：列出旧文件的参考、骨架、分层、评估、导入、可视化职责；抽出维护/评估能力并保留旧 export；同步类型、schema和资产加载；补模块边界说明。
 - 非范围：改变模型默认策略、生成世界正文、新增业务能力、放宽旧 schema。
 - AC1：旧世界生成、深化、评估消费者可继续从兼容门面导入，资产 ID/版本不无故改变。
@@ -49,7 +49,7 @@ S3-04 读取 S1-06 冻结的可空决定集合，不等待 S3-06 的写操作。
 - AC3：产品 Prompt 具有 Registry、management/catalog、输出 schema 与上下文合同，service 不新增裸 LLM/inline Prompt。
 - AC4：拆分后调用仍使用原 Runner、budget/telemetry和repair策略，任何未纳管路径显式记录而非隐藏。
 - 检查：针对资产加载/目录与现有世界 Prompt 的兼容行为检查；server typecheck；复用 `server/tests/worldSkeletonGeneration.test.js` 的相关路径，必要时集中构建后运行。
-- Done证据：职责清单、依赖方向、原资产到新文件映射、加载检查结果；无业务变化时不强加用户发布条目。失败时保留兼容门面，不修改用户世界数据。
+- Done证据：`world.prompts.ts` 从 1,316 行收敛为 33 行兼容门面；14 个资产声明块与拆分前逐字一致，并按 `inspiration`（4）、`presentation`（1）、`maintenance`（3）、`structure`（4）、`transfer`（1）、`generation`（1）归属。六个实现文件均低于 500 行，无 service 深导入、无 `worldDraft.prompts.ts`/Registry/schema/Runtime 改动。server build、门面 14/14 元数据、Registry loader 一致性、模型选择与战力合同均通过；完整 Prompt governance 仍只报已登记的 `ComicFactService` 两处既有 inline Prompt 债，不扩入本 Story。模块边界记录在 `server/src/prompting/prompts/world/README.md` 与 Prompt Wiki；无用户行为变化，发布条目明确跳过。
 
 ## S3-02a：世界样本安全提交边界
 
