@@ -1,9 +1,9 @@
 # 当前项目看板：Release 1 单机成书版
 
 更新时间：2026-09-18
-当前分支：`codex/r1-s2d-evidence-foundations`
+当前分支：`codex/r1-s2e-actions-world-prompts-retry`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S2D 已完成（9/9 点）；下一 Sprint 尚未 Planning
+当前状态：R1-S2E 已启动；8 点承诺、无 Stretch
 
 ## 权威文档
 
@@ -169,6 +169,24 @@ Review 与 Retrospective 见 [R1-S2C Sprint 承诺](./docs/plans/r1-s2c-sprint-c
 完成 `9/9` 点，无 Story carryover。Sprint Goal 达成：单书页面能区分已保存正文、本轮任务与全书目标，并只显示一个可信建议；通用 attempt store 与 Prompt execution owned 边界已建立。S2-03a 的桌面/400×800 移动视口、局部完成、失败保留、跨作品隔离和零导演命令均通过 Computer Use 验收。Review 与 Retrospective 见 [R1-S2D Sprint 承诺](./docs/plans/r1-s2d-sprint-commitment.md)。
 
 下一 Planning 的 Ready 候选为 S2-03b、S2-04b3 与 S3-01；尚未承诺、尚未开始。`R1-PROMPT01` 继续留在 Refinement。
+
+## 当前 Sprint：R1-S2E
+
+### Sprint Goal
+
+让作者在单书来源现场安全执行唯一推荐动作，同时清理世界 Prompt 的能力边界，并恢复结构化模型调用对瞬态传输失败的既有重试保障。
+
+### 承诺 Backlog
+
+| Story | 点数 | 状态 | Owner | 验收边界 |
+| --- | ---: | --- | --- | --- |
+| R1-PROMPT01 结构化调用瞬态传输失败重试 | 2 | Ready | Prompt 平台 owner | [瞬态错误分类、重试/空响应/取消矩阵](./docs/plans/r1-prompt01-structured-transport-retry.md)；不改策略 |
+| S2-03b 来源现场推荐动作与反馈接线 | 3 | Ready | 单书交互 owner | 同任务动作、pending 防重、失败/刷新/跨书与 Computer Use；运行记录只读 |
+| S3-01 世界 Prompt 维护能力边界 | 3 | Ready | 世界 Prompt owner | 14 个资产按责任拆分、旧导入兼容、Registry/Schema 等价；无业务变化 |
+
+承诺容量：8 点。Stretch：无。权威合同见 [R1-S2E Sprint 承诺](./docs/plans/r1-s2e-sprint-commitment.md)。
+
+未承诺：S2-04b3 因 transport retry 基线失败回到 Not Ready；R1-PROMPT01 完成后只能进入下一次 Planning。04b4/04c、S3-02a/b 及 Release 2 均不顺手扩入。
 
 ## Release 1 后续队列
 

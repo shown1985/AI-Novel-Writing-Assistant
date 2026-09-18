@@ -41,7 +41,7 @@ S3-04 读取 S1-06 冻结的可空决定集合，不等待 S3-06 的写操作。
 
 作为作者，我希望相同世界在检查与修改中遵守同一套约束，避免不同按钮生成互相矛盾的设定。
 
-- 点数3，P0；**Ready**，S1-06 与 S3-00 均已完成。Prompt Agent 独占现有 `world.prompts.ts`、`world.promptTypes.ts`、`world.promptSchemas.ts` 与拟建能力责任子目录；Registry/catalog 交根集成人。为守住 3 点，只迁现有 `world.prompts.ts` 的 14 个资产，`worldDraft.prompts.ts` 留在原位且不改。
+- 点数3，P0；**Ready（R1-S2E 已承诺）**，S1-06 与 S3-00 均已完成。Prompt Agent 独占现有 `world.prompts.ts`、`world.promptTypes.ts`、`world.promptSchemas.ts` 与拟建能力责任子目录；Registry/catalog 交根集成人。为守住 3 点，只迁现有 `world.prompts.ts` 的 14 个资产，`worldDraft.prompts.ts` 留在原位且不改。
 - 子任务：列出旧文件的参考、骨架、分层、评估、导入、可视化职责；抽出维护/评估能力并保留旧 export；同步类型、schema和资产加载；补模块边界说明。
 - 非范围：改变模型默认策略、生成世界正文、新增业务能力、放宽旧 schema。
 - AC1：旧世界生成、深化、评估消费者可继续从兼容门面导入，资产 ID/版本不无故改变。
