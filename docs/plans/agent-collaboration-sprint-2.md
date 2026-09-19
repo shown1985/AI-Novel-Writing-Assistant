@@ -293,7 +293,7 @@
 ### S2-04b3：真实 transport attempt 接线
 
 - 用户价值：重试、结构策略切换、JSON 修复、语义重试和备用模型的每次真实调用都能分开记录，并明确最终采用者。
-- 状态：**Ready**；5 点，04b1、04b2 与 `R1-PROMPT01` 已 Done。模型平台 Agent 串行拥有 recorder、structured invoke/repair 和拆分后的 text execution hooks；等待后续 Sprint Planning。
+- 状态：**In Progress（R1-S2F）**；5 点，04b1、04b2 与 `R1-PROMPT01` 已 Done。模型平台 Agent 串行拥有 recorder、structured invoke/repair 和拆分后的 text execution hooks；冻结合同见 [S2-04b3 真实 transport attempt 接线](./s2-04b3-production-attempt-wiring-contract.md)。
 - 范围：建立 request/attempt ID 生命周期，在每次物理 invoke/stream 前 start、终态 finalize；把 strategy/transport/fallback/repair/semantic lineage 与 04a 脱敏选择证据关联。
 - 非范围：不改重试次数/模型路由、不因观测失败重发生成、不做公开 API/UI、不扩独立世界库或 batch 身份。
 - AC：invoke/stream、null usage、失败→重试→备用成功、repair/semantic、取消与崩溃 started 行通过 production seam mock；repository 故障不改变模型调用次数、正文结果、任务状态或人工暂停。

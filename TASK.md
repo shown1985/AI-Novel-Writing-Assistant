@@ -1,9 +1,9 @@
 # 当前项目看板：Release 1 单机成书版
 
-更新时间：2026-09-18
-当前分支：`codex/r1-s2e-actions-world-prompts-retry`
+更新时间：2026-09-19
+当前分支：`codex/r1-s2f-attempts-world-cas`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S2E 已启动；8 点承诺、无 Stretch
+当前状态：R1-S2F 已启动；8 点承诺、无 Stretch
 
 ## 权威文档
 
@@ -170,7 +170,7 @@ Review 与 Retrospective 见 [R1-S2C Sprint 承诺](./docs/plans/r1-s2c-sprint-c
 
 下一 Planning 的 Ready 候选为 S2-03b、S2-04b3 与 S3-01；尚未承诺、尚未开始。`R1-PROMPT01` 继续留在 Refinement。
 
-## 当前 Sprint：R1-S2E
+## 已完成 Sprint：R1-S2E
 
 ### Sprint Goal
 
@@ -190,11 +190,28 @@ Review 与 Retrospective 见 [R1-S2C Sprint 承诺](./docs/plans/r1-s2c-sprint-c
 
 未承诺：S2-04b3 的 transport retry 基线阻断已解除并回到 Ready，但只能进入下一次 Planning。04b4/04c、S3-02a/b 及 Release 2 均不顺手扩入。
 
+## 当前 Sprint：R1-S2F
+
+### Sprint Goal
+
+让真实模型调用的每次物理尝试可追溯，同时为世界内容写入建立原子、可重放的版本保护边界。
+
+### 承诺 Backlog
+
+| Story | 点数 | 状态 | Owner | 验收边界 |
+| --- | ---: | --- | --- | --- |
+| S2-04b3 真实 transport attempt 接线 | 5 | In Progress | 模型平台 Agent | [物理调用、lineage、采用结果和 best-effort 证据状态](./docs/plans/s2-04b3-production-attempt-wiring-contract.md)；不做读 API/UI |
+| S3-02a 世界样本安全提交边界 | 3 | In Progress | 世界 Runtime Agent + 根集成人共享数据合同 | [World CAS、幂等回执、原子证据和结果查询](./docs/plans/s3-02a-world-sample-safe-commit-contract.md)；不收敛全部旧写入口 |
+
+承诺容量：8 点。Stretch：无。权威合同见 [R1-S2F Sprint 承诺](./docs/plans/r1-s2f-sprint-commitment.md)。
+
+未承诺：S2-04b4/04c、S3-02b 及后续卡保持依赖状态；即使前置卡提前完成也不在本 Sprint 顺手换入。
+
 ## Release 1 后续队列
 
 1. R1-S1：配置、诊断、阅读恢复和世界归属安全（已完成，15/15 点）。
-2. R1-S2：R1-S2A 可信单书现场已结束（14/14 点）；R1-S2B 主动诊断与可信装配已结束（9/9 点）；R1-S2C 事实权威与世界 Prompt 解锁已结束（8/8 点）；R1-S2D 展示与调用证据底座已结束（9/9 点）。
-3. R1-S3～4：可信世界、提案采用和失败复核；S3-01 已在 R1-S2E 完成，后续 Runtime Story 仍按依赖顺序进入 Planning。
+2. R1-S2：R1-S2A～S2E 已完成；R1-S2F 正在接入真实模型 attempt，04b4/04c 继续等待。
+3. R1-S3～4：可信世界、提案采用和失败复核；S3-01 已完成，S3-02a 在 R1-S2F 建立首个安全提交边界。
 4. R1-S5～6：本机Agent委托、预算、记忆和资产。
 5. R1-S7：十章长链、有限撤回和导航收束。
 6. R1-RC：桌面升级、备份恢复、包装与用户验收。
