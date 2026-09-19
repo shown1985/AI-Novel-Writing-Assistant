@@ -2,7 +2,7 @@
 
 ## 目标、范围与容量
 
-本页细分[路线图](./agent-collaboration-sprints.md)中的 S2-01～04，并作为滚动状态合同维护。S2-01a 与 S2-02 已在 R1-S2A 完成；S2-01b 与 S2-04a 已在 [R1-S2B](./r1-s2b-sprint-commitment.md) 完成；当前审计发现 S2-03a 和 S2-04b 的事实权威仍会改变方案，因此在 [R1-S2C](./r1-s2c-sprint-commitment.md) 新增各自 3 点合同 Spike，不把未冻结生产卡直接承诺。目标是让作者在原作品现场读到成果、按需展开协作、处理一个明确下一步，并区分预计使用模型和本次实际调用。
+本页细分[路线图](./agent-collaboration-sprints.md)中的 S2-01～04，并作为滚动状态合同维护。S2-01a 与 S2-02 已在 R1-S2A 完成；S2-01b 与 S2-04a 已在 [R1-S2B](./r1-s2b-sprint-commitment.md) 完成；当前审计发现 S2-03a 和 S2-04b 的事实权威仍会改变方案，因此在 [R1-S2C](./r1-s2c-sprint-commitment.md) 新增各自 3 点合同 Spike，不把未冻结生产卡直接承诺。S2-04b1～04b3 已在 R1-S2D～S2F 完成；R1-S2G 当前只承诺 04b4 的首批内部身份读投影，不提前接 04c UI。目标是让作者在原作品现场读到成果、按需展开协作、处理一个明确下一步，并区分预计使用模型和本次实际调用。
 
 当前源码已提供章节修改预览、候选、差异、正文保存和审校；本 Sprint 复用这些能力。全局 Creative Hub 和运行记录保持只读，运行中的任务恢复仍走现有来源页命令。简易体验的用户写门禁和不可逆转专业语义继续生效。
 
@@ -299,14 +299,15 @@
 - AC：invoke/stream、null usage、失败→重试→备用成功、repair/semantic、取消与崩溃 started 行通过 production seam mock；repository 故障不改变模型调用次数、正文结果、任务状态或人工暂停。
 - 验证：mock transport + 持久 repository 的行为测试，并发 request 不串线；普通读取零模型调用且持久行无凭证、地址、Prompt 或输出正文。
 
-### S2-04b4：首批身份归因与读投影
+### S2-04b4：首批身份归因与内部读投影
 
-- 用户价值：自动导演、本书世界生成和章节改稿预览的调用证据归属正确作品与任务，缺失时明确显示未记录。
-- 状态：**Ready（未承诺）**；3 点，依赖 04b3 Done。模型平台 Agent 拥有 attempt context/read service；根集成人独占共享 DTO、HTTP/API 和挂载。进入下一次 Planning 前不启动。
-- 范围：接自动导演 runtime frame、本书世界 `novel-world-generate`、章节 `ai-revision-preview`；后者先显式补齐 novelId/chapterId/entrypoint。读取返回 request 聚合、唯一 adopted 与 `complete|partial|missing`。
-- 非范围：独立世界库、batch、多小说请求归因、公开 UI；不得从 label、当前 URL、当前设置或 live interaction 猜身份。
-- AC：三入口身份与两个小说并发隔离；runtime frame 冲突不做字段拼接；not-found 与 observation missing 分开；修改默认模型不改变旧记录。
-- 验证：身份矩阵、API/read service 聚合、重启读取和零模型调用检查；未覆盖入口保持 unattributed，不宣称全系统透明。
+- 用户价值：自动导演、本书世界生成和章节改稿预览的调用证据归属正确作品与任务，缺失时能区分“没有匹配记录”和“有记录但归因缺失”。
+- 状态：**In Progress（R1-S2G，规划冻结后派发）**；5 点（由原 3 点重新估算）。依赖 04b3 Done。单一模型平台全栈 owner 覆盖必要跨模块 wiring、内部 read service 与测试；不拆第二 owner。
+- 范围：仅接自动导演完整 runtime frame、本书世界 `novel-world-generate`、章节 `ai-revision-preview` 三个显式 attribution context；后者补齐 novelId/chapterId/entrypoint；读取返回 request 聚合、lineage、唯一 adopted 与独立的 `attributionStatus=complete|partial|unattributed`。`evidenceStatus=complete|partial|missing` 只透传真实 execution evidence，不由读 service 重定义。
+- 冻结优先级：director 使用完整 frame 整体事实，冲突时不与 telemetry/URL/设置/live 字段拼接；world/chapter 只消费显式 context；未覆盖入口保留 `unattributed/legacy_unknown`。
+- 非范围：公开 HTTP/API、client UI、shared/public DTO、Prisma schema/migration、S2-04c、独立世界库、batch、多小说推断和旧记录回填；不得从 label、当前 URL、当前设置或 live interaction 猜身份。
+- AC：三入口身份与两个小说并发隔离；runtime frame 冲突不拼字段；`reconstructRequest=null` 只产生 `not_found`；persisted legacy/unattributed 产生 `attributionStatus=unattributed`；只有调用方带真实 execution evidence 时才可出现 `evidenceStatus=missing`；修改默认模型不改变旧记录；读取不触发模型调用。
+- 验证：内部身份矩阵、read service 聚合、重启/默认变化、并发/stream scope、脱敏和零模型读取检查；不以公共 API/UI 覆盖率宣称全系统透明。完整 DoR/AC/验证见 [S2-04b4 合同](./s2-04b4-attribution-read-projection-contract.md)。
 
 ## S2-04c：预计模型与实际来源的只读显示
 
@@ -347,10 +348,11 @@
 | 1 | 01a→01b串行 | 02或复用证据 | 04a resolver | 共享类型/API、边界审查；不让其他人同时改NovelEdit |
 | 2 | 03a→03b串行 | 04c纯展示准备 | 04b实际来源记录 | 增量schema/迁移、live出口；逐项分配全局组件和drawer接线 |
 | 3 | 来源动作集成 | 04c接线 | 平台定向回归 | review完整diff、统一build/检查、Wiki与适用发布记录、阶段提交 |
+| R1-S2G | 不再改单书现场 | 不接 04c UI | 单一模型平台全栈 owner 接 04b4 三入口 context、director 完整 frame 与内部 read service | 只做合同审阅、窄验证与集成；不新增 API/UI/schema/migration |
 
-最多三个子Agent加根集成人。一个checkout内不自行切分支、commit、merge。NovelTaskDrawer.tsx 在03阶段归Agent A；04c涉及模型详情时先冻结接口，再由根集成人整合，禁止A/B同时写。04a/04b同一平台owner串行，factory/usage/live不拆给多人并写。S1-X与02同一章节owner，避免重复交付。
+最多三个子Agent加根集成人。一个checkout内不自行切分支、commit、merge。NovelTaskDrawer.tsx 在03阶段归Agent A；04c涉及模型详情时先冻结接口，再由根集成人整合，禁止A/B同时写。04a/04b同一平台owner串行，factory/usage/live不拆给多人并写。R1-S2G 的 04b4 改为单一模型平台全栈 owner，必要入口 wiring 不再拆给其他 Agent；S1-X与02同一章节owner，避免重复交付。
 
-共享类型、Prisma schema、registry、API facade、queryKeys、路由挂载、README、release/wiki由根集成人单一管理。拟建类型/存储不代表现有接口；依赖不明确时生产接线标Not Ready，可只做Spike或mock联调。
+共享类型、Prisma schema、registry、API facade、queryKeys、路由挂载、README、release/wiki由根集成人单一管理。R1-S2G 04b4 不新增 public/shared DTO、HTTP/API、schema 或 migration；内部平台类型只在 owner 模块内闭合。拟建类型/存储不代表现有接口；依赖不明确时生产接线标Not Ready，可只做Spike或mock联调。
 
 ## 验证、验收与阶段完成
 
