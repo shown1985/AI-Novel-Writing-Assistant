@@ -46,6 +46,8 @@
 ### 实际调用尝试证据边界
 
 - “预计使用模型”来自 resolver；“实际调用模型”只能来自真实 provider transport 尝试。Token 用量表、十分钟 live interaction 和当前模型配置都不能回填历史 attempt。
+- 生产 text invoke/stream 与 structured invoke/stream 共享同一 request/attempt 运行时边界：每次物理 transport 调用先建立 attempt，再以 `succeeded / failed / cancelled` 结束；结构化校验、修复或语义协调完成后另记录 `adopted / not_adopted`。这样可以区分“服务商完成了响应”和“该候选被业务采用”，避免重试或修复覆盖真实来源。
+- attempt recorder 是旁路观测能力。start/finalize/repository 失败时，调用结果、调用次数、重试/备用策略、正文和任务状态保持不变，并通过 `complete / partial / missing` 标识证据完整度；原因是证据缺失不应触发一次新的创作调用或改变作者已得到的结果。
 - 一个逻辑 request 可以包含多个有序 attempt。每次 invoke/stream、transport retry、structured strategy retry、JSON repair、semantic retry 和 fallback 都有独立 `attemptId`、`attemptIndex`、role、route tier 与 parent；transport 状态和最终是否被采用必须分开记录。
 - usage 可以为 null，仍必须保留 attempt。旧历史缺证据时只能是 `legacy_unknown` 或未记录，不能把 null 当成零用量，也不能按当前默认模型补造来源。
 - 通用 attempt store 与导演 Token 表职责分离。前者是跨产品入口的调用事实，采用 append/finalize 模型；后者仍服务导演用量投影，不能因为已有 task/run 外键就泛化成全局事实源。

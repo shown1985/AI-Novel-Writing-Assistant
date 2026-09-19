@@ -3,7 +3,7 @@
 更新时间：2026-09-19
 当前分支：`codex/r1-s2f-attempts-world-cas`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S2F 已启动；8 点承诺、无 Stretch
+当前状态：R1-S2F 已完成；8/8 点、无 Stretch
 
 ## 权威文档
 
@@ -200,18 +200,20 @@ Review 与 Retrospective 见 [R1-S2C Sprint 承诺](./docs/plans/r1-s2c-sprint-c
 
 | Story | 点数 | 状态 | Owner | 验收边界 |
 | --- | ---: | --- | --- | --- |
-| S2-04b3 真实 transport attempt 接线 | 5 | In Progress | 模型平台 Agent | [物理调用、lineage、采用结果和 best-effort 证据状态](./docs/plans/s2-04b3-production-attempt-wiring-contract.md)；不做读 API/UI |
-| S3-02a 世界样本安全提交边界 | 3 | In Progress | 世界 Runtime Agent + 根集成人共享数据合同 | [World CAS、幂等回执、原子证据和结果查询](./docs/plans/s3-02a-world-sample-safe-commit-contract.md)；不收敛全部旧写入口 |
+| S2-04b3 真实 transport attempt 接线 | 5 | Done | 模型平台 Agent | [生产 wiring 7/7；production wiring、repository、store、prototype 四套组合检查 25/25，最终 P1 已关闭](./docs/plans/s2-04b3-production-attempt-wiring-contract.md)；不做读 API/UI |
+| S3-02a 世界样本安全提交边界 | 3 | Done | 世界 Runtime Agent + 根集成人共享数据合同 | [单文件 11/11；与 runtimeMigrations、prismaMigrationCompleteness 组成三套组合检查共 22/22，AC1-5、双 schema validate 与 SQLite 迁移通过](./docs/plans/s3-02a-world-sample-safe-commit-contract.md)；PostgreSQL apply 属 Release gate；不收敛全部旧写入口 |
 
 承诺容量：8 点。Stretch：无。权威合同见 [R1-S2F Sprint 承诺](./docs/plans/r1-s2f-sprint-commitment.md)。
 
-未承诺：S2-04b4/04c、S3-02b 及后续卡保持依赖状态；即使前置卡提前完成也不在本 Sprint 顺手换入。
+未承诺：S2-04b4/04c、S3-02b 进入下一次 Planning 队列；不在本 Sprint 或当前收尾中启动后续 Story。
+
+R1-S2F Review 与 Retrospective：见 [R1-S2F Sprint 承诺](./docs/plans/r1-s2f-sprint-commitment.md#sprint-review)。两项均为内部运行时/数据底座能力，当前没有新增用户入口，因此不更新 README 或 release notes。
 
 ## Release 1 后续队列
 
 1. R1-S1：配置、诊断、阅读恢复和世界归属安全（已完成，15/15 点）。
-2. R1-S2：R1-S2A～S2E 已完成；R1-S2F 正在接入真实模型 attempt，04b4/04c 继续等待。
-3. R1-S3～4：可信世界、提案采用和失败复核；S3-01 已完成，S3-02a 在 R1-S2F 建立首个安全提交边界。
+2. R1-S2：R1-S2A～S2F 已完成（S2F `8/8`）；下一次 Planning 只接续 S2-04b4/04c 的身份读投影与只读显示。
+3. R1-S3～4：可信世界、提案采用和失败复核；S3-01、S3-02a 已完成，下一次 Planning 接续 S3-02b 的既有写入口收敛。
 4. R1-S5～6：本机Agent委托、预算、记忆和资产。
 5. R1-S7：十章长链、有限撤回和导航收束。
 6. R1-RC：桌面升级、备份恢复、包装与用户验收。

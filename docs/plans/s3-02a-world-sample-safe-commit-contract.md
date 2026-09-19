@@ -3,7 +3,7 @@
 ## Story 合同
 
 - Release / Sprint：Release 1 / R1-S2F。
-- 状态 / 点数：In Progress / 3 点。
+- 状态 / 点数：Done / 3 点。
 - 用户价值：AI 或其他页面提交世界样本时，不能覆盖作者刚保存的内容；响应丢失后也能判断同一操作是否已经完成。
 - 依赖：S1-06、S3-01 已 Done；本合同冻结 S1-06 要求的样本 content revision、提交身份、旧客户端和事务边界。
 - Owner：世界 Runtime Agent拥有 `server/src/services/world/maintenance/{domain,application,infrastructure}` 与聚焦测试；根集成人独占双 Prisma schema、增量迁移和共享合同。
@@ -50,6 +50,11 @@
 
 ## 最窄验证
 
-- `server/tests/worldMaintenanceCommit.test.js` 使用 mock persistence 或临时隔离 SQLite，覆盖双提交竞争、重放、operation id 复用、事务回滚、响应丢失查询与后续人工 revision 保护。
-- 双 schema validate/generate 与两种增量迁移检查；不得操作用户桌面数据库。
+- `server/tests/worldMaintenanceCommit.test.js` 单文件 11/11 通过；与 `runtimeMigrations`、`prismaMigrationCompleteness` 组成三套组合检查共 22/22，覆盖双提交竞争、重放、operation id 复用、事务回滚、响应丢失查询与后续人工 revision 保护。
+- PostgreSQL 与 SQLite 两套 schema validate/generate 通过；SQLite 增量迁移已由既有 runtime migration runner 验证。真实 PostgreSQL apply 保留为 Release gate，不作为本 Story 当前阻断，也不以 SQLite 结果冒充该发布门。
 - 本卡无 UI，Computer Use 不适用。
+
+## 完成证据
+
+- AC1～AC5 均有行为证据：CAS 竞争只允许一个提交、同 operation 重放与 hash 冲突、事务原子性、响应丢失后的 receipt 查询、后续人工 revision 保护，以及 RAG 资料债不回滚内容。
+- 新入口继续只接受完整且已验证的 aggregate 与 expected revision；旧 HTTP/手动编辑/AI 整理/快照恢复入口未被静默接管，S3-02b 继续负责后续收敛。

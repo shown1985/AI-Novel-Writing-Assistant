@@ -97,3 +97,14 @@ export function projectModelSelectionProvenance(
     routeDegradedReason: provenance.routeDegradedReason,
   };
 }
+
+export {
+  getModelAttemptExecutionEvidence,
+  getModelAttemptRequestState,
+  runWithModelAttemptRequestContext,
+  runWithModelAttemptRequestState,
+  startModelTransportAttempt,
+  updateModelAttemptPromptIdentity,
+  setModelAttemptRepositoryForTests,
+  type ModelAttemptCandidate,
+} from "./attempts/runtime";

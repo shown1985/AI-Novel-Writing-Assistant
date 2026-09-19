@@ -20,6 +20,7 @@ const targetMigration = "20260318233000_book_analysis_source_cache";
 const novelFactMigration = "20260812120000_novel_fact_ledger";
 const visualAssetCompatibilityMigration = "20260910140000_visual_asset_source_compatibility";
 const promptSlotOverrideMigration = "20260912170000_prompt_slot_overrides";
+const worldMaintenanceCommitMigration = "20260919100000_world_maintenance_commit";
 const visualAssetSchemaRepairMigrations = [
   "20260916090000_comic_character_gender",
   "20260916090100_comic_panel_scene_ref",
@@ -617,6 +618,67 @@ test("ensureRuntimeDatabaseReady repairs partially satisfied visual asset schema
         assertFinishedMigrationRecord(verifyDb, migrationName);
       }
       assertFinishedMigrationRecord(verifyDb, visualAssetCompatibilityMigration);
+      assert.equal(verifyDb.pragma("integrity_check", { simple: true }), "ok");
+      assert.deepEqual(verifyDb.pragma("foreign_key_check"), []);
+    } finally {
+      verifyDb.close();
+    }
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("ensureRuntimeDatabaseReady adds world maintenance commit protection to existing desktop databases", async () => {
+  const { tempDir, databasePath } = createTempDatabaseFile();
+  const database = new Database(databasePath);
+
+  try {
+    createMigrationTable(database);
+    database.exec(`
+      CREATE TABLE "Novel" (
+        "id" TEXT NOT NULL PRIMARY KEY
+      );
+      CREATE TABLE "World" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "version" INTEGER NOT NULL DEFAULT 1
+      );
+    `);
+    database.prepare('INSERT INTO "World" (id, version) VALUES (?, ?)').run("world-low", 0);
+    database.prepare('INSERT INTO "World" (id, version) VALUES (?, ?)').run("world-current", 7);
+
+    for (const migrationName of allMigrationNames) {
+      if (migrationName !== worldMaintenanceCommitMigration) {
+        insertMigrationRecord(database, migrationName);
+      }
+    }
+  } finally {
+    database.close();
+  }
+
+  try {
+    await withDesktopRuntime(databasePath, () => ensureRuntimeDatabaseReady());
+
+    const verifyDb = new Database(databasePath, { readonly: true });
+    try {
+      assert.deepEqual(
+        verifyDb.prepare('SELECT id, contentRevision FROM "World" ORDER BY id').all(),
+        [
+          { id: "world-current", contentRevision: 7 },
+          { id: "world-low", contentRevision: 1 },
+        ],
+      );
+      assert.ok(verifyDb.prepare(
+        `SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'WorldMaintenanceOperation'`,
+      ).get());
+      assert.ok(verifyDb.prepare(
+        `SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'WorldMaintenanceCommitReceipt'`,
+      ).get());
+      assert.ok(verifyDb.prepare(
+        `SELECT name FROM sqlite_master
+         WHERE type = 'index'
+           AND name = 'WorldMaintenanceOperation_targetType_targetId_operationType_operationId_key'`,
+      ).get());
+      assertFinishedMigrationRecord(verifyDb, worldMaintenanceCommitMigration);
       assert.equal(verifyDb.pragma("integrity_check", { simple: true }), "ok");
       assert.deepEqual(verifyDb.pragma("foreign_key_check"), []);
     } finally {

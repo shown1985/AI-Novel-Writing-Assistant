@@ -293,7 +293,7 @@
 ### S2-04b3：真实 transport attempt 接线
 
 - 用户价值：重试、结构策略切换、JSON 修复、语义重试和备用模型的每次真实调用都能分开记录，并明确最终采用者。
-- 状态：**In Progress（R1-S2F）**；5 点，04b1、04b2 与 `R1-PROMPT01` 已 Done。模型平台 Agent 串行拥有 recorder、structured invoke/repair 和拆分后的 text execution hooks；冻结合同见 [S2-04b3 真实 transport attempt 接线](./s2-04b3-production-attempt-wiring-contract.md)。
+- 状态：**Done（R1-S2F）**；5 点，04b1、04b2 与 `R1-PROMPT01` 已 Done。生产 wiring 7/7；production wiring、repository、store、prototype 四套组合检查 25/25，最终 P1 已关闭；模型平台 Agent 串行拥有 recorder、structured invoke/repair 和拆分后的 text execution hooks。冻结合同与完成证据见 [S2-04b3 真实 transport attempt 接线](./s2-04b3-production-attempt-wiring-contract.md)。
 - 范围：建立 request/attempt ID 生命周期，在每次物理 invoke/stream 前 start、终态 finalize；把 strategy/transport/fallback/repair/semantic lineage 与 04a 脱敏选择证据关联。
 - 非范围：不改重试次数/模型路由、不因观测失败重发生成、不做公开 API/UI、不扩独立世界库或 batch 身份。
 - AC：invoke/stream、null usage、失败→重试→备用成功、repair/semantic、取消与崩溃 started 行通过 production seam mock；repository 故障不改变模型调用次数、正文结果、任务状态或人工暂停。
@@ -302,7 +302,7 @@
 ### S2-04b4：首批身份归因与读投影
 
 - 用户价值：自动导演、本书世界生成和章节改稿预览的调用证据归属正确作品与任务，缺失时明确显示未记录。
-- 状态：**Not Ready**；3 点，依赖 04b3 Done。模型平台 Agent 拥有 attempt context/read service；根集成人独占共享 DTO、HTTP/API 和挂载。
+- 状态：**Ready（未承诺）**；3 点，依赖 04b3 Done。模型平台 Agent 拥有 attempt context/read service；根集成人独占共享 DTO、HTTP/API 和挂载。进入下一次 Planning 前不启动。
 - 范围：接自动导演 runtime frame、本书世界 `novel-world-generate`、章节 `ai-revision-preview`；后者先显式补齐 novelId/chapterId/entrypoint。读取返回 request 聚合、唯一 adopted 与 `complete|partial|missing`。
 - 非范围：独立世界库、batch、多小说请求归因、公开 UI；不得从 label、当前 URL、当前设置或 live interaction 猜身份。
 - AC：三入口身份与两个小说并发隔离；runtime frame 冲突不做字段拼接；not-found 与 observation missing 分开；修改默认模型不改变旧记录。

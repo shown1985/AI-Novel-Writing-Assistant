@@ -1,10 +1,8 @@
 /**
  * Model-attempt persistence contract established by S2-04b0 and implemented
- * by the injected store/repository in S2-04b1.
- *
- * Nothing in this directory is wired to the production LLM facade. These
- * types describe the evidence a later production story must persist at the
- * actual transport boundary.
+ * by the injected store/repository in S2-04b1. S2-04b3 also uses these types
+ * at the production transport boundaries; the contract remains internal and
+ * is not an HTTP/shared DTO.
  */
 
 export type ModelAttemptMode = "invoke" | "stream" | "legacy_unknown";
@@ -153,6 +151,13 @@ export interface ModelAttemptObservationIssue {
   attemptId: string;
   /** Deliberately generic so repository details and credentials cannot leak. */
   code: "attempt_evidence_write_failed";
+}
+
+/** Internal execution projection; this is not an HTTP/shared DTO. */
+export interface ModelAttemptExecutionEvidence {
+  requestId: string;
+  evidenceStatus: ModelAttemptEvidenceStatus;
+  observationIssues: ModelAttemptObservationIssue[];
 }
 
 export const LEGACY_UNKNOWN_ATTRIBUTION: ModelAttemptAttribution = {

@@ -1500,6 +1500,7 @@ model World {
   factions           String?
   status             String                @default("draft")
   version            Int                   @default(1)
+  contentRevision    Int                   @default(1)
   selectedDimensions String?
   selectedElements   String?
   layerStates        String?
@@ -1613,6 +1614,37 @@ model WorldSnapshot {
   createdAt DateTime @default(now())
 
   @@index([worldId, createdAt])
+}
+
+model WorldMaintenanceOperation {
+  id            String   @id @default(cuid())
+  targetType    String
+  targetId      String
+  operationType String
+  operationId   String
+  requestHash   String
+  status        String
+  receipt       WorldMaintenanceCommitReceipt?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([targetType, targetId, operationType, operationId])
+  @@index([targetType, targetId, updatedAt])
+}
+
+model WorldMaintenanceCommitReceipt {
+  id                   String   @id @default(cuid())
+  operationRecordId    String   @unique
+  targetType           String
+  targetId             String
+  baseRevision         Int
+  committedRevision    Int
+  decisionRevision     Int
+  selectedPatchIdsJson String
+  beforeDigest         String
+  afterDigest          String
+  committedAt          DateTime @default(now())
+  operationRecord      WorldMaintenanceOperation @relation(fields: [operationRecordId], references: [id], onDelete: Cascade)
 }
 
 model WorldGenerationRun {

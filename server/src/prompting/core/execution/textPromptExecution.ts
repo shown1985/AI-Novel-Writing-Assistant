@@ -1,6 +1,6 @@
 import type { BaseMessage, BaseMessageChunk } from "@langchain/core/messages";
 import type { LLMProvider } from "@ai-novel/shared/types/llm";
-import { getLLM } from "../../../llm/factory";
+import { getLLM, getResolvedLLMClientOptionsFromInstance } from "../../../llm/factory";
 import { ReasoningStreamCollector } from "../../../llm/reasoning";
 import { formatLivePrompt } from "../../../llm/structuredInvoke";
 import {
@@ -10,6 +10,14 @@ import {
 } from "../../../llm/usageTracking";
 import { toText } from "../../../services/novel/novelP0Utils";
 import { beginLlmLiveSession } from "../../../platform/llm/live/llmLiveSession";
+import {
+  getModelAttemptExecutionEvidence,
+  getModelAttemptRequestState,
+  runWithModelAttemptRequestContext,
+  runWithModelAttemptRequestState,
+  startModelTransportAttempt,
+  type ModelAttemptCandidate,
+} from "../../../platform/llm/provenance";
 import { resolveAdvancedPromptMessages } from "../../templates/templateRuntime";
 import { selectContextBlocks } from "../contextSelection";
 import type {
@@ -39,6 +47,7 @@ type TextPromptResultInput = {
   invocation: PromptInvocationMeta;
   renderedPromptChars?: number;
   tokenUsage?: LlmTokenUsageSnapshot | null;
+  attemptEvidence?: ReturnType<typeof getModelAttemptExecutionEvidence>;
 };
 
 type TextPromptFailureInput = {
@@ -74,6 +83,11 @@ export function captureStreamOutput(
   rawStream: AsyncIterable<BaseMessageChunk>,
   onChunk?: (content: string) => void,
   onReasoning?: (content: string) => void,
+  onTerminal?: (input: {
+    status: "completed" | "failed" | "cancelled";
+    usage: LlmTokenUsageSnapshot | null;
+    error?: unknown;
+  }) => void | Promise<void>,
 ): {
   stream: AsyncIterable<BaseMessageChunk>;
   completedText: Promise<string>;
@@ -97,6 +111,7 @@ export function captureStreamOutput(
       const chunks: string[] = [];
       let usage: LlmTokenUsageSnapshot | null = null;
       const reasoningCollector = new ReasoningStreamCollector();
+      let completed = false;
       try {
         for await (const chunk of rawStream) {
           const content = toText(chunk.content);
@@ -107,12 +122,23 @@ export function captureStreamOutput(
           yield chunk;
         }
         onReasoning?.(reasoningCollector.flush());
+        completed = true;
+        await onTerminal?.({ status: "completed", usage });
         resolveText(chunks.join(""));
         resolveUsage(usage);
       } catch (error) {
+        completed = true;
+        await onTerminal?.({ status: "failed", usage, error });
         rejectText(error);
         rejectUsage(error);
         throw error;
+      } finally {
+        if (!completed) {
+          const error = new Error("model_stream_cancelled_before_completion");
+          await onTerminal?.({ status: "cancelled", usage, error });
+          rejectText(error);
+          resolveUsage(usage);
+        }
       }
     },
   };
@@ -125,6 +151,22 @@ export function captureStreamOutput(
 }
 
 export async function executeTextPrompt<I>(input: {
+  asset: PromptAsset<I, string, string>;
+  promptInput: I;
+  contextBlocks?: Parameters<typeof selectContextBlocks>[0];
+  options?: PromptExecutionOptions;
+}, dependencies: TextPromptExecutionDependencies): Promise<PromptRunResult<string>> {
+  return runWithModelAttemptRequestContext({
+    mode: "invoke",
+    prompt: {
+      promptId: input.asset.id,
+      promptVersion: input.asset.version,
+      taskType: input.asset.taskType,
+    },
+  }, () => executeTextPromptInContext(input, dependencies));
+}
+
+async function executeTextPromptInContext<I>(input: {
   asset: PromptAsset<I, string, string>;
   promptInput: I;
   contextBlocks?: Parameters<typeof selectContextBlocks>[0];
@@ -161,6 +203,9 @@ export async function executeTextPrompt<I>(input: {
     model: input.options?.model,
     promptText: formatLivePrompt(messages),
   });
+  let attempt: ModelAttemptCandidate | null = null;
+  let transportCompleted = false;
+  let tokenUsage: LlmTokenUsageSnapshot | null = null;
   try {
     const llm = await dependencies.llmFactory(input.options?.provider, {
       fallbackProvider: "deepseek",
@@ -175,10 +220,15 @@ export async function executeTextPrompt<I>(input: {
       taskType: input.asset.taskType,
       promptMeta: prepared.invocation,
     });
+    const resolved = getResolvedLLMClientOptionsFromInstance(llm);
+    attempt = await startModelTransportAttempt({
+      provider: resolved?.provider ?? input.options?.provider ?? "unknown",
+      model: resolved?.model ?? input.options?.model ?? "unknown",
+      modelRoute: resolved?.modelRoute ?? null,
+    });
     liveSession.phase("streaming", "模型正在返回内容");
     const stream = await llm.stream(messages, buildPromptCallOptions(input.options));
     let rawOutput = "";
-    let tokenUsage: LlmTokenUsageSnapshot | null = null;
     const reasoningCollector = new ReasoningStreamCollector();
     for await (const chunk of stream) {
       const content = toText(chunk.content);
@@ -187,6 +237,7 @@ export async function executeTextPrompt<I>(input: {
       liveSession.reasoning(reasoningCollector.push(chunk, content));
       tokenUsage = mergeStreamTokenUsage(tokenUsage, extractLlmTokenUsage(chunk));
     }
+    transportCompleted = true;
     liveSession.reasoning(reasoningCollector.flush());
     liveSession.phase("validating", "正在整理生成结果");
     const output = applyPromptPostValidate({
@@ -200,6 +251,7 @@ export async function executeTextPrompt<I>(input: {
       reasoningTokens: tokenUsage.reasoningTokens ?? null,
     } : null);
     liveSession.complete();
+    await attempt?.finalizeSucceeded(tokenUsage, "adopted");
     return dependencies.buildResult({
       asset: input.asset as PromptAsset<unknown, unknown, unknown>,
       output,
@@ -218,8 +270,14 @@ export async function executeTextPrompt<I>(input: {
       ),
       renderedPromptChars,
       tokenUsage,
+      attemptEvidence: getModelAttemptExecutionEvidence(),
     });
   } catch (error) {
+    if (transportCompleted) {
+      await attempt?.finalizeSucceeded(tokenUsage, "not_adopted");
+    } else {
+      await attempt?.finalizeFailed(error, input.options?.signal);
+    }
     liveSession.fail(error);
     dependencies.recordFailure({
       asset: input.asset as PromptAsset<unknown, unknown, unknown>,
@@ -236,6 +294,22 @@ export async function executeTextPrompt<I>(input: {
 }
 
 export async function executeTextPromptStream<I>(input: {
+  asset: PromptAsset<I, string, string>;
+  promptInput: I;
+  contextBlocks?: Parameters<typeof selectContextBlocks>[0];
+  options?: PromptExecutionOptions;
+}, dependencies: TextPromptExecutionDependencies): Promise<PromptStreamRunResult<string>> {
+  return runWithModelAttemptRequestContext({
+    mode: "stream",
+    prompt: {
+      promptId: input.asset.id,
+      promptVersion: input.asset.version,
+      taskType: input.asset.taskType,
+    },
+  }, () => executeTextPromptStreamInContext(input, dependencies));
+}
+
+async function executeTextPromptStreamInContext<I>(input: {
   asset: PromptAsset<I, string, string>;
   promptInput: I;
   contextBlocks?: Parameters<typeof selectContextBlocks>[0];
@@ -273,6 +347,10 @@ export async function executeTextPromptStream<I>(input: {
     promptText: formatLivePrompt(prepared.messages),
   });
   let captured: ReturnType<typeof captureStreamOutput>;
+  let attempt: ModelAttemptCandidate | null = null;
+  let transportCompleted = false;
+  let transportUsage: LlmTokenUsageSnapshot | null = null;
+  const requestState = getModelAttemptRequestState();
   try {
     const llm = await dependencies.llmFactory(input.options?.provider, {
       fallbackProvider: "deepseek",
@@ -287,14 +365,38 @@ export async function executeTextPromptStream<I>(input: {
       taskType: input.asset.taskType,
       promptMeta: prepared.invocation,
     });
+    const resolved = getResolvedLLMClientOptionsFromInstance(llm);
+    attempt = await startModelTransportAttempt({
+      provider: resolved?.provider ?? input.options?.provider ?? "unknown",
+      model: resolved?.model ?? input.options?.model ?? "unknown",
+      modelRoute: resolved?.modelRoute ?? null,
+    });
     liveSession.phase("streaming", "模型正在返回内容");
     const rawStream = await llm.stream(messages, buildPromptCallOptions(input.options));
     captured = captureStreamOutput(
       rawStream as AsyncIterable<BaseMessageChunk>,
       (content) => liveSession.delta(content),
       (content) => liveSession.reasoning(content),
+      async (terminal) => {
+        const runTerminal = async () => {
+          transportUsage = terminal.usage;
+          if (terminal.status === "completed") {
+            transportCompleted = true;
+          } else if (terminal.status === "cancelled") {
+            await attempt?.finalizeCancelled();
+          } else {
+            await attempt?.finalizeFailed(terminal.error, input.options?.signal);
+          }
+        };
+        if (requestState) {
+          await runWithModelAttemptRequestState(requestState, runTerminal);
+        } else {
+          await runTerminal();
+        }
+      },
     );
   } catch (error) {
+    await attempt?.finalizeFailed(error, input.options?.signal);
     liveSession.fail(error);
     dependencies.recordFailure({
       asset: input.asset as PromptAsset<unknown, unknown, unknown>,
@@ -320,6 +422,15 @@ export async function executeTextPromptStream<I>(input: {
         rawOutput: content,
       });
       const tokenUsage = await captured.completedUsage.catch(() => null);
+      const attemptEvidence = requestState
+        ? await runWithModelAttemptRequestState(requestState, async () => {
+          await attempt?.finalizeSucceeded(tokenUsage, "adopted");
+          return getModelAttemptExecutionEvidence();
+        })
+        : await (async () => {
+          await attempt?.finalizeSucceeded(tokenUsage, "adopted");
+          return getModelAttemptExecutionEvidence();
+        })();
       const result = dependencies.buildResult({
         asset: input.asset as PromptAsset<unknown, unknown, unknown>,
         output,
@@ -338,6 +449,7 @@ export async function executeTextPromptStream<I>(input: {
         ),
         renderedPromptChars,
         tokenUsage,
+        attemptEvidence,
       });
       liveSession.usage(tokenUsage ? {
         ...tokenUsage,
@@ -345,7 +457,19 @@ export async function executeTextPromptStream<I>(input: {
       } : null);
       liveSession.complete();
       return result;
-    }).catch((error) => {
+    }).catch(async (error) => {
+      const finalizeFailure = async () => {
+        if (transportCompleted) {
+          await attempt?.finalizeSucceeded(transportUsage, "not_adopted");
+        } else {
+          await attempt?.finalizeFailed(error, input.options?.signal);
+        }
+      };
+      if (requestState) {
+        await runWithModelAttemptRequestState(requestState, finalizeFailure);
+      } else {
+        await finalizeFailure();
+      }
       liveSession.fail(error);
       dependencies.recordFailure({
         asset: input.asset as PromptAsset<unknown, unknown, unknown>,

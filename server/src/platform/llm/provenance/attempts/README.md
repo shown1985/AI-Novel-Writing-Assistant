@@ -1,11 +1,11 @@
 # Model attempt evidence persistence boundary
 
-`attempts/` contains the S2-04b0 contract and seam proof plus the S2-04b1
-generic persistence repository for evidence about actual model transport
-attempts. It is deliberately **not** exported from
-`server/src/platform/llm/provenance/index.ts` and is not connected to the
-application Prisma singleton, factory, structured invocation, usage tracking,
-prompt runner, live broker, transport, or HTTP routes.
+`attempts/` contains the S2-04b0 contract, the S2-04b1 generic persistence
+repository, and the S2-04b3 production recorder for evidence about actual
+model transport attempts. The recorder is exported only through the internal
+provenance facade and is connected to the production transport seams; it is
+not an HTTP/shared DTO or a replacement for usage tracking, live broker, or
+workflow state.
 
 The production boundary frozen here is:
 
@@ -30,6 +30,17 @@ request-serializable transactions and atomic unique-key/CAS operations.
 schema through an injected client; it never imports or opens the application
 database singleton itself.
 
+Production wiring rules:
+
+- text prompt invoke/stream and structured invoke/stream start one attempt
+  immediately before the provider transport opens;
+- structured strategy/transport/fallback/repair/semantic calls use the same
+  request scope and explicit lineage role; post-validation decides adoption;
+- stream callbacks re-enter the captured request scope so deferred consumers
+  cannot lose the request id or leave a started row without a terminal write;
+- recorder start/finalize failures are evidence issues only and never alter
+  model results or retry/fallback decisions.
+
 The in-memory adapter and coordinator under `prototype/` remain seam-proof
-only. Production transport stories must use the production repository at the
-real transport/validation seams rather than import the prototype.
+only. Production code uses the recorder and repository provider at the real
+transport/validation seams rather than importing the prototype.

@@ -19,6 +19,7 @@ export interface World {
   factions?: string | null;
   status: string;
   version: number;
+  contentRevision: number;
   selectedDimensions?: string | null;
   selectedElements?: string | null;
   layerStates?: string | null;
@@ -226,6 +227,74 @@ export interface WorldStructuredData {
   locations: WorldLocation[];
   relations: WorldRelations;
   metadata: WorldStructureMeta;
+}
+
+export interface WorldMaintenanceCandidateAggregate {
+  name: string;
+  description: string | null;
+  worldType: string | null;
+  templateKey: string | null;
+  axioms: string | null;
+  background: string | null;
+  geography: string | null;
+  cultures: string | null;
+  magicSystem: string | null;
+  politics: string | null;
+  races: string | null;
+  religions: string | null;
+  technology: string | null;
+  conflicts: string | null;
+  history: string | null;
+  economy: string | null;
+  factions: string | null;
+  status: string;
+  selectedDimensions: string | null;
+  selectedElements: string | null;
+  layerStates: string | null;
+  overviewSummary: string | null;
+  structureJson: string | null;
+  bindingSupportJson: string | null;
+  structureSchemaVersion: number;
+}
+
+export interface WorldMaintenanceCommitCommand {
+  operationId: string;
+  expectedContentRevision: number;
+  expectedDecisionRevision: number;
+  candidateAggregate: WorldMaintenanceCandidateAggregate;
+  selectedPatchIds: string[];
+  sourceRef: string;
+}
+
+export interface WorldMaintenanceCommitReceipt {
+  operationId: string;
+  targetType: "world";
+  targetId: string;
+  baseRevision: number;
+  committedRevision: number;
+  decisionRevision: number;
+  selectedPatchIds: string[];
+  beforeDigest: string;
+  afterDigest: string;
+  committedAt: string;
+}
+
+export type WorldMaintenanceCommitState =
+  | "committed"
+  | "replayed"
+  | "content_revision_conflict"
+  | "operation_id_reused"
+  | "commit_result_unknown";
+
+export interface WorldMaintenanceCommitResult {
+  operationId: string;
+  target: { type: "world"; id: string };
+  state: WorldMaintenanceCommitState;
+  contentSaved: boolean;
+  committedRevision?: number;
+  receipt?: WorldMaintenanceCommitReceipt;
+  sourceRoute: string;
+  ragRefreshPending?: boolean;
 }
 
 export interface WorldPropertyLibrary {

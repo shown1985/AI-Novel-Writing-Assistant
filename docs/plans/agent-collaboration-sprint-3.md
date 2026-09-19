@@ -2,7 +2,7 @@
 
 ## 范围、状态与估点
 
-本页展开[路线图](./agent-collaboration-sprints.md)的 S3-00～S3-06，目标是可靠 Prompt 登记、内容版本、可信评估来源、持续问题历史和作者留白。除静态登记门外，业务代码尚未实施。各生产卡在 S1-06 的版本、来源、运行承接和可空决定合同冻结前为 **Not Ready**；下文的依赖还必须分别通过。
+本页展开[路线图](./agent-collaboration-sprints.md)的 S3-00～S3-06，目标是可靠 Prompt 登记、内容版本、可信评估来源、持续问题历史和作者留白。S3-01 与 S3-02a 已分别完成 Prompt 能力边界和世界样本安全提交边界；其余生产卡仍须在 S1-06 的版本、来源、运行承接和可空决定合同满足后按依赖推进，不能把已完成的底座解释为全部世界维护能力已上线。
 
 原候选总量为 28 点。展开后对 Prompt 静态登记门、版本接线、双侧同步、历史兼容和上下文消费分别验收，重新估算为 **36 相对点**，不是单个验收窗口的承诺或工时。每张不超过 5 点；拆分不会把原 Story 的保护条件移出 Done。
 
@@ -55,7 +55,7 @@ S3-04 读取 S1-06 冻结的可空决定集合，不等待 S3-06 的写操作。
 
 作为作者，我希望 AI 或其他页面修改世界时，不能覆盖我刚保存的内容。
 
-- 点数3，P0；**In Progress（R1-S2F）**。依赖 S1-06 的 contentRevision、提交身份、旧客户端策略、快照/事务合同，均由 [S3-02a 安全提交合同](./s3-02a-world-sample-safe-commit-contract.md) 冻结。Runtime Agent owned maintenance domain/application/infrastructure；schema、迁移与共享合同由根集成人。为守住 3 点，本卡不接管 `WorldService.ts` 的全部旧写入口，该收敛属于 S3-02b。
+- 点数3，P0；**Done（R1-S2F）**。`worldMaintenanceCommit.test.js` 单文件 11/11；与 `runtimeMigrations`、`prismaMigrationCompleteness` 组成三套组合检查共 22/22，AC1～AC5 均有证据；双 schema validate 与 SQLite runtime migration 通过。真实 PostgreSQL apply 保留为 Release gate，不作为本 Story 当前阻断。依赖 S1-06 的 contentRevision、提交身份、旧客户端策略、快照/事务合同，均由 [S3-02a 安全提交合同](./s3-02a-world-sample-safe-commit-contract.md) 冻结。Runtime Agent owned maintenance domain/application/infrastructure；schema、迁移与共享合同由根集成人。为守住 3 点，本卡不接管 `WorldService.ts` 的全部旧写入口，该收敛属于 S3-02b。
 - 子任务：建立受资源范围约束的提交入口；实现版本条件、提交幂等、内容与前后证据原子提交；定义冲突和未知提交结果的读取方式；明确报告/缓存与内容写入区别。
 - 非范围：AI提案、部分采用、跨小说同步、全系统撤回。
 - AC1：相同 baseRevision 的两个不同提交仅一个成功，另一个得到可解释冲突且零内容写入。
@@ -70,6 +70,7 @@ S3-04 读取 S1-06 冻结的可空决定集合，不等待 S3-06 的写操作。
 
 作为作者，我希望手动编辑、AI整理和历史操作得到同样的版本保护。
 
+- 状态：**Ready（未承诺）**；依赖 S3-02a 已 Done，进入下一次 Planning 队列；本窗口不启动旧写入口盘点或接线。
 - 点数3，P0；依赖 S3-02a，所有待接线写入口清单由 S1-06 复核。Runtime Agent独占 `WorldService.ts`、`worldImprovementService.ts`、`worldSnapshotService.ts` 的接线；结构投影复用 `worldStructure.ts`。
 - 子任务：盘点普通编辑、公理、分层、深化、结构编辑、素材使用、快照恢复和导入写入；接到安全提交；确定可信骨架与 legacy-text 的来源策略；分离只改报告/缓存的更新。
 - 非范围：把旧 QA 自动重写成骨架；修改快照恢复产品权限；清理或删除历史数据。

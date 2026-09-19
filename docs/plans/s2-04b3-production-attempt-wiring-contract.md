@@ -3,7 +3,7 @@
 ## Story 合同
 
 - Release / Sprint：Release 1 / R1-S2F。
-- 状态 / 点数：In Progress / 5 点。
+- 状态 / 点数：Done / 5 点。
 - 用户价值：作者和后续诊断能力能区分一次请求中的重试、策略切换、修复、语义重试与备用模型，并知道最终采用了哪次真实结果。
 - 依赖：S2-04a、S2-04b1、S2-04b2、R1-PROMPT01 已 Done。
 - Owner：模型平台 Agent。根集成人只做计划、review、文档集成和阶段提交。
@@ -46,3 +46,10 @@
 - 聚焦测试覆盖 text success/null usage、stream complete/abort/early stop、strategy/transport/fallback、JSON repair、semantic retry、repair→semantic parent、recorder 两阶段故障、并发隔离、脱敏和零模型读取。
 - 运行 attempt repository/prototype 回归与 server typecheck/build 中覆盖改动文件的最窄检查。
 - 本卡无 UI，Computer Use 不适用。
+
+## 完成证据
+
+- 生产 wiring 7/7：text invoke/stream、structured invoke/stream、strategy/transport/fallback、JSON repair、semantic retry、取消/提前停止与 recorder best-effort 边界均接入真实 transport。
+- production wiring、repository、store、prototype 四套组合检查 25/25：覆盖终态 attempt、lineage 父子关系、采用/不采用分离、null usage、并发 request 隔离、脱敏、零模型读取与 recorder 故障降级。
+- 生产调用结果、调用次数、重试策略和任务状态不因证据旁路故障改变；未新增读 API/UI 或身份归属逻辑。
+- 本卡最终 P1 已关闭。S2-04b4 的身份归因与读投影、S2-04c 的只读显示仍由后续 Story 承接，不在本卡完成范围内。

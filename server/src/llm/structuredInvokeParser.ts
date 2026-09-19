@@ -18,6 +18,8 @@ import {
 import { extractJSONValue } from "../services/novel/novelP0Utils";
 import type { PromptInvocationMeta } from "../prompting/core/promptTypes";
 import type { LlmTokenUsageSnapshot } from "./usageTracking";
+import type { ModelAttemptCandidate } from "../platform/llm/provenance";
+import type { ModelAttemptExecutionEvidence } from "../platform/llm/provenance/attempts/contracts";
 
 export interface StructuredInvokeResult<T> {
   data: T;
@@ -25,6 +27,10 @@ export interface StructuredInvokeResult<T> {
   repairAttempts: number;
   diagnostics: StructuredOutputDiagnostics;
   tokenUsage?: LlmTokenUsageSnapshot | null;
+  /** Internal-only handle finalized after product validation chooses a candidate. */
+  modelAttemptCandidate?: ModelAttemptCandidate | null;
+  modelAttemptUsage?: LlmTokenUsageSnapshot | null;
+  attemptEvidence?: ModelAttemptExecutionEvidence;
 }
 
 export interface StructuredInvokeRawParseInput<T> {
@@ -53,6 +59,7 @@ export interface StructuredInvokeRawParseInput<T> {
   reasoningChars?: number;
   reasoningEnabled?: boolean;
   reasoningEffort?: ReasoningEffort;
+  modelAttemptCandidate?: ModelAttemptCandidate | null;
 }
 
 function tryFixTruncatedJson(raw: string): string {
@@ -407,17 +414,21 @@ export async function parseStructuredLlmRawContentDetailed<T>(
 
   const maxRepairAttempts = input.maxRepairAttempts ?? 1;
   if (parseErrorMessage) {
+    await input.modelAttemptCandidate?.finalizeSucceeded(input.tokenUsage, "not_adopted");
     for (let attempt = 1; attempt <= maxRepairAttempts; attempt += 1) {
       try {
+        const repaired = await repairWithLlm<T>({
+          ...input,
+          schema: runtimeSchema,
+        }, input.rawContent, parseErrorMessage, attempt, getRepairHelpers<T>());
         return {
-          data: await repairWithLlm<T>({
-            ...input,
-            schema: runtimeSchema,
-          }, input.rawContent, parseErrorMessage, attempt, getRepairHelpers<T>()),
+          data: repaired.data,
           repairUsed: true,
           repairAttempts: attempt,
           diagnostics,
           tokenUsage: input.tokenUsage ?? null,
+          modelAttemptCandidate: repaired.modelAttemptCandidate,
+          modelAttemptUsage: repaired.tokenUsage,
         };
       } catch (repairError) {
         if (attempt >= maxRepairAttempts) {
@@ -446,6 +457,8 @@ export async function parseStructuredLlmRawContentDetailed<T>(
       repairAttempts: 0,
       diagnostics,
       tokenUsage: input.tokenUsage ?? null,
+      modelAttemptCandidate: input.modelAttemptCandidate ?? null,
+      modelAttemptUsage: input.tokenUsage ?? null,
     };
   }
 
@@ -467,6 +480,8 @@ export async function parseStructuredLlmRawContentDetailed<T>(
       repairAttempts: 0,
       diagnostics,
       tokenUsage: input.tokenUsage ?? null,
+      modelAttemptCandidate: input.modelAttemptCandidate ?? null,
+      modelAttemptUsage: input.tokenUsage ?? null,
     };
   }
 
@@ -488,21 +503,27 @@ export async function parseStructuredLlmRawContentDetailed<T>(
       repairAttempts: 0,
       diagnostics,
       tokenUsage: input.tokenUsage ?? null,
+      modelAttemptCandidate: input.modelAttemptCandidate ?? null,
+      modelAttemptUsage: input.tokenUsage ?? null,
     };
   }
 
   let zodError: ZodError = first.error;
+  await input.modelAttemptCandidate?.finalizeSucceeded(input.tokenUsage, "not_adopted");
   for (let attempt = 1; attempt <= maxRepairAttempts; attempt += 1) {
     try {
+      const repaired = await repairWithLlm<T>({
+        ...input,
+        schema: runtimeSchema,
+      }, input.rawContent, `Zod 校验错误：\n${formatZodErrors(zodError)}`, attempt, getRepairHelpers<T>());
       return {
-        data: await repairWithLlm<T>({
-          ...input,
-          schema: runtimeSchema,
-        }, input.rawContent, `Zod 校验错误：\n${formatZodErrors(zodError)}`, attempt, getRepairHelpers<T>()),
+        data: repaired.data,
         repairUsed: true,
         repairAttempts: attempt,
         diagnostics,
         tokenUsage: input.tokenUsage ?? null,
+        modelAttemptCandidate: repaired.modelAttemptCandidate,
+        modelAttemptUsage: repaired.tokenUsage,
       };
     } catch (error) {
       if (attempt >= maxRepairAttempts) {

@@ -57,6 +57,10 @@ domain   Prompt port   persistence / lease / index ports
 
 commit 必须在一个事务中完成 ownership、proposal 状态、`contentRevision`、`decisionRevision`、保护范围和引用完整性校验，再写完整 aggregate、兼容投影、新 revision、before/after 证据、commit receipt 与 `committed_pending_verification`。任一校验失败整笔零内容写入。
 
+世界样本安全提交的运行时门面固定接收完整且已验证的 aggregate、`expectedContentRevision`、`expectedDecisionRevision` 与 `operationId`，通过 CAS 在同一事务内写入内容、兼容投影、revision、operation 和 receipt。相同 operation 重放原 receipt，不重复递增或派发索引；revision 冲突、缺少版本或 operation hash 复用冲突均在内容写入前结束。该边界将作者内容保护与后续旧写入口收敛分开，避免新安全入口静默改变既有编辑语义。
+
+本机 SQLite runtime migration 是安全提交可运行的必要条件；PostgreSQL apply 属 Release gate，在发布组合验证时单独执行，不把发布环境尚未 apply 混同为本地提交合同失败。两套 schema 仍须保持可验证的一致性，且任何迁移演练都只使用隔离数据库。
+
 引用校验必须发生在任何会丢弃无效引用的 normalization 之前。分区同步若会破坏跨分区引用，应返回最小依赖分区供作者重新确认，不能自动扩大用户选择，也不能把过滤后的结构当作修复成功。
 
 ## 复核与恢复

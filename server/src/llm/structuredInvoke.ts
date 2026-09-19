@@ -36,6 +36,12 @@ import {
 import { toText } from "../services/novel/novelP0Utils";
 import type { PromptInvocationMeta } from "../prompting/core/promptTypes";
 import { ReasoningStreamCollector } from "./reasoning";
+import {
+  getModelAttemptExecutionEvidence,
+  runWithModelAttemptRequestContext,
+  startModelTransportAttempt,
+} from "../platform/llm/provenance";
+import type { ModelAttemptRole } from "../platform/llm/provenance/attempts/contracts";
 
 export {
   parseStructuredLlmRawContentDetailed,
@@ -68,6 +74,10 @@ export interface StructuredInvokeInput<T> {
   reasoningEnabled?: boolean;
   reasoningEffort?: ReasoningEffort;
   disableFallbackModel?: boolean;
+  /** Internal production-wiring controls; not part of the public prompt API. */
+  deferModelAttemptAdoption?: boolean;
+  modelAttemptRole?: Exclude<ModelAttemptRole, "legacy_unknown">;
+  modelAttemptParentId?: string | null;
 }
 
 interface StructuredAttemptTarget {
@@ -224,6 +234,7 @@ async function invokeStructuredAttempt<T>(input: {
   strategyIndex: number;
   fallbackAvailable: boolean;
   fallbackUsed: boolean;
+  transportRetryAttempt: number;
 }): Promise<StructuredInvokeResult<T>> {
   const attemptTemperature = computeAttemptTemperature(input.target.temperature, input.strategyIndex);
   const resolved = await resolveLLMClientOptions(input.target.provider, {
@@ -278,6 +289,34 @@ async function invokeStructuredAttempt<T>(input: {
     model: resolved.model,
     promptText: formatLivePrompt(messages),
   });
+  const requestedRole = input.baseInput.modelAttemptRole;
+  const attemptRole = input.fallbackUsed && requestedRole === "transport_retry"
+    ? "fallback"
+    : requestedRole
+    ?? (input.transportRetryAttempt > 0
+      ? "transport_retry"
+      : input.strategyIndex > 0
+        ? "strategy_retry"
+        : input.fallbackUsed ? "fallback" : "primary");
+  const modelAttempt = await startModelTransportAttempt({
+    provider: resolved.provider,
+    model: resolved.model,
+    modelRoute: resolved.modelRoute ?? null,
+    structuredStrategy: input.strategy,
+    role: attemptRole,
+    routeTier: input.fallbackUsed ? "fallback" : "primary",
+    // An explicit parent seeds the first physical call of a deferred stream
+    // or semantic retry. Later transport/strategy calls must follow the
+    // recorder's current last attempt; a fallback likewise points to the
+    // primary attempt that actually triggered the model switch.
+    parentAttemptId: !input.fallbackUsed
+      && input.transportRetryAttempt === 0
+      && input.strategyIndex === 0
+      ? input.baseInput.modelAttemptParentId
+      : null,
+  });
+  let transportCompleted = false;
+  let transportUsage: ReturnType<typeof mergeStreamTokenUsage> = null;
   try {
     liveSession.phase("streaming", "模型正在返回结构化结果");
     const collected = await runWithEnforcedTimeout({
@@ -309,6 +348,8 @@ async function invokeStructuredAttempt<T>(input: {
       },
     });
     const rawContent = collected.rawContent;
+    transportUsage = collected.tokenUsage;
+    transportCompleted = true;
     logStructuredInvokeEvent({
       event: "invoke_done",
       label: input.baseInput.label,
@@ -356,7 +397,16 @@ async function invokeStructuredAttempt<T>(input: {
       reasoningChars: collected.reasoningChars,
       reasoningEnabled: resolved.reasoningEnabled,
       reasoningEffort: input.baseInput.reasoningEffort,
+      modelAttemptCandidate: modelAttempt,
     });
+    const candidate = parsed.modelAttemptCandidate ?? modelAttempt;
+    if (!input.baseInput.deferModelAttemptAdoption) {
+      await candidate?.finalizeSucceeded(
+        parsed.modelAttemptUsage ?? parsed.tokenUsage ?? transportUsage,
+        "adopted",
+      );
+    }
+    parsed.attemptEvidence = getModelAttemptExecutionEvidence();
     liveSession.usage(parsed.tokenUsage ? {
       ...parsed.tokenUsage,
       reasoningTokens: parsed.tokenUsage.reasoningTokens ?? null,
@@ -364,6 +414,14 @@ async function invokeStructuredAttempt<T>(input: {
     liveSession.complete();
     return parsed;
   } catch (error) {
+    // A provider stream that ended normally but produced invalid/empty output
+    // is still a successful transport candidate; validation decides adoption.
+    // If the stream itself failed, preserve the transport failure instead.
+    if (transportCompleted) {
+      await modelAttempt?.finalizeSucceeded(transportUsage, "not_adopted");
+    } else {
+      await modelAttempt?.finalizeFailed(error, input.baseInput.signal);
+    }
     liveSession.fail(error);
     const category = error instanceof StructuredOutputError
       ? error.category
@@ -397,6 +455,7 @@ async function tryStructuredStrategies<T>(input: {
   target: StructuredAttemptTarget;
   fallbackAvailable: boolean;
   fallbackUsed: boolean;
+  transportRetryAttempt: number;
 }): Promise<StructuredInvokeResult<T>> {
   const sequence = buildStrategySequence(input.target.profile, input.baseInput.schema);
   const preferredSequence = input.target.preferredStrategy
@@ -416,6 +475,7 @@ async function tryStructuredStrategies<T>(input: {
         strategyIndex: index,
         fallbackAvailable: input.fallbackAvailable,
         fallbackUsed: input.fallbackUsed,
+        transportRetryAttempt: input.transportRetryAttempt,
       });
     } catch (error) {
       lastError = wrapStructuredInvokeError({
@@ -465,6 +525,7 @@ async function tryStructuredStrategiesWithTransportRetries<T>(input: {
         target: input.target,
         fallbackAvailable: input.fallbackAvailable,
         fallbackUsed: input.fallbackUsed,
+        transportRetryAttempt: retryAttempt,
       });
     } catch (error) {
       const structuredError = error instanceof StructuredOutputError ? error : null;
@@ -490,7 +551,7 @@ async function tryStructuredStrategiesWithTransportRetries<T>(input: {
   }
 }
 
-export async function invokeStructuredLlmDetailed<T>(input: StructuredInvokeInput<T>): Promise<StructuredInvokeResult<T>> {
+async function invokeStructuredLlmDetailedInContext<T>(input: StructuredInvokeInput<T>): Promise<StructuredInvokeResult<T>> {
   const primaryTarget = await resolveAttemptTarget({
     provider: input.provider,
     model: input.model,
@@ -560,6 +621,22 @@ export async function invokeStructuredLlmDetailed<T>(input: StructuredInvokeInpu
         : primaryError;
     }
   }
+}
+
+/**
+ * Keep every physical call made by one structured business execution under a
+ * stable request scope. Direct low-level callers still get a complete
+ * adopted attempt; PromptRunner passes the internal defer flag so its
+ * semantic coordinator can decide adoption after post-validation.
+ */
+export async function invokeStructuredLlmDetailed<T>(input: StructuredInvokeInput<T>): Promise<StructuredInvokeResult<T>> {
+  return runWithModelAttemptRequestContext({
+    mode: "invoke",
+    prompt: {
+      taskType: input.taskType,
+      modelRoute: input.promptMeta?.promptId,
+    },
+  }, () => invokeStructuredLlmDetailedInContext(input));
 }
 
 export async function invokeStructuredLlm<T>(input: StructuredInvokeInput<T>): Promise<T> {

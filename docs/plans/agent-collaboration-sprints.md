@@ -154,7 +154,7 @@ Sprint Goal：作者能安静阅读、看见真实成果与一个下一步，并
 | S2-01 单书总控按责任模块化 | 5 | Done：[application 身份隔离](./s2-01a-single-book-application-facade.md)与[presentation 等价装配](./s2-01b-single-book-presentation.md)均通过；无文件超过硬阈值 | 独占 NovelEdit.tsx 与 novels/workspace/application、presentation；R1-S2A/S2B 分窗完成 |
 | S2-02 专业章节阅读与协作区域开关 | 3 | Done：[正文优先、选区唤起、状态保持与窄屏单层验收通过](./s2-02-professional-chapter-assist-panels.md) | chapterEditor 组；R1-S2A 完成，不重复开发 |
 | S2-03 单书一个推荐动作和来源恢复 | 5 | 已交付/当前工作/待决定分开；无 URL taskId 仍正确显示导演恢复；局部债不伪装全书失败 | S2-01 后独占总控组；复用既有投影与命令 |
-| S2-04 实际模型和选择来源可追溯 | 5 | 显式覆盖/任务路由/默认/备用有来源；提交前与运行实际结果分开；历史记录不按当前配置重算 | 根集成人冻结元数据；factory、usageTracking、live 由一个平台 owner 接线 |
+| S2-04 实际模型和选择来源可追溯 | 5 | S2-04b3 已完成生产 wiring 与 attempt 证据；04b4/04c 继续承接身份读投影和只读显示 | 根集成人冻结元数据；factory、usageTracking、live 由一个平台 owner 接线 |
 
 R1-S2C 新增两张不重复计父项的合同 Spike：`S2-03a0`（3 点）冻结单书展示事实与动作权威，`S2-04b0`（3 点）冻结通用模型 attempt 证据；另以 `S3-00`（2 点）修复世界 Prompt 静态版本门。04b0 完成后，原 S2-04b 已由 04b1～04b4（3+3+5+3 点）替换；生产卡仍按[详细实施卡](./agent-collaboration-sprint-2.md)依赖推进，Spike 不冒充用户能力完成。
 
@@ -168,7 +168,7 @@ Sprint Goal：世界内容有可靠版本；AI 检查读取可信内容并保留
 | --- | --- | --- | --- |
 | S3-00 世界 Prompt 静态登记一致性门 | 2 | Done：[9 处 loader/资产版本统一，全量静态检查阻止运行时容错掩盖漂移](./s3-00-world-prompt-registry-alignment.md) | S1-06；R1-S2C |
 | S3-01 世界 Prompt 按能力归属拆分 | 3 | 抽出评估/维护能力至 owned 子目录；旧门面兼容；Registry 元数据完整；不新增 inline Prompt | S1-06、S3-00；world.prompts.ts 扩展前完成 |
-| S3-02 世界样本的版本安全写入 | 5 | 普通编辑、AI 编辑递增内容 revision；同 revision 并发只一方成功；明确旧客户端策略；事务证据和提交重放幂等 | S1-06；共享 schema/迁移冻结 |
+| S3-02 世界样本的版本安全写入 | 5 | S3-02a 已完成样本 CAS、幂等回执和原子证据；S3-02b 继续承接既有写入口收敛 | S1-06；共享 schema/迁移冻结 |
 | S3-03 本书实例与同步的版本保护 | 5 | 本书内容 revision 与来源 syncBaseVersion 分开；push/pull 对两边校验；分区同步不静默丢失跨实体引用；缓存刷新不改内容 revision；不会自动同步 | S3-02；WorldContextGateway 与现有同步门面 |
 | S3-04 AI 结构化世界评估 | 5 | 读取结构/可信旧文本/作者决定；实体引用、证据、影响完整；移除语义正则分流；AI 失败保留旧报告并显示未完成 | S3-01、02；S1-06 冻结可空决定输入，不等待 S3-06；不用非 AI 语义兜底 |
 | S3-05 问题身份、历史与评估版本 | 5 | 换措辞不重复同一风险；新检查不删除决定；过期报告不能覆盖新内容；旧 resolved 标为历史声明而非验证通过 | S3-04；AI 结构化身份理解加确定性引用约束 |

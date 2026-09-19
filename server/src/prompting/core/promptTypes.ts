@@ -5,6 +5,7 @@ import type { TaskType } from "../../llm/modelRouter";
 import type { LlmTokenUsageSnapshot } from "../../llm/usageTracking";
 import type { PromptSlotDef, ResolvedSlots } from "../slots/slotTypes";
 import type { LlmRequestBudgetSnapshot } from "../../llm/requestBudget";
+import type { ModelAttemptExecutionEvidence } from "../../platform/llm/provenance/attempts/contracts";
 
 export type PromptMode = "structured" | "text";
 export type PromptLanguage = "zh" | "en";
@@ -163,6 +164,8 @@ export interface PromptExecutionMeta {
   invocation: PromptInvocationMeta;
   tokenUsage?: LlmTokenUsageSnapshot | null;
   requestBudget?: LlmRequestBudgetSnapshot;
+  /** Internal execution evidence; not exposed as an HTTP/shared DTO. */
+  attemptEvidence?: ModelAttemptExecutionEvidence;
 }
 
 export interface PromptRunResult<T> {

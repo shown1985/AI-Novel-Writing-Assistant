@@ -16,6 +16,7 @@ import type {
   PromptRenderContext,
 } from "../promptTypes";
 import { buildPromptInvocationMeta } from "./promptExecutionContext";
+import type { ModelAttemptCandidate } from "../../../platform/llm/provenance";
 
 export type PromptStructuredInvoker = typeof invokeStructuredLlmDetailed;
 
@@ -150,12 +151,13 @@ export async function resolveStructuredStreamOutput<I, O, R = O>(input: {
   strategy: ReturnType<typeof selectStructuredOutputStrategy>;
   profile: ReturnType<typeof resolveStructuredOutputProfile>;
   options?: PromptExecutionOptions;
+  modelAttemptCandidate?: ModelAttemptCandidate | null;
   onRepairStart?: () => void;
   onRepairOutputDelta?: (content: string) => void;
 }): Promise<StructuredInvokeResult<R>> {
   let repairStarted = false;
-  return input.rawContent.trim()
-    ? parseStructuredLlmRawContentDetailed({
+  if (input.rawContent.trim()) {
+    return parseStructuredLlmRawContentDetailed({
       rawContent: input.rawContent,
       schema: input.outputSchema,
       provider: input.options?.provider,
@@ -177,8 +179,12 @@ export async function resolveStructuredStreamOutput<I, O, R = O>(input: {
       },
       strategy: input.strategy,
       profile: input.profile,
-    })
-    : input.structuredInvoker<R>({
+      modelAttemptCandidate: input.modelAttemptCandidate,
+    });
+  }
+
+  await input.modelAttemptCandidate?.finalizeSucceeded(null, "not_adopted");
+  return input.structuredInvoker<R>({
       label: `${input.asset.id}@${input.asset.version}#empty-stream-fallback`,
       provider: input.options?.provider,
       model: input.options?.model,
@@ -192,6 +198,9 @@ export async function resolveStructuredStreamOutput<I, O, R = O>(input: {
       structuredStrategy: "prompt_json",
       maxRepairAttempts: resolveStructuredRepairAttempts(input.asset as PromptAsset<unknown, unknown, unknown>),
       promptMeta: input.invocation,
+      deferModelAttemptAdoption: true,
+      modelAttemptRole: "transport_retry",
+      modelAttemptParentId: input.modelAttemptCandidate?.attemptId ?? null,
     });
 }
 
@@ -217,6 +226,19 @@ export async function resolveStructuredOutput<I, O, R = O>(input: {
   let semanticRetryAttempts = 0;
   const maxSemanticRetryAttempts = resolveStructuredSemanticRetryAttempts(asset);
 
+  const finalizeCandidate = async (
+    adoption: "adopted" | "not_adopted",
+  ): Promise<void> => {
+    const candidate = currentResult.modelAttemptCandidate;
+    if (!candidate) {
+      return;
+    }
+    await candidate.finalizeSucceeded(
+      currentResult.modelAttemptUsage ?? currentResult.tokenUsage ?? null,
+      adoption,
+    );
+  };
+
   while (true) {
     try {
       const output = applyPromptPostValidate({
@@ -225,6 +247,7 @@ export async function resolveStructuredOutput<I, O, R = O>(input: {
         context: input.context,
         rawOutput: currentResult.data,
       });
+      await finalizeCandidate("adopted");
       return {
         output,
         invocation: buildPromptInvocationMeta(
@@ -241,6 +264,7 @@ export async function resolveStructuredOutput<I, O, R = O>(input: {
     } catch (error) {
       if (semanticRetryAttempts >= maxSemanticRetryAttempts) {
         if (input.asset.postValidateFailureRecovery) {
+          await finalizeCandidate("adopted");
           logStructuredPromptEvent({
             event: "semantic_retry_recovered",
             asset,
@@ -284,9 +308,11 @@ export async function resolveStructuredOutput<I, O, R = O>(input: {
             postValidateFailureRecovered: true,
           };
         }
+        await finalizeCandidate("not_adopted");
         throw markPostValidateFailure(error);
       }
 
+      await finalizeCandidate("not_adopted");
       semanticRetryAttempts += 1;
       recordPromptQualityEvent({
         event: "semantic_retry_start",
@@ -333,6 +359,9 @@ export async function resolveStructuredOutput<I, O, R = O>(input: {
         taskType: input.asset.taskType,
         messages: currentMessages,
         schema: input.outputSchema,
+        deferModelAttemptAdoption: true,
+        modelAttemptRole: "semantic_retry",
+        modelAttemptParentId: currentResult.modelAttemptCandidate?.attemptId ?? null,
         maxRepairAttempts: resolveStructuredRepairAttempts(asset),
         promptMeta: buildPromptInvocationMeta(
           asset,
