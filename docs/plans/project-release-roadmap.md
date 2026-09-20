@@ -51,14 +51,14 @@
 
 ### R1-S2G 已完成窗口
 
-R1-S2G 是 Release 1 已完成实施 Sprint，承诺/完成 `8/8` 点、无 Stretch，规划基线为 `codex/r1-s2g-attribution-world-writes@32b2e9c7`。Sprint Review 与 Retrospective 已关闭：
+R1-S2G 是 Release 1 已完成实施 Sprint，承诺/完成 `8/8` 点、无 Stretch，规划基线为 `codex/r1-s2g-attribution-world-writes@32b2e9c7`。Sprint Review 与 Retrospective 已关闭；beta 组合验证已通过：合并提交 `eaa8cce8`（双亲 `32b2e9c7` / `21c7642e`，merge tree 一致），shared/server/client build/typecheck PASS，服务端 8 文件 `45/45`、client `3/3`，合计 `48/48`，验证前后工作树 clean，Computer Use 证据复用既有合同：
 
 | Story | 点数 | 状态 | 当前范围 | 明确不带入 |
 | --- | ---: | --- | --- | --- |
 | [S2-04b4 首批身份归因与内部读投影](./s2-04b4-attribution-read-projection-contract.md) | 5 | Done | 自动导演完整 runtime frame、本书 `novel-world-generate`、章节 `ai-revision-preview` 三个显式 context；director frame 整体优先；内部 read service/tests；Terra 最终 PASS，shared/server build、三文件定向检查 `20/20`，无 UI | 公开 API/UI、shared/public DTO、schema/migration、S2-04c、其他入口/batch/旧记录回填 |
 | [S3-02b1 世界编辑与公理保存 CAS 兼容](./s3-02b1-world-edit-axiom-cas-contract.md) | 3 | Done | `WorldService.updateWorld` 兼容 HTTP/API；既有 `updateAxioms` UI 显式 revision + 稳定 operationId；统一 CAS；Terra 代码级 PASS（maintenance/runtime/migration/service/route `25/25`、client CAS `3/3`，shared/server/client build/typecheck PASS）；Computer Use PASS，隔离路径保存/刷新、并发冲突与草稿保留、两条 committed operation、client retry harness `3/3` 均通过 | 普通编辑新 UI、原 S3-02b 父项其余旧写入口、提案/评估/同步/快照、schema/migration |
 
-两张卡均已写明 DoR、AC、owner、非范围和最窄验证。R1-S2G 已完成 `8/8` 点并关闭 Review/Retrospective，但这不代表 Release 1 可发布；S2-04c、S3-03～06、原 S3-02b 父项其余旧世界入口、S4+ 均不因本窗口完成自动标为 Ready，也不启动或承诺下一 Story。
+两张卡均已写明 DoR、AC、owner、非范围和最窄验证。R1-S2G 已完成 `8/8` 点并通过 beta 组合验证，但这不代表 Release 1 可发布；R1-03 仍为 `PASS=9 / BLOCKED=2 / REVIEW=1`，公开发布 workflow 触发规则、macOS 打包 workflow、macOS x64 支持范围仍待处理。S2-04c、S3-03～06、原 S3-02b 父项其余旧世界入口、S4+ 均不因本窗口完成自动标为 Ready，也不启动或承诺下一 Story。
 
 ### R1-S0 新增 Story
 

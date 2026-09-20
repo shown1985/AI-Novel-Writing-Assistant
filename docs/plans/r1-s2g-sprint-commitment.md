@@ -55,6 +55,12 @@ Wave 2
 - Retrospective：carryover `0`。流程改进（最多两项）：(1) 将来源页 Computer Use 与并发冲突场景列为 CAS Story 的必备退出证据；(2) 固定隔离运行路径并同时记录持久化、草稿、operation 计数和服务清理结果，减少“代码通过但 UI 未闭环”的返修往返。
 - 文档判断：本次是既有 CAS 合同的验收闭环，没有新增长期架构或工作流规则，Wiki 无需更新；README 与 release notes 已记录用户行为，本次不重复新增条目。
 
+## beta 组合验证
+
+- beta 合并提交：`eaa8cce8`，双亲 `32b2e9c7` / `21c7642e`，merge tree 一致。
+- Terra 权威证据：shared/server/client build/typecheck PASS；服务端 8 文件 `45/45`、client `3/3`，合计 `48/48`；验证前后工作树均 clean。Computer Use 证据复用既有隔离路径与 Sprint/Story 合同。
+- R1-S2G beta 集成：PASS。Release 1 尚未完成；R1-03 当前仍为 `PASS=9 / BLOCKED=2 / REVIEW=1`，公开发布 workflow 触发规则、macOS 打包 workflow、macOS x64 支持范围仍待处理。
+
 ## Sprint 级验收与退出门
 
 - S2-04b4：三入口均以显式 attribution context 写入同一 request scope；director 以完整 runtime frame 为最高优先级；两个小说并发不串线；内部 read service 只把 `reconstructRequest=null` 映射为 `not_found`，以 `attributionStatus=complete|partial|unattributed` 表示归因，只有真实 execution evidence 才透传 `evidenceStatus=complete|partial|missing`；无读取模型调用，无公共 API/UI/schema/migration。
@@ -71,4 +77,4 @@ Wave 2
 - 新 Prisma migration、schema 字段、数据库 reset 或用户库修复；Release gate 的 PostgreSQL apply 仍按既有计划处理。
 - 新公理编辑器或普通世界编辑 UI；本卡只把既有公理保存控件接到 CAS 合同。
 
-退出判断：`S2-04b4=5` 与 `S3-02b1=3` 均完成真实行为证据及必要 UI 验收，R1-S2G 计为 `8/8` 并关闭 Sprint Review/Retrospective；beta 组合验证仍是 Release 晋级门，不等同于自动启动下一 Story。
+退出判断：`S2-04b4=5` 与 `S3-02b1=3` 均完成真实行为证据及必要 UI 验收，R1-S2G 计为 `8/8` 并关闭 Sprint Review/Retrospective；beta 组合验证已通过（`eaa8cce8`，merge tree 一致，48/48 定向检查与 shared/server/client build/typecheck PASS），但 Release 1 仍未完成；不等同于自动启动下一 Story。

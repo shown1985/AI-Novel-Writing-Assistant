@@ -1,9 +1,9 @@
 # 当前项目看板：Release 1 单机成书版
 
 更新时间：2026-09-20
-当前分支：`codex/r1-s2g-attribution-world-writes`
+当前分支：`beta`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S2G 已完成；承诺/完成 8/8 点、无 Stretch；S2-04b4 与 S3-02b1 均 Done，Sprint Review/Retrospective 已关闭
+当前状态：R1-S2G 已完成并通过 beta 组合验证；承诺/完成 8/8 点、无 Stretch；S2-04b4 与 S3-02b1 均 Done，Sprint Review/Retrospective 已关闭。Release 1 仍未完成。
 
 ## 权威文档
 
@@ -231,6 +231,13 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 - S2-04b4 必须证明三入口显式归因、director 完整 frame 优先、并发隔离；`reconstructRequest=null` 只产生 `not_found`，持久 legacy/unattributed 使用 `attributionStatus=unattributed`，只有真实 execution evidence 才能出现 `evidenceStatus=missing`；不以 S2-04c UI 或其他入口覆盖率代替。
 - S3-02b1 必须证明两个路径同一 CAS 门面、缺保护字段业务返回 428、revision/operation 冲突返回 409、公理保存显式 revision 与稳定 operationId 重试复用；不以新增普通编辑 UI 或 migration 代替。原 S3-02b 其余入口继续 Refinement。
 - Sprint Review/Retrospective 已关闭：S2-04b4 与 S3-02b1 均 Done，R1-S2G 完成 `8/8`、carryover `0`。Computer Use PASS 证据见 Sprint 合同与 Story 合同；不启动或承诺下一 Story。
+
+## R1-S2G beta 组合验证
+
+- beta 合并提交：`eaa8cce8`，双亲为 `32b2e9c7` / `21c7642e`，merge tree 一致。
+- Terra 权威验证：shared/server/client build/typecheck PASS；服务端 8 文件 `45/45`、client `3/3`，合计 `48/48`；验证前后工作树均 clean。Computer Use 证据复用既有 Sprint/Story 合同，不重复执行。
+- R1-S2G beta 集成结论：PASS。该结论只关闭本 Sprint 的 beta 组合门，不代表 Release 1 完成，也不启动下一 Story。
+- R1-03 当前发布静态门仍为 `PASS=9 / BLOCKED=2 / REVIEW=1`；待处理项为公开发布 workflow 触发规则、macOS 打包 workflow，以及 macOS x64 支持范围。
 
 ## Release 1 后续队列
 

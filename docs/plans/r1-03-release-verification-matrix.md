@@ -10,6 +10,11 @@
 - 基线：`codex/r1-s0-release-readiness@ec19dde7`，已包含 `origin/main@e3545c1f`（`v0.4.25`）及 R1-00～02。
 - Owner / 文件边界：R1-03 验证 owner 独占本文与 `scripts/release/r1-03-static-gate-audit.cjs`；R1-02 owner 独占十章 fixture；R1-RC01 数据升级 owner 独占升级/备份 fixture；R1-RC02 桌面发布 owner 独占包装与工作流。
 
+## beta 组合验证状态
+
+- R1-S2G beta 组合验证：PASS。权威合并提交为 `eaa8cce8`，双亲 `32b2e9c7` / `21c7642e`，merge tree 一致；shared/server/client build/typecheck PASS，服务端 8 文件 `45/45`、client `3/3`，合计 `48/48`；验证前后工作树均 clean。Computer Use 证据复用既有 Sprint/Story 合同。
+- Release 1 尚未完成。R1-03 当前静态状态仍为 `PASS=9 / BLOCKED=2 / REVIEW=1`；剩余待处理项：公开发布 workflow 触发规则、macOS 打包 workflow、macOS x64 支持范围。
+
 ## 证据类型与判定
 
 | 类型 | 能证明什么 | 不能替代什么 |
