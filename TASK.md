@@ -3,7 +3,7 @@
 更新时间：2026-09-20
 当前分支：`codex/r1-s2h-model-provenance-ui`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S2H 已冻结并进入实施；只承诺 S2-04c1 3 点、无 Stretch，目标是在实况窗口只读显示预计与实际模型来源。Release 1 仍未完成。
+当前状态：R1-S2H 只承诺 S2-04c1 3 点、无 Stretch；代码与自动化验证已完成，Story 保持 User Acceptance，等待 Computer Use 用户验收。Release 1 仍未完成。
 
 ## 权威文档
 
@@ -242,10 +242,11 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 ## 当前 Sprint：R1-S2H 实况模型来源可见
 
 - Sprint Goal：作者在实况窗口中能看懂本次调用的预计选择、实际采用结果和备用链；读取不改变配置、任务或生成结果。
-- 承诺：`S2-04c1`，3 点；无 Stretch。Story 合同：[S2-04c1](./docs/plans/s2-04c1-live-model-provenance-contract.md)，Sprint 合同：[R1-S2H](./docs/plans/r1-s2h-sprint-commitment.md)。
+- 承诺：`S2-04c1`，3 点；无 Stretch。代码完成但 UI 用户验收待完成，Story 状态为 User Acceptance，Sprint 完成点数 `0/3`。Story 合同：[S2-04c1](./docs/plans/s2-04c1-live-model-provenance-contract.md)，Sprint 合同：[R1-S2H](./docs/plans/r1-s2h-sprint-commitment.md)。
 - 范围：最小脱敏 GET、shared public DTO、`LlmLiveContext.requestId` 显式传播、`LiveExecutionDialog` 只读摘要/详情及行为测试。
 - 非范围：Task Center、`NovelTaskDrawer`、全局历史或按 task/novel 反查、schema/migration、配置/任务写入、S3 与 RC。
 - Owner：单一 GPT-5.6 Luna xhigh 全栈 Agent；根 Agent 负责 PO/Scrum/集成；实现完成后由 GPT-5.6 Terra medium 独立 QC。
+- 证据：shared/server/client build/typecheck PASS；server 聚焦 `5/5`、client 最终 `4/4`，Terra QC 已修复预计文案 P1 并复验 PASS，`git diff --check` PASS。Computer Use 真实尝试因 macOS 锁屏阻塞，未使用真实库或付费模型；服务已停止，隔离 fixture 已移除。
 
 ## Release 1 后续队列
 

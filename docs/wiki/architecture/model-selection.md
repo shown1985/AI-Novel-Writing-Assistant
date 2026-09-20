@@ -35,7 +35,7 @@
 
 ### 解析来源证据
 
-- 模型来源必须由实际 resolver 在解析 provider、model、temperature 和 maxTokens 时同步生成；客户端、实况或历史查询不得根据“当前设置”反推一次旧调用。
+- 模型来源必须由实际 resolver 在解析 provider、model、temperature 和 maxTokens 时同步生成；实况中的“预计模型”只能来自该次调用显式提供的 live context；客户端或历史查询不得根据“当前设置”反推一次旧调用。
 - 每个字段分别记录 `requested / effective / source / adjustments`。同一次调用允许字段来自不同来源，例如厂商由显式请求指定、模型来自厂商配置、温度和 Token 上限来自任务路由。
 - source 只表达确定事实：显式请求、任务路由、任务默认、厂商配置、环境配置、内建默认、备用默认、系统默认或未知。旧记录没有证据时使用 `unknown`，不能补造来源。
 - adjustment 保存发生修正前后的值、执行修正时的 provider 与结构化原因。provider 必须归属于产生该修正的解析层；如果任务路由先按 DeepSeek 限制 Token、随后显式请求把最终厂商覆盖为 OpenAI，限制记录仍归因于 DeepSeek。当前覆盖厂商 Token 上限、历史 4096 占位、固定/最小/最大温度，以及结构化输出的 Token 截断或省略。
@@ -45,7 +45,7 @@
 
 ### 实际调用尝试证据边界
 
-- “预计使用模型”来自 resolver；“实际调用模型”只能来自真实 provider transport 尝试。Token 用量表、十分钟 live interaction 和当前模型配置都不能回填历史 attempt。
+- “预计使用模型”来自 resolver 并随该次调用的 live context 显式提供；“实际调用模型”只能来自真实 provider transport 尝试，并以 adopted persisted attempt 作为作者可见事实。Token 用量表、十分钟 live interaction 和当前模型配置都不能回填历史 attempt。
 - 生产 text invoke/stream 与 structured invoke/stream 共享同一 request/attempt 运行时边界：每次物理 transport 调用先建立 attempt，再以 `succeeded / failed / cancelled` 结束；结构化校验、修复或语义协调完成后另记录 `adopted / not_adopted`。这样可以区分“服务商完成了响应”和“该候选被业务采用”，避免重试或修复覆盖真实来源。
 - attempt recorder 是旁路观测能力。start/finalize/repository 失败时，调用结果、调用次数、重试/备用策略、正文和任务状态保持不变，并通过 `complete / partial / missing` 标识证据完整度；原因是证据缺失不应触发一次新的创作调用或改变作者已得到的结果。
 - 一个逻辑 request 可以包含多个有序 attempt。每次 invoke/stream、transport retry、structured strategy retry、JSON repair、semantic retry 和 fallback 都有独立 `attemptId`、`attemptIndex`、role、route tier 与 parent；transport 状态和最终是否被采用必须分开记录。
@@ -76,7 +76,7 @@
 - `evidenceStatus=complete|partial|missing` 仍属于实际执行观察事实，只能透传调用方同时提供的真实 `ModelAttemptExecutionEvidence`，不能由读服务按归因缺失、空投影或 repository 读取结果推断。
 - 未覆盖入口和历史旧记录保留 `legacy_unknown/unattributed`；不得回填新身份，也不得因为读投影完成而扩大为公开 API 或调用历史 UI。
 
-这套读投影是内部平台能力，供后续受控消费；它不等于作者已经能在界面查看所有调用来源。只读显示应另行冻结数据合同、身份隔离和用户验收，不得把内部归因 PASS 夸大为全系统透明度已交付。
+这套读投影是内部平台能力，供后续受控消费；public read DTO 必须显式白名单映射，不能直接序列化内部投影。实况 requestId 必须从 attempt scope 显式传入；读取只读，不反查调用历史，也不等于作者已经能在界面查看所有调用来源。只读显示应另行冻结数据合同、身份隔离和用户验收，不得把内部归因 PASS 夸大为全系统透明度已交付。
 
 #### 失败模式
 

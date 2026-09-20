@@ -6,6 +6,7 @@ import { useLlmLiveFeed } from "@/hooks/useLlmLiveFeed";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { LlmSourceSummary } from "@/components/common/LlmSourceSummary";
 
 function phaseLabel(phase: string): string {
   const labels: Record<string, string> = {
@@ -60,9 +61,9 @@ function SessionModelRoute({
   return (
     <span
       className={cn("block truncate text-[10px] text-emerald-100/55", className)}
-      title={`本次调用：厂商 ${provider}，模型 ${model}`}
+      title={`预计路由：厂商 ${provider}，模型 ${model}`}
     >
-      厂商 <span className="text-emerald-100/80">{provider}</span>
+      预计使用：厂商 <span className="text-emerald-100/80">{provider}</span>
       <span className="px-1 text-emerald-400/45">·</span>
       模型 <span className="text-emerald-100/80">{model}</span>
     </span>
@@ -410,6 +411,7 @@ export default function LiveExecutionDialog(props: LiveExecutionDialogProps) {
                   </div>
                   <div className="mb-1 truncate text-[11px] text-emerald-100/45">{latestSession.phaseMessage}</div>
                   <SessionModelRoute session={latestSession} className="mb-1" />
+                  <LlmSourceSummary session={latestSession} scopeKey={props.taskId} />
                   <SessionMetrics session={latestSession} nowMs={nowMs} />
                   {latestSession.reasoning ? (
                     <>
@@ -460,6 +462,7 @@ export default function LiveExecutionDialog(props: LiveExecutionDialogProps) {
                               <span className="text-[11px] text-emerald-100/60">{session.phaseMessage}</span>
                               <SessionModelRoute session={session} className="max-w-full" />
                             </div>
+                            <LlmSourceSummary session={session} scopeKey={props.taskId} />
                             <div className="mb-2"><SessionMetrics session={session} nowMs={nowMs} /></div>
                             {session.context.promptText ? (
                               <div className="mb-2">

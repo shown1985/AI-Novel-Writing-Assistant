@@ -29,7 +29,7 @@ export class LlmLiveBroker {
     this.pruneCompletedSessions();
     const now = new Date();
     const interactionId = input.interactionId ?? randomUUID();
-    const context: LlmLiveContext = { ...input, interactionId };
+    const context: LlmLiveContext = { ...input, requestId: input.requestId ?? null, interactionId };
     const snapshot: LlmLiveSessionSnapshot = {
       context,
       seq: this.nextSequence(),

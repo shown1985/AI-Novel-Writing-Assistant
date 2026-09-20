@@ -107,3 +107,53 @@ export interface ModelAttemptLineage {
   attemptIndex: number | null;
   role: ModelAttemptRole;
 }
+
+/**
+ * Public, read-only model-attempt evidence used by the live execution view.
+ * Keep this contract deliberately smaller than the server-side attempt record:
+ * prompt identity, usage, attribution identity, and provider response details
+ * never cross this boundary.
+ */
+export type LlmAttemptProvenanceStatus = "found" | "not_found" | "error";
+export type LlmAttemptAttributionStatus = "complete" | "partial" | "unattributed";
+export type LlmAttemptProvenanceRole = ModelAttemptRole;
+export type LlmAttemptProvenanceRouteTier = "primary" | "fallback" | "unknown";
+export type LlmAttemptProvenanceAttemptStatus = "started" | "succeeded" | "failed" | "cancelled" | "unknown";
+export type LlmAttemptProvenanceAdoption = "pending" | "adopted" | "not_adopted" | "unknown";
+export type LlmAttemptFailureCategory = "transport" | "timeout" | "cancelled" | "validation" | "unknown";
+export type LlmAttemptFailureCode =
+  | "transport_unknown"
+  | "transport_error"
+  | "upstream_timeout"
+  | "stream_missing_output"
+  | "request_cancelled"
+  | "validation_failed"
+  | "rate_limited"
+  | "authentication_failed"
+  | "provider_unavailable";
+
+export interface LlmAttemptProvenanceAttempt {
+  attemptId: string;
+  parentAttemptId: string | null;
+  attemptIndex: number;
+  role: LlmAttemptProvenanceRole;
+  routeTier: LlmAttemptProvenanceRouteTier;
+  status: LlmAttemptProvenanceAttemptStatus;
+  finalAdoption: LlmAttemptProvenanceAdoption;
+  provider: string | null;
+  model: string | null;
+  failureCode: LlmAttemptFailureCode | null;
+  failureCategory: LlmAttemptFailureCategory | null;
+  retryable: boolean | null;
+  startedAt: string;
+  finishedAt: string | null;
+  durationMs: number | null;
+}
+
+export interface LlmAttemptProvenance {
+  status: LlmAttemptProvenanceStatus;
+  requestId: string;
+  attributionStatus: LlmAttemptAttributionStatus;
+  adoptedAttemptId: string | null;
+  attempts: LlmAttemptProvenanceAttempt[];
+}

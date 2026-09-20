@@ -584,9 +584,11 @@ async function streamStructuredPromptInContext<I, O, R = O>(input: {
   });
   const startedAt = Date.now();
   const renderedPromptChars = estimateRenderedPromptChars(prepared.messages);
+  const requestState = getModelAttemptRequestState();
   const liveSession = beginLlmLiveSession({
     label: input.asset.id + "@" + input.asset.version,
     mode: "structured",
+    requestId: requestState?.requestId ?? null,
     promptMeta: prepared.invocation,
     provider: input.options?.provider,
     model: input.options?.model,
@@ -597,7 +599,6 @@ async function streamStructuredPromptInContext<I, O, R = O>(input: {
   let modelAttempt: ModelAttemptCandidate | null = null;
   let transportCompleted = false;
   let transportUsage: LlmTokenUsageSnapshot | null = null;
-  const requestState = getModelAttemptRequestState();
   try {
     const llm = await promptRunnerLLMFactory(input.options?.provider, {
       fallbackProvider: "deepseek",

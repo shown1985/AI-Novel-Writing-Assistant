@@ -204,6 +204,7 @@ async function executeTextPromptInContext<I>(input: {
   const liveSession = beginLlmLiveSession({
     label: input.asset.id + "@" + input.asset.version,
     mode: "text",
+    requestId: getModelAttemptRequestState()?.requestId ?? null,
     promptMeta: prepared.invocation,
     provider: input.options?.provider,
     model: input.options?.model,
@@ -349,9 +350,11 @@ async function executeTextPromptStreamInContext<I>(input: {
     novelId: input.options?.novelId,
   });
   const renderedPromptChars = estimateRenderedPromptChars(messages);
+  const requestState = getModelAttemptRequestState();
   const liveSession = beginLlmLiveSession({
     label: input.asset.id + "@" + input.asset.version,
     mode: "text",
+    requestId: requestState?.requestId ?? null,
     promptMeta: prepared.invocation,
     provider: input.options?.provider,
     model: input.options?.model,
@@ -361,7 +364,6 @@ async function executeTextPromptStreamInContext<I>(input: {
   let attempt: ModelAttemptCandidate | null = null;
   let transportCompleted = false;
   let transportUsage: LlmTokenUsageSnapshot | null = null;
-  const requestState = getModelAttemptRequestState();
   try {
     const llm = await dependencies.llmFactory(input.options?.provider, {
       fallbackProvider: "deepseek",
