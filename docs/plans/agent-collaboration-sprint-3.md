@@ -2,7 +2,7 @@
 
 ## 范围、状态与估点
 
-本页展开[路线图](./agent-collaboration-sprints.md)的 S3-00～S3-06，目标是可靠 Prompt 登记、内容版本、可信评估来源、持续问题历史和作者留白。S3-01 与 S3-02a 已分别完成 Prompt 能力边界和世界样本安全提交边界；R1-S2G 当前只承诺新稳定 ID `S3-02b1` 的 `updateWorld`/`updateAxioms` 两条既有保存路径。原 `S3-02b` 父项其余旧入口留在 Refinement，其他生产卡仍须在 S1-06 的版本、来源、运行承接和可空决定合同满足后按依赖推进，不能把已完成的底座解释为全部世界维护能力已上线。
+本页展开[路线图](./agent-collaboration-sprints.md)的 S3-00～S3-06，目标是可靠 Prompt 登记、内容版本、可信评估来源、持续问题历史和作者留白。S3-01、S3-02a 与 R1-S2G 的 S3-02b1 已分别完成 Prompt 能力边界、世界样本安全提交边界和两条既有保存路径 CAS 接线。原 `S3-02b` 父项其余旧入口留在 Refinement，其他生产卡仍须在 S1-06 的版本、来源、运行承接和可空决定合同满足后按依赖推进，不能把已完成的底座解释为全部世界维护能力已上线。
 
 原候选总量为 28 点。展开后对 Prompt 静态登记门、版本接线、双侧同步、历史兼容和上下文消费分别验收，重新估算为 **36 相对点**，不是单个验收窗口的承诺或工时。每张不超过 5 点；拆分不会把原 Story 的保护条件移出 Done。
 
@@ -70,7 +70,7 @@ S3-04 读取 S1-06 冻结的可空决定集合，不等待 S3-06 的写操作。
 
 作为作者，我希望现有世界字段和公理保存不会覆盖我刚保存的内容，并能在冲突后沿来源页安全重试。
 
-- 状态：**User Acceptance（R1-S2G）**；3 点，代码级验证通过但尚未计入 Done；依赖 S3-02a 已 Done。Terra 代码级 PASS：maintenance/runtime/migration/service/route `25/25`、client CAS `3/3`，shared/server/client build/typecheck PASS；Computer Use 工具不可用，真实公理来源页点击未验收。单一世界 Runtime 全栈 owner 独占 `WorldService.updateWorld`、既有 world HTTP/API、`updateAxioms` client/API/UI 与定向测试。
+- 状态：**Done（R1-S2G）**；3 点，依赖 S3-02a 已 Done。Terra 代码级 PASS：maintenance/runtime/migration/service/route `25/25`、client CAS `3/3`，shared/server/client build/typecheck PASS；Computer Use PASS。隔离路径 `/tmp/ai-novel-qc-s3-runtime-20260920000000` 成功保存 `revision 1→2` 并刷新持久；并发合法写使 `2→3`，旧页面保存得到 `CONTENT_REVISION_CONFLICT`，草稿即时保留且数据库保留较新内容，仅两条 committed operation；client retry harness `3/3`。服务已停止，UI QC 结束时工作树干净。单一世界 Runtime 全栈 owner 独占 `WorldService.updateWorld`、既有 world HTTP/API、`updateAxioms` client/API/UI 与定向测试。
 - 详细合同：[S3-02b1 世界编辑与公理保存 CAS 合同](./s3-02b1-world-edit-axiom-cas-contract.md)。本卡只接 `WorldService.updateWorld` 兼容 HTTP/API 与 `updateAxioms` 既有公理来源页，不新增普通编辑 UI；原 S3-02b 父项其余旧入口留 Refinement。
 - 冻结业务保护：请求 schema 可选解析 `operationId`/`expectedContentRevision`，但业务缺任一字段返回 428/`REVISION_REQUIRED` 且零写入；revision 冲突和 operationId/hash 冲突返回 409；客户端公理保存显式传当前 revision 与稳定 operationId，网络重试复用该 ID。
 - 统一写门面：两个方法都构造完整 candidate aggregate 并复用 S3-02a CAS/operation/receipt；不在客户端/路由复制 CAS，不保留无条件 `prisma.world.update` 旁路。
@@ -78,7 +78,7 @@ S3-04 读取 S1-06 冻结的可空决定集合，不等待 S3-06 的写操作。
 - AC：两个路径共享 CAS；缺保护字段 428、冲突 409、同 operation 重放不重复递增；公理 UI 请求含显式 revision/稳定 operationId 且重试复用；RAG 失败不回滚内容；跨世界不串数据。
 - 检查：`WorldService`/HTTP 428-409 行为、CAS 并发/重放/事务失败、`WorldAxiomsCard` payload/retry/409 草稿保留与跨世界隔离；复用现有 runtime migration 证据但不新增 migration。完整 DoR/AC/验证见 `S3-02b1` 详细合同。
 
-R1-S2G 当前验收进展：代码级检查已通过，但真实来源页 UI 点击尚未验收，因此本卡保持 User Acceptance，3 点不计 Done；原 S3-02b 父项其余入口继续 Refinement，不启动下一 Story。
+R1-S2G 已完成 `8/8`：S2-04b4 `5` 点与 S3-02b1 `3` 点均为 Done，且 S3-02b1 已完成真实来源页 UI QC。原 S3-02b 父项其余入口继续 Refinement，不启动或承诺下一 Story。
 
 ## S3-03a：本书世界独立内容版本
 

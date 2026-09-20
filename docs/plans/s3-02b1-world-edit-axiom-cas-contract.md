@@ -4,7 +4,7 @@
 
 - Release / Sprint：Release 1 / R1-S2G。
 - 稳定 Story ID：`S3-02b1`。原 `S3-02b` 是更宽的父项；其余未接入旧入口留在 Refinement，不由本合同隐式继承或完成。
-- 状态 / 点数：User Acceptance / 3 点（代码级验证通过，尚未计入 Done）。
+- 状态 / 点数：Done / 3 点。
 - 用户价值：作者在世界来源页保存普通世界字段或核心公理时，系统会依据作者看到的内容版本安全提交；保存请求缺少版本或操作身份时不会静默覆盖，重复/过期请求能得到可理解的 428/409 结果并安全重试。
 - 依赖：S3-02a 已 Done；复用已存在的 `World.contentRevision`、`WorldMaintenanceOperation`、`WorldMaintenanceCommitReceipt`、CAS/幂等提交门面和既有迁移。无新 migration。
 - Owner：单一世界 Runtime 全栈 owner。该 owner 覆盖 `WorldService.updateWorld`、既有 world HTTP/API 兼容映射、`updateAxioms` 来源页的 client API/UI 接线和定向测试；根集成人只做合同审阅、组合验证与阶段集成。
@@ -93,7 +93,7 @@
 
 - 两条路径真实调用同一 CAS 门面；428/409、重放、并发、RAG 资料债和跨 world 隔离均有行为证据。
 - Terra 代码级 PASS：maintenance/runtime/migration/service/route 定向检查 `25/25`、client CAS 检查 `3/3`，shared/server/client build/typecheck PASS；无新增 migration，未宣称其他旧写入口已收敛。
-- 公理来源页请求携带显式 revision/稳定 operationId，并能在冲突/重试后保留草稿；但 Computer Use 工具不可用，真实来源页点击尚未验收，因此本 Story 保持 User Acceptance，3 点不计 Done。
+- 公理来源页请求携带显式 revision/稳定 operationId，并能在冲突/重试后保留草稿。Computer Use PASS：隔离路径 `/tmp/ai-novel-qc-s3-runtime-20260920000000` 成功保存 `revision 1→2` 并刷新持久；并发合法写使 `2→3`，旧页面保存得到 `CONTENT_REVISION_CONFLICT`，草稿即时保留且数据库保留较新内容，仅两条 committed operation；client retry harness `3/3`。服务已停止，UI QC 结束时工作树干净。本 Story 计入 Done。
 - `git diff --check` 作为阶段集成检查。
 - 本 Story 不新增 schema/migration；长期 Wiki、README/release notes 判断由根集成人在阶段集成时处理，本页不代替这些记录。
 

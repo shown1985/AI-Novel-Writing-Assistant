@@ -39,8 +39,8 @@
 | --- | --- | --- | --- |
 | R1-S0 路线重整 | 重新核对上游现状、单机边界、验收基线和首个承诺 Backlog | `R1-00～04` | Backlog 可追溯，首个实施 Sprint 满足 DoR |
 | R1-S1 配置与安全阅读 | 先解除 SQLite 升级阻断，再冻结被动诊断门、恢复阅读现场和世界归属安全 | `R1-MIG01`、`S1-00/04/05/06` | [15 点承诺窗口](./r1-s1-sprint-commitment.md)通过 |
-| R1-S2 单书工作台 | 正文优先、一个推荐动作、模型来源可追溯 | `S2-01～04` 的细分卡；前两窗补齐 P0 配置/诊断 Backlog | S2A～S2F 已通过（S2F `8/8`）；R1-S2G 当前完成 `5/8` 点：S2-04b4 已 Done，只做三入口内部归因/读投影，不接 04c UI/API |
-| R1-S3 可信世界 | 世界版本、评估来源、作者决定和历史可信 | `S3-00～06` 的细分卡 | S3-01、S3-02a 已完成；R1-S2G 的 S3-02b1 为 User Acceptance（3 点未计 Done），仅接 `updateWorld`/`updateAxioms` CAS，原 S3-02b 其余旧入口保持 Refinement |
+| R1-S2 单书工作台 | 正文优先、一个推荐动作、模型来源可追溯 | `S2-01～04` 的细分卡；前两窗补齐 P0 配置/诊断 Backlog | S2A～S2F 已通过（S2F `8/8`）；R1-S2G 已完成 `8/8` 点：S2-04b4 与 S3-02b1 均 Done，不接 04c UI/API |
+| R1-S3 可信世界 | 世界版本、评估来源、作者决定和历史可信 | `S3-00～06` 的细分卡 | S3-01、S3-02a、S3-02b1 已完成；S3-02b1 仅接 `updateWorld`/`updateAxioms` CAS，原 S3-02b 其余旧入口保持 Refinement |
 | R1-S4 世界修改闭环 | 提案、差异、采用、复核和失败恢复在来源页闭环 | `S4-01～05` 的细分卡 | 保存和验证分离，刷新不重复采用 |
 | R1-S5 本机委托与预算 | 任务范围、模型策略、总预算、保存暂停和同任务恢复 | Sprint 5～6 实施卡 | 取消/恢复/重试共用一份任务账本 |
 | R1-S6 记忆与资产 | 本书记忆、人物/正文/规划修改、资产适配与来源保护 | Sprint 7 实施卡 | 已发布稿和作者保护内容不被覆盖 |
@@ -49,16 +49,16 @@
 
 既有详细 Story 以[作者协作交互与 AI 能力 Sprint](./agent-collaboration-sprints.md)为准，不在本页重复计点。
 
-### R1-S2G 当前承诺窗口
+### R1-S2G 已完成窗口
 
-R1-S2G 是 Release 1 当前实施 Sprint，承诺 `8` 点、已完成 `5/8` 点、无 Stretch，规划基线为 `codex/r1-s2g-attribution-world-writes@32b2e9c7`。S2-04b4 已 Done；S3-02b1 代码级验证通过但保持 User Acceptance，Sprint Review 尚未关闭：
+R1-S2G 是 Release 1 已完成实施 Sprint，承诺/完成 `8/8` 点、无 Stretch，规划基线为 `codex/r1-s2g-attribution-world-writes@32b2e9c7`。Sprint Review 与 Retrospective 已关闭：
 
 | Story | 点数 | 状态 | 当前范围 | 明确不带入 |
 | --- | ---: | --- | --- | --- |
 | [S2-04b4 首批身份归因与内部读投影](./s2-04b4-attribution-read-projection-contract.md) | 5 | Done | 自动导演完整 runtime frame、本书 `novel-world-generate`、章节 `ai-revision-preview` 三个显式 context；director frame 整体优先；内部 read service/tests；Terra 最终 PASS，shared/server build、三文件定向检查 `20/20`，无 UI | 公开 API/UI、shared/public DTO、schema/migration、S2-04c、其他入口/batch/旧记录回填 |
-| [S3-02b1 世界编辑与公理保存 CAS 兼容](./s3-02b1-world-edit-axiom-cas-contract.md) | 3 | User Acceptance | `WorldService.updateWorld` 兼容 HTTP/API；既有 `updateAxioms` UI 显式 revision + 稳定 operationId；统一 CAS；Terra 代码级 PASS（maintenance/runtime/migration/service/route `25/25`、client CAS `3/3`，shared/server/client build/typecheck PASS） | Computer Use 工具不可用，真实公理来源页点击未验收；普通编辑新 UI、原 S3-02b 父项其余旧写入口、提案/评估/同步/快照、schema/migration |
+| [S3-02b1 世界编辑与公理保存 CAS 兼容](./s3-02b1-world-edit-axiom-cas-contract.md) | 3 | Done | `WorldService.updateWorld` 兼容 HTTP/API；既有 `updateAxioms` UI 显式 revision + 稳定 operationId；统一 CAS；Terra 代码级 PASS（maintenance/runtime/migration/service/route `25/25`、client CAS `3/3`，shared/server/client build/typecheck PASS）；Computer Use PASS，隔离路径保存/刷新、并发冲突与草稿保留、两条 committed operation、client retry harness `3/3` 均通过 | 普通编辑新 UI、原 S3-02b 父项其余旧写入口、提案/评估/同步/快照、schema/migration |
 
-两张卡均已写明 DoR、AC、owner、非范围和最窄验证。当前 Sprint 只完成 `5/8` 点，不宣称窗口完成或 Release 1 可发布；S2-04c、S3-03～06、原 S3-02b 父项其余旧世界入口、S4+ 均不因本窗口验收自动标为 Ready，也不启动下一 Story。
+两张卡均已写明 DoR、AC、owner、非范围和最窄验证。R1-S2G 已完成 `8/8` 点并关闭 Review/Retrospective，但这不代表 Release 1 可发布；S2-04c、S3-03～06、原 S3-02b 父项其余旧世界入口、S4+ 均不因本窗口完成自动标为 Ready，也不启动或承诺下一 Story。
 
 ### R1-S0 新增 Story
 
