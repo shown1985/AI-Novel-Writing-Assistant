@@ -146,6 +146,15 @@ export interface ModelAttemptRequestEvidence {
 
 export type ModelAttemptEvidenceStatus = "complete" | "partial" | "missing";
 
+/** Internal read-projection states; they are not public/shared DTO values. */
+export type ModelAttemptAttributionStatus = "complete" | "partial" | "unattributed";
+export type ModelAttemptReadStatus = "found" | "not_found" | "error";
+export type ModelAttemptAttributionIssue =
+  | "director_frame_missing"
+  | "director_frame_incomplete"
+  | "director_frame_conflict"
+  | "nested_attribution_conflict";
+
 export interface ModelAttemptObservationIssue {
   phase: "start" | "finalize";
   attemptId: string;
@@ -158,6 +167,8 @@ export interface ModelAttemptExecutionEvidence {
   requestId: string;
   evidenceStatus: ModelAttemptEvidenceStatus;
   observationIssues: ModelAttemptObservationIssue[];
+  /** Internal diagnostic for a request that could not capture a safe frame. */
+  attributionIssue?: ModelAttemptAttributionIssue;
 }
 
 export const LEGACY_UNKNOWN_ATTRIBUTION: ModelAttemptAttribution = {

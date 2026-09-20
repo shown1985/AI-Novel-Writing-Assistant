@@ -4,7 +4,7 @@
 
 - Release / Sprint：Release 1 / R1-S2G。
 - 稳定 Story ID：`S3-02b1`。原 `S3-02b` 是更宽的父项；其余未接入旧入口留在 Refinement，不由本合同隐式继承或完成。
-- 状态 / 点数：In Progress（规划冻结后派发）/ 3 点。
+- 状态 / 点数：User Acceptance / 3 点（代码级验证通过，尚未计入 Done）。
 - 用户价值：作者在世界来源页保存普通世界字段或核心公理时，系统会依据作者看到的内容版本安全提交；保存请求缺少版本或操作身份时不会静默覆盖，重复/过期请求能得到可理解的 428/409 结果并安全重试。
 - 依赖：S3-02a 已 Done；复用已存在的 `World.contentRevision`、`WorldMaintenanceOperation`、`WorldMaintenanceCommitReceipt`、CAS/幂等提交门面和既有迁移。无新 migration。
 - Owner：单一世界 Runtime 全栈 owner。该 owner 覆盖 `WorldService.updateWorld`、既有 world HTTP/API 兼容映射、`updateAxioms` 来源页的 client API/UI 接线和定向测试；根集成人只做合同审阅、组合验证与阶段集成。
@@ -92,8 +92,9 @@
 ## Definition of Done 与交付证据
 
 - 两条路径真实调用同一 CAS 门面；428/409、重放、并发、RAG 资料债和跨 world 隔离均有行为证据。
-- 公理来源页真实保存请求携带显式 revision/稳定 operationId，并能在冲突/重试后保留草稿；UI 验收由 QC/用户按既有工作台完成。
-- server/client 定向检查、build/typecheck、迁移无新增证明和 `git diff --check` 结果记录；不宣称其他旧写入口已收敛。
+- Terra 代码级 PASS：maintenance/runtime/migration/service/route 定向检查 `25/25`、client CAS 检查 `3/3`，shared/server/client build/typecheck PASS；无新增 migration，未宣称其他旧写入口已收敛。
+- 公理来源页请求携带显式 revision/稳定 operationId，并能在冲突/重试后保留草稿；但 Computer Use 工具不可用，真实来源页点击尚未验收，因此本 Story 保持 User Acceptance，3 点不计 Done。
+- `git diff --check` 作为阶段集成检查。
 - 本 Story 不新增 schema/migration；长期 Wiki、README/release notes 判断由根集成人在阶段集成时处理，本页不代替这些记录。
 
 ## 后续边界

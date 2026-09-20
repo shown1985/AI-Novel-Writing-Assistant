@@ -261,6 +261,8 @@ export interface WorldMaintenanceCommitCommand {
   operationId: string;
   expectedContentRevision: number;
   expectedDecisionRevision: number;
+  /** Optional stable intent hash for compatibility adapters that start from a partial request. */
+  requestHash?: string;
   candidateAggregate: WorldMaintenanceCandidateAggregate;
   selectedPatchIds: string[];
   sourceRef: string;

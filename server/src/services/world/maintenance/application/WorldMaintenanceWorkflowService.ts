@@ -54,6 +54,12 @@ function assertCommitCommand(command: WorldMaintenanceCommitCommand): void {
       operationId: command.operationId,
     });
   }
+  if (command.requestHash !== undefined && (typeof command.requestHash !== "string" || !command.requestHash.trim())) {
+    throw new WorldMaintenanceError(422, "PROPOSAL_INVALID", "世界提交包含无效的请求指纹。", {
+      field: "requestHash",
+      operationId: command.operationId,
+    });
+  }
 }
 
 function buildCommittedCandidate(
@@ -88,7 +94,7 @@ export class WorldMaintenanceWorkflowService {
 
     const candidateAggregate = buildCommittedCandidate(command.candidateAggregate);
     const selectedPatchIds = normalizeSelectedPatchIds(command.selectedPatchIds);
-    const requestHash = hashWorldMaintenanceValue({
+    const requestHash = command.requestHash ?? hashWorldMaintenanceValue({
       targetType: "world",
       targetId: worldId,
       operationType: "commit_world_sample",

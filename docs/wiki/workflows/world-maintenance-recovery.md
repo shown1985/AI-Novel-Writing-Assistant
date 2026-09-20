@@ -4,7 +4,7 @@
 
 世界样本与本书世界已经有结构化内容、同步、快照、深化问答和一致性检查，但这些入口尚未共享统一的内容版本、提交身份与恢复协议。部分旧入口只写扁平字段，部分归一化会过滤悬空引用，一致性检查也会替换旧观察。若直接在此基础上增加“AI 修正并采用”，容易覆盖作者刚保存的内容，或在响应丢失、刷新和服务重启后重复应用同一修改。
 
-本页记录已经签认的长期设计边界。它是后续 S3/S4 实施的约束，不表示 maintenance schema、API、Prompt、worker 或 UI 已经上线。完整评审证据见 [S1-06 合同](../../plans/s1-06-world-maintenance-recovery-contract.md)。
+本页记录已经签认的长期设计边界。它是后续 S3/S4 实施的约束；当前仅有首批 `updateWorld`/`updateAxioms` 保存路径接入 CAS，不能把这两条路径的完成理解为全量 maintenance schema、API、Prompt、worker 或 UI 已经上线。完整评审证据见 [S1-06 合同](../../plans/s1-06-world-maintenance-recovery-contract.md)。
 
 ## 决策
 
@@ -58,6 +58,17 @@ domain   Prompt port   persistence / lease / index ports
 commit 必须在一个事务中完成 ownership、proposal 状态、`contentRevision`、`decisionRevision`、保护范围和引用完整性校验，再写完整 aggregate、兼容投影、新 revision、before/after 证据、commit receipt 与 `committed_pending_verification`。任一校验失败整笔零内容写入。
 
 世界样本安全提交的运行时门面固定接收完整且已验证的 aggregate、`expectedContentRevision`、`expectedDecisionRevision` 与 `operationId`，通过 CAS 在同一事务内写入内容、兼容投影、revision、operation 和 receipt。相同 operation 重放原 receipt，不重复递增或派发索引；revision 冲突、缺少版本或 operation hash 复用冲突均在内容写入前结束。该边界将作者内容保护与后续旧写入口收敛分开，避免新安全入口静默改变既有编辑语义。
+
+### 首批世界写入口：updateWorld 与 updateAxioms
+
+R1-S2G 的首批生产接线只覆盖 `WorldService.updateWorld` 的既有 HTTP/API 兼容路径和世界来源页的 `updateAxioms` 公理保存。两条路径都必须先构造完整 candidate aggregate，再调用同一 CAS/operation/receipt 门面；客户端或路由不得复制 revision 比较、幂等去重或 receipt 持久化。
+
+- 请求可为了旧客户端解析而接受缺失的 `expectedContentRevision` 或 `operationId`，但业务层必须在任何读后写前拒绝，返回 HTTP `428` 与 `REVISION_REQUIRED`，且零 World、revision、operation、receipt、snapshot 和 RAG 写入。
+- 过期 `expectedContentRevision` 返回 HTTP `409` 与 `CONTENT_REVISION_CONFLICT`；相同 `operationId` 搭配不同 request hash 返回 HTTP `409` 与 `OPERATION_ID_REUSED`。拒绝不能覆盖后来作者内容。
+- 相同 `operationId` 与相同 request hash 的重试返回原结果/receipt，不重复递增 `contentRevision`，也不重复派发提交副作用。公理来源页在网络超时、未知响应或既有重试动作中复用同一 operationId；不能用新 ID 绕过冲突。
+- 服务器成功保存后，即使 RAG enqueue 失败，也保留已保存 World 与 revision，并把资料债交给既有恢复机制；不能回滚内容或创建第二次提交。
+
+这不是所有世界写入口的收敛：结构/分层/深化/导入/素材/快照/生成/整理、提案/评估/同步、批量历史修复和新普通编辑 UI 均不在首批范围，继续进入 Refinement/后续 Story。运行记录仍然只读，恢复、重试和保存动作仍回到来源页完成。
 
 本机 SQLite runtime migration 是安全提交可运行的必要条件；PostgreSQL apply 属 Release gate，在发布组合验证时单独执行，不把发布环境尚未 apply 混同为本地提交合同失败。两套 schema 仍须保持可验证的一致性，且任何迁移演练都只使用隔离数据库。
 
@@ -116,6 +127,7 @@ UI 不自行判断 proposal 是否仍可提交，也不把本地 pending 当作�
 ## 相关模块与来源
 
 - [S1-06 完整合同与审阅记录](../../plans/s1-06-world-maintenance-recovery-contract.md)
+- [S3-02b1 世界编辑与公理保存 CAS 合同](../../plans/s3-02b1-world-edit-axiom-cas-contract.md)
 - [世界上下文门面](../architecture/world-context-gateway.md)
 - [Prompt Registry 与结构化输出](../prompts/prompt-registry-and-structured-output.md)
 - [运行记录产品边界](../product/task-center-role.md)

@@ -1,9 +1,9 @@
 # 当前项目看板：Release 1 单机成书版
 
-更新时间：2026-09-19
+更新时间：2026-09-20
 当前分支：`codex/r1-s2g-attribution-world-writes`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S2G In Progress；8 点、无 Stretch；两张承诺卡均已满足 DoR，规划冻结后派发
+当前状态：R1-S2G In Progress；承诺 8 点、已完成 5/8 点、无 Stretch；S2-04b4 已 Done，S3-02b1 为 User Acceptance（3 点未计 Done）
 
 ## 权威文档
 
@@ -219,18 +219,18 @@ R1-S2F Review 与 Retrospective：见 [R1-S2F Sprint 承诺](./docs/plans/r1-s2f
 
 | Story | 点数 | 状态 | Owner | 验收边界 |
 | --- | ---: | --- | --- | --- |
-| S2-04b4 首批身份归因与内部读投影 | 5 | In Progress | 单一模型平台全栈 owner | [三入口 attribution context、director 完整 frame 优先、内部 read service；`reconstructRequest=null` 仅 `not_found`，归因另用 `attributionStatus`](./docs/plans/s2-04b4-attribution-read-projection-contract.md)；execution `evidenceStatus` 只透传真实 evidence；无 API/UI/schema/migration |
-| S3-02b1 世界编辑与公理保存最小 CAS 兼容接线 | 3 | In Progress | 世界 Runtime 全栈 owner | [仅 `WorldService.updateWorld` 兼容 HTTP/API 与 `updateAxioms` 既有 UI](./docs/plans/s3-02b1-world-edit-axiom-cas-contract.md)；428/409、稳定 operationId 重试、无新迁移；原 S3-02b 其余入口留 Refinement |
+| S2-04b4 首批身份归因与内部读投影 | 5 | Done | 单一模型平台全栈 owner | [Terra 最终 PASS：shared/server build、三文件定向检查 20/20；无 UI](./docs/plans/s2-04b4-attribution-read-projection-contract.md)；三入口 attribution context、director 完整 frame 优先、内部 read service；`reconstructRequest=null` 仅 `not_found`，归因另用 `attributionStatus`；execution `evidenceStatus` 只透传真实 evidence；无 API/UI/schema/migration |
+| S3-02b1 世界编辑与公理保存最小 CAS 兼容接线 | 3 | User Acceptance | 世界 Runtime 全栈 owner | [Terra 代码级 PASS：maintenance/runtime/migration/service/route 25/25、client CAS 3/3，shared/server/client build/typecheck PASS；Computer Use 工具不可用，真实公理来源页点击未验收，3 点不计 Done](./docs/plans/s3-02b1-world-edit-axiom-cas-contract.md)；428/409、稳定 operationId 重试、无新迁移；原 S3-02b 其余入口留 Refinement |
 
 承诺容量：8 点。Stretch：无。权威合同见 [R1-S2G Sprint 承诺](./docs/plans/r1-s2g-sprint-commitment.md)。规划提交后立即按单 owner 派发；根集成人保留共享计划、review、组合验证和阶段提交权，不夺取生产文件。
 
-DoR 已满足：两张卡均有稳定 ID、Release、用户价值、范围/非范围、依赖、AC、owner、文件边界和最窄验证。S2-04b4 不做公开 API/UI/schema；S3-02b1 只接两个既有保存路径，原 S3-02b 其余旧入口全部 Refinement/非范围。后续卡不因本次 Planning 自动标 Ready。
+DoR 已满足：两张卡均有稳定 ID、Release、用户价值、范围/非范围、依赖、AC、owner、文件边界和最窄验证。S2-04b4 已完成 5 点且不做公开 API/UI/schema；S3-02b1 已完成代码级检查但仍为 User Acceptance，3 点不计 Done，只接两个既有保存路径，原 S3-02b 其余旧入口全部 Refinement/非范围。后续卡不因本次验收自动标 Ready。
 
 ## R1-S2G 退出前置
 
 - S2-04b4 必须证明三入口显式归因、director 完整 frame 优先、并发隔离；`reconstructRequest=null` 只产生 `not_found`，持久 legacy/unattributed 使用 `attributionStatus=unattributed`，只有真实 execution evidence 才能出现 `evidenceStatus=missing`；不以 S2-04c UI 或其他入口覆盖率代替。
 - S3-02b1 必须证明两个路径同一 CAS 门面、缺保护字段业务返回 428、revision/operation 冲突返回 409、公理保存显式 revision 与稳定 operationId 重试复用；不以新增普通编辑 UI 或 migration 代替。原 S3-02b 其余入口继续 Refinement。
-- 两张卡均完成行为级失败/重放/并发证据后，才可记录 Sprint Review；未完成项保留 In Progress/Returned-to-Backlog，不自动带入 Done。
+- Sprint Review 进行中：S2-04b4 已完成 5 点；S3-02b1 的代码级证据已通过，但真实公理来源页点击尚未验收，保持 User Acceptance，3 点不计 Done。Sprint 当前完成 `5/8`，不宣称 Sprint 完成；未完成项不自动带入 Done 或下一 Story。
 
 ## Release 1 后续队列
 

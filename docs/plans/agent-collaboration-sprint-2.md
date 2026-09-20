@@ -302,12 +302,14 @@
 ### S2-04b4：首批身份归因与内部读投影
 
 - 用户价值：自动导演、本书世界生成和章节改稿预览的调用证据归属正确作品与任务，缺失时能区分“没有匹配记录”和“有记录但归因缺失”。
-- 状态：**In Progress（R1-S2G，规划冻结后派发）**；5 点（由原 3 点重新估算）。依赖 04b3 Done。单一模型平台全栈 owner 覆盖必要跨模块 wiring、内部 read service 与测试；不拆第二 owner。
+- 状态：**Done（R1-S2G）**；5 点（由原 3 点重新估算）。依赖 04b3 Done。Terra 最终 PASS：shared/server build、三文件定向检查 `20/20`；本卡无 UI。单一模型平台全栈 owner 覆盖必要跨模块 wiring、内部 read service 与测试；不拆第二 owner。
 - 范围：仅接自动导演完整 runtime frame、本书世界 `novel-world-generate`、章节 `ai-revision-preview` 三个显式 attribution context；后者补齐 novelId/chapterId/entrypoint；读取返回 request 聚合、lineage、唯一 adopted 与独立的 `attributionStatus=complete|partial|unattributed`。`evidenceStatus=complete|partial|missing` 只透传真实 execution evidence，不由读 service 重定义。
 - 冻结优先级：director 使用完整 frame 整体事实，冲突时不与 telemetry/URL/设置/live 字段拼接；world/chapter 只消费显式 context；未覆盖入口保留 `unattributed/legacy_unknown`。
 - 非范围：公开 HTTP/API、client UI、shared/public DTO、Prisma schema/migration、S2-04c、独立世界库、batch、多小说推断和旧记录回填；不得从 label、当前 URL、当前设置或 live interaction 猜身份。
 - AC：三入口身份与两个小说并发隔离；runtime frame 冲突不拼字段；`reconstructRequest=null` 只产生 `not_found`；persisted legacy/unattributed 产生 `attributionStatus=unattributed`；只有调用方带真实 execution evidence 时才可出现 `evidenceStatus=missing`；修改默认模型不改变旧记录；读取不触发模型调用。
 - 验证：内部身份矩阵、read service 聚合、重启/默认变化、并发/stream scope、脱敏和零模型读取检查；不以公共 API/UI 覆盖率宣称全系统透明。完整 DoR/AC/验证见 [S2-04b4 合同](./s2-04b4-attribution-read-projection-contract.md)。
+
+R1-S2G 当前验收进展：S2-04b4 已完成 5 点；S2-04c 仍受内部读投影的数据合同与显示边界约束，不能因本卡 Done 自动进入 UI 实现或标为 Ready。
 
 ## S2-04c：预计模型与实际来源的只读显示
 

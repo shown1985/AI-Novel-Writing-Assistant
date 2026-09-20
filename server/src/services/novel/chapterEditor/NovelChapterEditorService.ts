@@ -133,7 +133,13 @@ export class NovelChapterEditorService {
       ? createTargetRangeForWholeChapter(content)
       : resolveSelectionTargetRange(content, input.selection);
 
-    const resolvedIntent = await this.resolveRevisionIntent(input, context.macroContext, targetRange.text);
+    const resolvedIntent = await this.resolveRevisionIntent(
+      novelId,
+      chapterId,
+      input,
+      context.macroContext,
+      targetRange.text,
+    );
     const contextWindow = input.scope === "selection"
       ? input.context ?? buildParagraphWindow(content, targetRange)
       : { beforeParagraphs: [], afterParagraphs: [] };
@@ -158,6 +164,9 @@ export class NovelChapterEditorService {
         constraintsText: buildConstraintsText(input.constraints),
       } satisfies ChapterEditorRewriteCandidatesPromptInput,
       options: {
+        novelId,
+        chapterId,
+        entrypoint: "ai-revision-preview",
         provider: input.provider ?? "deepseek",
         model: input.model,
         temperature: input.temperature ?? 0.45,
@@ -221,6 +230,8 @@ export class NovelChapterEditorService {
   }
 
   private async resolveRevisionIntent(
+    novelId: string,
+    chapterId: string,
     input: ChapterEditorAiRevisionRequest,
     macroContext: ChapterEditorMacroContext,
     selectedText: string,
@@ -247,6 +258,9 @@ export class NovelChapterEditorService {
         mustKeepConstraints: macroContext.mustKeepConstraints,
       } satisfies ChapterEditorUserIntentPromptInput,
       options: {
+        novelId,
+        chapterId,
+        entrypoint: "ai-revision-preview",
         provider: input.provider ?? "deepseek",
         model: input.model,
         temperature: 0.2,

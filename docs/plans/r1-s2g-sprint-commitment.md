@@ -14,8 +14,8 @@
 
 | Story | 点数 | 状态 | Owner / 文件域 | 依赖 | 验收边界 |
 | --- | ---: | --- | --- | --- | --- |
-| [S2-04b4 首批身份归因与内部读投影](./s2-04b4-attribution-read-projection-contract.md) | 5 | In Progress（规划冻结后派发） | 单一模型平台全栈 owner；`server/src/platform/llm/provenance/attempts/`、三个明确调用入口及定向测试 | S2-04b3 Done；现有 attempt store/repository 可用 | 只接自动导演 runtime frame、`novel-world-generate`、`ai-revision-preview` 三个显式 attribution context；director 完整 frame 优先；内部 read service/tests；`reconstructRequest=null` 仅 `not_found`；归因另用 `attributionStatus=complete|partial|unattributed`，execution `evidenceStatus` 只透传；无 API/UI/schema/migration |
-| [S3-02b1 世界编辑与公理保存的最小 CAS 兼容接线](./s3-02b1-world-edit-axiom-cas-contract.md) | 3 | In Progress（规划冻结后派发） | 世界 Runtime 全栈 owner；`WorldService.updateWorld`、既有 world HTTP/API、`client/src/api/world.ts` 与公理来源页 | S3-02a Done；已有 `contentRevision`、operation/receipt 和 CAS 门面 | 只接 `updateWorld` 兼容 HTTP/API 与 `updateAxioms` 真实 UI；业务缺失 revision/operation 返回 428，冲突返回 409；client 显式 revision + 稳定 operationId 重试复用；无新迁移、无普通编辑新 UI；原 S3-02b 其余旧入口留 Refinement/非范围 |
+| [S2-04b4 首批身份归因与内部读投影](./s2-04b4-attribution-read-projection-contract.md) | 5 | Done | 单一模型平台全栈 owner；`server/src/platform/llm/provenance/attempts/`、三个明确调用入口及定向测试 | S2-04b3 Done；现有 attempt store/repository 可用 | Terra 最终 PASS：shared/server build、三文件定向检查 20/20；无 UI。三入口 attribution context；director 完整 frame 优先；内部 read service；`reconstructRequest=null` 仅 `not_found`；归因另用 `attributionStatus=complete|partial|unattributed`，execution `evidenceStatus` 只透传；无 API/UI/schema/migration |
+| [S3-02b1 世界编辑与公理保存的最小 CAS 兼容接线](./s3-02b1-world-edit-axiom-cas-contract.md) | 3 | User Acceptance | 世界 Runtime 全栈 owner；`WorldService.updateWorld`、既有 world HTTP/API、`client/src/api/world.ts` 与公理来源页 | S3-02a Done；已有 `contentRevision`、operation/receipt 和 CAS 门面 | Terra 代码级 PASS：maintenance/runtime/migration/service/route 25/25、client CAS 3/3，shared/server/client build/typecheck PASS；Computer Use 工具不可用，真实公理来源页点击未验收，3 点不计 Done。只接 `updateWorld` 兼容 HTTP/API 与 `updateAxioms` 真实 UI；业务缺失 revision/operation 返回 428，冲突返回 409；client 显式 revision + 稳定 operationId 重试复用；无新迁移、无普通编辑新 UI；原 S3-02b 其余旧入口留 Refinement/非范围 |
 
 两张卡均具备稳定 ID、Release、用户价值、范围/非范围、依赖、AC、owner、文件边界和最窄验证；均不把后续卡提前标为 Ready。计划冻结后立即按单 owner 派发，不以规划文档或 mock 联调代替业务 Done。
 
@@ -45,13 +45,20 @@ Wave 2
 - `TASK.md`、Roadmap、两个 Sprint 规划页、README/Release Notes、Wiki、Prisma schema/migration 和阶段提交仍由根集成人单一管理；子 Agent 不修改这些文件、不 commit/switch/merge。
 - 运行记录与 Creative Hub 仍为只读；任何恢复、编辑或重试动作仍在来源页完成。S2-04c 只能在 04b4 的内部 read DTO/状态语义稳定后重新 Refinement，不在本 Sprint 自动变 Ready。
 
+## Sprint Review 进展
+
+- 当前完成 `5/8` 点：S2-04b4 已 Done；S3-02b1 保持 User Acceptance，代码级验证通过但真实公理来源页点击尚未验收。
+- S2-04b4 证据：Terra 最终 PASS，shared/server build 与三文件定向检查 `20/20`；本卡无 UI。
+- S3-02b1 证据：Terra 代码级 PASS，maintenance/runtime/migration/service/route `25/25`、client CAS `3/3`，shared/server/client build/typecheck PASS；Computer Use 工具不可用，因此真实来源页 UI 点击仍待验收。
+- Sprint Review 尚未关闭，Retrospective 待 User Acceptance 完成；不宣称 R1-S2G 完成，不启动下一 Story，也不将 S3-02b1 的 3 点计入 Done。
+
 ## Sprint 级验收与退出门
 
 - S2-04b4：三入口均以显式 attribution context 写入同一 request scope；director 以完整 runtime frame 为最高优先级；两个小说并发不串线；内部 read service 只把 `reconstructRequest=null` 映射为 `not_found`，以 `attributionStatus=complete|partial|unattributed` 表示归因，只有真实 execution evidence 才透传 `evidenceStatus=complete|partial|missing`；无读取模型调用，无公共 API/UI/schema/migration。
 - S3-02b1：`updateWorld` 与 `updateAxioms` 都经过已有 CAS 提交门面；缺 `expectedContentRevision` 或 `operationId` 在业务层返回 428 且零写入；revision 冲突或 operationId 复用冲突返回 409 且零错误覆盖；公理客户端重试复用同一 operationId；既有来源页真实保存可通过 QC。原 S3-02b 其余入口继续 Refinement。
 - 最窄验证：两张卡各自的定向行为测试、受影响 package typecheck/build、必要的隔离 SQLite/runtime migration 检查，以及 `git diff --check`。不以静态 grep、仅 build 或 hidden button 作为业务 Done。
-- 每张卡完成时记录行为级证据、失败/重放/并发结果、文档判断和 UI 验收状态。未完成卡保持 In Progress/Returned-to-Backlog，不自动带入下一 Sprint。
-- 本窗口退出时由根集成人补 Sprint Review/Retrospective；只有两张卡各自 Done 且 beta 组合验证通过后，才可讨论 Release 1 后续晋级。S2-04c、S3-03～06、S4+ 及所有未覆盖旧入口不因本窗口完成而宣称 Ready。
+- 每张卡完成时记录行为级证据、失败/重放/并发结果、文档判断和 UI 验收状态。S2-04b4 已 Done；S3-02b1 代码级通过但保持 User Acceptance，未完成卡不自动带入下一 Sprint。
+- 本窗口退出时由根集成人补 Sprint Review/Retrospective；当前 S2-04b4 已 Done、S3-02b1 仍为 User Acceptance，Sprint Review 尚未关闭，不讨论 Release 1 后续晋级。S2-04c、S3-03～06、S4+ 及所有未覆盖旧入口不因本窗口完成而宣称 Ready。
 
 ## 明确不承诺的范围
 
@@ -61,4 +68,4 @@ Wave 2
 - 新 Prisma migration、schema 字段、数据库 reset 或用户库修复；Release gate 的 PostgreSQL apply 仍按既有计划处理。
 - 新公理编辑器或普通世界编辑 UI；本卡只把既有公理保存控件接到 CAS 合同。
 
-退出判断：R1-S2G 只在 `S2-04b4=5` 与 `S3-02b1=3` 均有真实行为证据时计为 `8/8`；否则按实际完成点数记录 carryover，不以规划完成、typecheck 或 mock 通过替代 Story Done。
+退出判断：R1-S2G 只有在 `S2-04b4=5` 与 `S3-02b1=3` 均完成真实行为证据及必要 UI 验收，并通过 beta 组合验证后才计为 `8/8`；当前按实际完成点数记录 `5/8`，不以代码级 PASS、typecheck 或 mock 通过替代 Story Done。

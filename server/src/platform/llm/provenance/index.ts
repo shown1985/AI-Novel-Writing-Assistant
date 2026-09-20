@@ -101,10 +101,17 @@ export function projectModelSelectionProvenance(
 export {
   getModelAttemptExecutionEvidence,
   getModelAttemptRequestState,
+  buildPromptInvocationAttribution,
   runWithModelAttemptRequestContext,
   runWithModelAttemptRequestState,
   startModelTransportAttempt,
   updateModelAttemptPromptIdentity,
+  readModelAttemptRequest,
+  projectModelAttemptRead,
   setModelAttemptRepositoryForTests,
   type ModelAttemptCandidate,
+  type ModelAttemptAttributionStatus,
+  type ModelAttemptAttributionIssue,
+  type ModelAttemptReadProjection,
+  type ModelAttemptReadStatus,
 } from "./attempts/runtime";

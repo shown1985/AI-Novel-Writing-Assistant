@@ -3,7 +3,7 @@
 ## Story 合同
 
 - Release / Sprint：Release 1 / R1-S2G。
-- 状态 / 点数：In Progress（规划冻结后派发）/ 5 点。
+- 状态 / 点数：Done（R1-S2G）/ 5 点。
 - 用户价值：自动导演、本书世界生成和章节改稿预览的每次模型调用能归属于真实作品与任务上下文；调用证据缺失时显示明确的“未记录/无匹配记录”状态，而不是从当前配置、URL 或按钮文案猜一个来源。
 - 依赖：S2-04b3 已 Done；复用既有 `ModelAttemptStore`、repository、request scope、lineage 和脱敏字段。S2-04c 不是本卡依赖，也不在本卡实现。
 - Owner：单一模型平台全栈 owner。该 owner 独占本卡必要的 platform/runtime/三个入口 wiring/内部 read service/定向测试；根集成人只做合同审阅、组合验证和阶段集成，不拆第二 owner。
@@ -112,7 +112,8 @@
 
 - 三入口真实生产边界均有显式 context wiring；测试证实 director frame 优先、并发隔离和状态区分。
 - 内部 read service 能从既有持久记录生成聚合 projection；无公开 API/UI/schema/migration；不把 S2-04c 或全系统透明度标为完成。
-- 定向测试、server build/typecheck、共享兼容检查与 `git diff --check` 结果记录在阶段验收中；失败/重启/旧记录/脱敏证据可复现。
+- Terra 最终 PASS：shared/server build 通过，三文件定向检查 `20/20`；失败/重启/旧记录/脱敏证据可复现。
+- `git diff --check` 作为阶段集成检查。
 - UI 验收：不适用（本卡无新增 UI）；未来 S2-04c 的 UI 验收必须另卡另审。
 - 长期文档/发布判断由根集成人在阶段集成时处理；本 Story 不自行修改 Wiki、README 或 release notes。
 

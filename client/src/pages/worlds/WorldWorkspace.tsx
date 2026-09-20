@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Globe2, Trash2 } from "lucide-react";
@@ -34,6 +34,7 @@ import {
   updateWorldStructure,
   useWorldLibraryItem,
 } from "@/api/world";
+import type { ApiHttpError } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import { toast } from "@/components/ui/toast";
 import { useLLMStore } from "@/store/llmStore";
@@ -42,6 +43,12 @@ import { featureFlags } from "@/config/featureFlags";
 import {
   parseConsistencyReport,
 } from "./worldConsistencyUi";
+import {
+  createWorldAxiomsOperationId,
+  createWorldAxiomsSavePayload,
+  shouldResetWorldAxiomsOperation,
+  shouldRetryWorldAxiomsSave,
+} from "./worldAxiomSave";
 import WorldAssetsTab from "./components/workspace/WorldAssetsTab";
 import WorldAxiomsCard from "./components/workspace/WorldAxiomsCard";
 import WorldConsistencyTab from "./components/workspace/WorldConsistencyTab";
@@ -82,6 +89,11 @@ export default function WorldWorkspace() {
   const [refineLevel, setRefineLevel] = useState<"light" | "deep">("light");
   const [activeTab, setActiveTab] = useState("structure");
   const [advancedStructureOpen, setAdvancedStructureOpen] = useState(false);
+  const axiomsOperationIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    axiomsOperationIdRef.current = null;
+  }, [id]);
 
   const worldDetailQuery = useQuery({
     queryKey: queryKeys.worlds.detail(id),
@@ -223,8 +235,34 @@ export default function WorldWorkspace() {
     mutationFn: (payload: Parameters<typeof updateWorldStructure>[1]) => updateWorldStructure(id, payload),
   });
   const saveAxiomsMutation = useMutation({
-    mutationFn: (axioms: string[]) => updateWorldAxioms(id, axioms),
-    onSuccess: invalidateWorld,
+    mutationFn: (payload: {
+      worldId: string;
+      axioms: string[];
+      operationId: string;
+      expectedContentRevision: number;
+    }) => updateWorldAxioms(payload.worldId, payload.axioms, {
+      operationId: payload.operationId,
+      expectedContentRevision: payload.expectedContentRevision,
+    }),
+    retry: (failureCount, error) => {
+      return shouldRetryWorldAxiomsSave(error as ApiHttpError, failureCount);
+    },
+    onSuccess: async (_response, payload) => {
+      if (payload.worldId !== id || axiomsOperationIdRef.current !== payload.operationId) {
+        return;
+      }
+      axiomsOperationIdRef.current = null;
+      await invalidateWorld();
+    },
+    onError: (error, payload) => {
+      if (
+        payload.worldId === id
+        && axiomsOperationIdRef.current === payload.operationId
+        && shouldResetWorldAxiomsOperation(error as ApiHttpError)
+      ) {
+        axiomsOperationIdRef.current = null;
+      }
+    },
   });
   const backfillStructureMutation = useMutation({
     mutationFn: () => backfillWorldStructure(id, { provider: llm.provider, model: llm.model }),
@@ -430,7 +468,19 @@ export default function WorldWorkspace() {
                 <WorldAxiomsCard
                   rawAxioms={world?.axioms}
                   savePending={saveAxiomsMutation.isPending}
-                  onSave={(axioms) => saveAxiomsMutation.mutate(axioms)}
+                  onSave={(axioms) => {
+                    if (!world || !Number.isInteger(world.contentRevision)) {
+                      return;
+                    }
+                    const payload = createWorldAxiomsSavePayload(
+                      axioms,
+                      world.contentRevision,
+                      axiomsOperationIdRef.current,
+                      createWorldAxiomsOperationId,
+                    );
+                    axiomsOperationIdRef.current = payload.operationId;
+                    saveAxiomsMutation.mutate({ ...payload, worldId: id });
+                  }}
                 />
               ) : null}
               <WorldStructureTab
