@@ -4,17 +4,17 @@
 
 本页展开[路线图](./agent-collaboration-sprints.md)的 S3-00～S3-06，目标是可靠 Prompt 登记、内容版本、可信评估来源、持续问题历史和作者留白。S3-01、S3-02a 与 R1-S2G 的 S3-02b1 已分别完成 Prompt 能力边界、世界样本安全提交边界和两条既有保存路径 CAS 接线。原 `S3-02b` 父项其余旧入口留在 Refinement，其他生产卡仍须在 S1-06 的版本、来源、运行承接和可空决定合同满足后按依赖推进，不能把已完成的底座解释为全部世界维护能力已上线。
 
-原候选总量为 28 点。展开后对 Prompt 静态登记门、版本接线、双侧同步、历史兼容和上下文消费分别验收，重新估算为 **36 相对点**，不是单个验收窗口的承诺或工时。每张不超过 5 点；拆分不会把原 Story 的保护条件移出 Done。
+原候选总量为 28 点。展开后对 Prompt 静态登记门、版本接线、双侧同步、历史兼容和上下文消费分别验收，当前按 **41 相对点**校准，不是单个验收窗口的承诺或工时。每张不超过 5 点；拆分不会把原 Story 的保护条件移出 Done。
 
 | 原 ID | 任务卡 | 点数 | Owner | 解锁依赖 |
 | --- | --- | --- | --- | --- |
 | S3-00 | S3-00 世界 Prompt 静态登记一致性门 | 2 | 根集成人 | S1-06；R1-S2C |
 | S3-01 | S3-01 Prompt 维护能力边界 | 3 | Prompt Agent | S1-06、S3-00 |
 | S3-02 | S3-02a 样本安全提交；S3-02b1 两条既有保存路径 CAS 接线 | 3 + 3 | Runtime Agent | S1-06；02b1 依赖 02a；原 02b 其余入口 Refinement |
-| S3-03 | S3-03a 本书内容版本；S3-03b 双侧同步保护 | 3 + 5 | Runtime Agent | S3-02a；03b 依赖 03a、02b |
+| S3-03 | S3-03a1 实例内容版本与兼容迁移；S3-03a2 切片缓存与 Gateway 版本消费；S3-03b 双侧同步保护 | 5 + 3 + 5 | Runtime Agent | a1 依赖 S1-06、S3-02a；a2 依赖 a1；03b 依赖 a1/a2、02b |
 | S3-04 | S3-04 AI 结构化评估 | 5 | Prompt + Runtime 串行接线 | S3-01、02b；S2-04a/b来源合同与存储；S1-06 可空决定合同 |
 | S3-05 | S3-05a 问题身份与观察史；S3-05b 旧记录和并发评估 | 3 + 3 | Runtime Agent | S3-04；05b 依赖 05a |
-| S3-06 | S3-06a 作者决定持久化；S3-06b 按用途消费决定 | 3 + 3 | Runtime + Prompt 串行接线 | 原 S3-02b 父项剩余入口 Refinement；06b 依赖 06a、S3-04、03a |
+| S3-06 | S3-06a 作者决定持久化；S3-06b 按用途消费决定 | 3 + 3 | Runtime + Prompt 串行接线 | 原 S3-02b 父项剩余入口 Refinement；06b 依赖 06a、S3-04、S3-03a1/a2 |
 
 S3-04 读取 S1-06 冻结的可空决定集合，不等待 S3-06 的写操作。S3-06a 可与评估 Prompt 并行；S3-06b 才完成评估和生成中的实际保护，避免循环依赖。
 
@@ -80,26 +80,20 @@ S3-04 读取 S1-06 冻结的可空决定集合，不等待 S3-06 的写操作。
 
 R1-S2G 已完成 `8/8`：S2-04b4 `5` 点与 S3-02b1 `3` 点均为 Done，且 S3-02b1 已完成真实来源页 UI QC。原 S3-02b 父项其余入口继续 Refinement，不启动或承诺下一 Story。
 
-## S3-03a：本书世界独立内容版本
+## S3-03a 拆分：本书世界独立内容版本与上下文消费
 
-作为作者，我希望本书世界的修改与世界样本更新能分清楚，阅读缓存刷新不会被算成创作修改。
+原 S3-03a 的 3 点父范围不再计点，拆为两张可独立验收但尚未满足 DoR 的垂直 Story：
 
-- 点数3，P0；依赖 S1-06、S3-02a。本书世界版本模型、评估输入版本、来源版本由根集成人冻结。Runtime Agent owned `NovelWorldInstanceService.ts`、`NovelWorldManualService.ts`、`WorldContextGateway.ts` 与 `novelWorldProjection.ts`，同一owner串行接线。
-- 子任务：增加独立内容版本并适配导入/生成/手动创建/实例编辑；保存引用来源版本；区分切片缓存digest与内容revision；适配历史无实例初始化。
-- 非范围：改变当前创建自动关联样本行为；章节新事实自动写回样本；增加另一套世界上下文源。
-- AC1：本书内容版本与 syncBaseVersion 分开，来源更新不自动改变实例内容。
-- AC2：切片刷新、状态查询与摘要缓存写入不推进内容版本；必要缓存副作用不被显示为作者修改。
-- AC3：实例内容变化使旧 slice 失效，Gateway 后续读取新实例并按 purpose 组装。
-- AC4：历史仅 worldId/旧slice的作品按明确兼容路径初始化且可重复执行，不删除旧字段。
-- AC5：生成/手动创建样本与本书绑定仍事务一致；失败不产生本书有内容但来源绑定半完成状态。
-- 检查：复用 `worldContextGateway.test.js`、`storyWorldSlice.test.js`、`novelWorldProjection.test.js`；补版本/缓存/旧数据幂等行为。
-- Done证据：版本来源样例、缓存前后版本、旧作品读取结果；数据库变更采用增量迁移并同时说明SQLite/PostgreSQL验证缺口。
+- [S3-03a1 实例内容版本与兼容迁移](./s3-03a1-novel-world-content-revision-contract.md)：5 点，负责实例版本字段、双 schema 增量迁移、现有创建/导入/生成/legacy 初始化写路径和事务边界。
+- [S3-03a2 切片缓存与 Gateway 版本消费](./s3-03a2-world-slice-revision-consumption-contract.md)：3 点，依赖 a1，负责切片缓存不递增、版本失效和 Gateway 按用途读取当前实例。
+
+两张卡均保持 `Refinement`：a1 尚未冻结现有“实例编辑”权威写入口及旧记录初始化细节；a2 必须等待 a1 的字段名、失效规则和读取契约。S3-03b 仍为独立 5 点卡，不因本拆分提前进入实施。
 
 ## S3-03b：双侧同步安全与引用完整性
 
 作为作者，我希望比较两边差异后，只同步我选中的部分，而且不会破坏关系或覆盖期间的新修改。
 
-- 点数5，P0；依赖 S3-03a、原 S3-02b 父项剩余入口及双revision CAS合同。Runtime Agent独占 `NovelWorldSyncService.ts`、`novelWorldSyncRecords.ts` 和 `novelWorldSyncPending.ts`；共享同步请求、HTTP/API由根集成人接线。
+- 点数5，P0；依赖 S3-03a1/a2、原 S3-02b 父项剩余入口及双revision CAS合同。Runtime Agent独占 `NovelWorldSyncService.ts`、`novelWorldSyncRecords.ts` 和 `novelWorldSyncPending.ts`；共享同步请求、HTTP/API由根集成人接线。
 - 子任务：差异返回两侧依据版本；同步事务检验两边；合并后检查稳定实体引用；解释缺失依赖分区；原子记录方向、范围、版本和结果；pull清理对应缓存。
 - 非范围：自动push/pull、按名称合并实体、AI替作者决定同步范围、全局回滚。
 - AC1：差异查看之后任一侧内容改变，原同步请求零写入并提示重新比较。
@@ -186,7 +180,7 @@ R1-S2G 已完成 `8/8`：S2-04b4 `5` 点与 S3-02b1 `3` 点均为 Done，且 S3-
 
 1. Wave 0：S1-06、共享schema/迁移和写入口覆盖表冻结。未证明版本或运行恢复能力的卡保持Not Ready。
 2. Wave 1：Prompt Agent做S3-01；Runtime Agent已完成S3-02a。R1-S2G 仅由同一 Runtime 全栈 owner 接稳定 ID `S3-02b1` 的 `updateWorld`/`updateAxioms` 两条保存路径；不借此启动原 S3-02b 父项其他旧入口，也不新增普通编辑 UI。
-3. Wave 2：Prompt Agent做S3-04资产；Runtime Agent做S3-03a/b及S3-06a，彼此串行；这些卡仍等待原 S3-02b 父项其余入口的 Refinement/解锁，不因 S3-02b1 完成自动 Ready。根集成人只做共享接线与隔离测试，不抢Runtime owned文件。
+3. Wave 2：Prompt Agent做S3-04资产；Runtime Agent做S3-03a1/a2、S3-03b及S3-06a，彼此串行；这些卡仍等待原 S3-02b 父项其余入口的 Refinement/解锁，不因 S3-02b1 完成自动 Ready。根集成人只做共享接线与隔离测试，不抢Runtime owned文件。
 4. Wave 3：Runtime Agent接S3-04与S3-05a/b；Prompt Agent做S3-06b Prompt消费，Runtime后接Gateway；UI Agent验证来源/过期/未知状态的消费。相同文件不并发写。
 
 通用Done：真实持久化/投影/版本行为、定向检查、迁移兼容和源码最新构建证据；更新长期wiki；用户可见行为进入发布记录。R1-S2G 的 S3-02b1 不新增迁移，复用 S3-02a 数据底座；原 S3-02b 父项其余旧入口仍是 Refinement/非范围。根集成人review并阶段提交，子Agent不commit/switch/merge。UI验收交用户，不默认浏览器/截图。未通过beta组合验收不晋级main。
