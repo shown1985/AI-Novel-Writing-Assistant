@@ -11,6 +11,7 @@ import {
 import { toText } from "../../../services/novel/novelP0Utils";
 import { beginLlmLiveSession } from "../../../platform/llm/live/llmLiveSession";
 import {
+  buildPromptInvocationAttribution,
   getModelAttemptExecutionEvidence,
   getModelAttemptRequestState,
   runWithModelAttemptRequestContext,
@@ -163,6 +164,11 @@ export async function executeTextPrompt<I>(input: {
       promptVersion: input.asset.version,
       taskType: input.asset.taskType,
     },
+    attribution: buildPromptInvocationAttribution({
+      novelId: input.options?.novelId,
+      chapterId: input.options?.chapterId,
+      entrypoint: input.options?.entrypoint,
+    }),
   }, () => executeTextPromptInContext(input, dependencies));
 }
 
@@ -306,6 +312,11 @@ export async function executeTextPromptStream<I>(input: {
       promptVersion: input.asset.version,
       taskType: input.asset.taskType,
     },
+    attribution: buildPromptInvocationAttribution({
+      novelId: input.options?.novelId,
+      chapterId: input.options?.chapterId,
+      entrypoint: input.options?.entrypoint,
+    }),
   }, () => executeTextPromptStreamInContext(input, dependencies));
 }
 

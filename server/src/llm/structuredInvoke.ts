@@ -37,6 +37,7 @@ import { toText } from "../services/novel/novelP0Utils";
 import type { PromptInvocationMeta } from "../prompting/core/promptTypes";
 import { ReasoningStreamCollector } from "./reasoning";
 import {
+  buildPromptInvocationAttribution,
   getModelAttemptExecutionEvidence,
   runWithModelAttemptRequestContext,
   startModelTransportAttempt,
@@ -636,6 +637,11 @@ export async function invokeStructuredLlmDetailed<T>(input: StructuredInvokeInpu
       taskType: input.taskType,
       modelRoute: input.promptMeta?.promptId,
     },
+    attribution: buildPromptInvocationAttribution({
+      novelId: input.promptMeta?.novelId,
+      chapterId: input.promptMeta?.chapterId,
+      entrypoint: input.promptMeta?.entrypoint,
+    }),
   }, () => invokeStructuredLlmDetailedInContext(input));
 }
 

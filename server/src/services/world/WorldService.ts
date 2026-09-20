@@ -1,7 +1,9 @@
-import type { Prisma } from "@prisma/client";
+import type { Prisma, World as PrismaWorld } from "@prisma/client";
 import type { LLMProvider } from "@ai-novel/shared/types/llm";
 import type {
   WorldConsistencyReport,
+  WorldMaintenanceCandidateAggregate,
+  WorldMaintenanceCommitResult,
   WorldLayerKey,
   WorldStructuredData,
   WorldStructureSectionKey,
@@ -77,6 +79,123 @@ import { worldGenerationCheckpointService } from "./worldGenerationCheckpointSer
 import { exportWorldData, importWorldData } from "./worldTransfer";
 import { ragServices } from "../rag";
 import type { RagOwnerType } from "../rag/types";
+import {
+  hashWorldMaintenanceValue,
+  worldMaintenanceWorkflowService,
+  WorldMaintenanceError,
+  worldSampleSourceRoute,
+} from "./maintenance";
+
+type WorldWriteProtection = {
+  operationId?: string;
+  expectedContentRevision?: number;
+};
+
+type RequiredWorldWriteProtection = {
+  operationId: string;
+  expectedContentRevision: number;
+};
+
+type WorldWriteResult = PrismaWorld & {
+  maintenance: WorldMaintenanceCommitResult;
+};
+
+function requireWorldWriteProtection(input: WorldWriteProtection): RequiredWorldWriteProtection {
+  const operationId = input.operationId;
+  const expectedContentRevision = input.expectedContentRevision;
+  if (typeof operationId !== "string" || !operationId.trim()) {
+    throw new WorldMaintenanceError(428, "REVISION_REQUIRED", "世界保存需要操作标识。", {
+      field: "operationId",
+    });
+  }
+  if (typeof expectedContentRevision !== "number" || !Number.isInteger(expectedContentRevision) || expectedContentRevision < 0) {
+    throw new WorldMaintenanceError(428, "REVISION_REQUIRED", "世界保存需要当前内容版本。", {
+      field: "expectedContentRevision",
+      operationId,
+    });
+  }
+  const revision = expectedContentRevision as number;
+  return {
+    operationId: operationId.trim(),
+    expectedContentRevision: revision,
+  };
+}
+
+function buildWorldMaintenanceCandidate(
+  world: PrismaWorld,
+  input: Partial<CreateWorldInput> & WorldWriteProtection,
+): WorldMaintenanceCandidateAggregate {
+  const {
+    structure: requestedStructure,
+    bindingSupport: requestedBindingSupport,
+    knowledgeDocumentIds: _knowledgeDocumentIds,
+    operationId: _operationId,
+    expectedContentRevision: _expectedContentRevision,
+    ...legacyInput
+  } = input;
+  const parsed = parseWorldStructurePayload(world.structureJson, world.bindingSupportJson);
+  const baseStructure = parsed.hasStructuredData
+    ? parsed.structure
+    : buildWorldStructureFromLegacySource(world);
+  const nextStructure = requestedStructure
+    ? normalizeWorldStructuredData(requestedStructure, baseStructure)
+    : baseStructure;
+  const nextBindingSupport = requestedBindingSupport
+    ? normalizeWorldBindingSupport(requestedBindingSupport, parsed.bindingSupport)
+    : buildWorldBindingSupport(nextStructure);
+  const structuredFields = applyStructuredWorldToLegacyFields(nextStructure, world, nextBindingSupport);
+  const current = {
+    name: world.name,
+    description: world.description,
+    worldType: world.worldType,
+    templateKey: world.templateKey,
+    axioms: world.axioms,
+    background: world.background,
+    geography: world.geography,
+    cultures: world.cultures,
+    magicSystem: world.magicSystem,
+    politics: world.politics,
+    races: world.races,
+    religions: world.religions,
+    technology: world.technology,
+    conflicts: world.conflicts,
+    history: world.history,
+    economy: world.economy,
+    factions: world.factions,
+    status: world.status,
+    selectedDimensions: world.selectedDimensions,
+    selectedElements: world.selectedElements,
+    layerStates: world.layerStates,
+    overviewSummary: world.overviewSummary,
+    structureJson: world.structureJson,
+    bindingSupportJson: world.bindingSupportJson,
+    structureSchemaVersion: world.structureSchemaVersion,
+  } satisfies WorldMaintenanceCandidateAggregate;
+
+  return {
+    ...current,
+    ...structuredFields,
+    ...legacyInput,
+  } as WorldMaintenanceCandidateAggregate;
+}
+
+function buildWorldWriteRequestHash(
+  worldId: string,
+  operationId: string,
+  expectedContentRevision: number,
+  sourceRef: string,
+  intent: unknown,
+): string {
+  return hashWorldMaintenanceValue({
+    targetType: "world",
+    targetId: worldId,
+    operationType: "commit_world_sample",
+    operationId,
+    expectedContentRevision,
+    sourceRef,
+    intent,
+  });
+}
 
 function buildGeneratedStructurePersistence(
   world: Parameters<typeof buildWorldStructureFromLegacySource>[0],
@@ -308,12 +427,18 @@ export class WorldService {
     });
   }
 
-  async updateWorld(id: string, input: Partial<CreateWorldInput>) {
+  async updateWorld(id: string, input: Partial<CreateWorldInput> & WorldWriteProtection): Promise<WorldWriteResult> {
+    const protection = requireWorldWriteProtection(input);
     const world = await prisma.world.findUnique({ where: { id } });
     if (!world) {
-      throw new Error("World not found.");
+      throw new WorldMaintenanceError(404, "WORLD_TARGET_NOT_FOUND", "世界样本不存在。", { targetId: id });
     }
-    const { structure: _structure, bindingSupport: _bindingSupport, ...legacyInput } = input;
+    const {
+      structure: _structure,
+      bindingSupport: _bindingSupport,
+      knowledgeDocumentIds: _knowledgeDocumentIds,
+      ...legacyInput
+    } = input;
 
     const states = normalizeLayerStates(world.layerStates);
     for (const layer of WORLD_LAYER_ORDER) {
@@ -340,16 +465,40 @@ export class WorldService {
       markGeneratedLayerStatesFromFields(states, structuredUpdate);
     }
 
-    const updated = await prisma.world.update({
-      where: { id },
-      data: {
-        ...legacyInput,
-        ...structuredUpdate,
-        layerStates: JSON.stringify(states),
-      },
+    const candidate = buildWorldMaintenanceCandidate(world, {
+      ...legacyInput,
+      structure: input.structure,
+      bindingSupport: input.bindingSupport,
+      operationId: protection.operationId,
+      expectedContentRevision: protection.expectedContentRevision,
     });
-    this.queueRagUpsert("world", id);
-    return updated;
+    candidate.layerStates = JSON.stringify(states);
+    const sourceRef = worldSampleSourceRoute(id);
+    const requestIntent = {
+      ...legacyInput,
+      structure: input.structure,
+      bindingSupport: input.bindingSupport,
+    };
+    const maintenance = await worldMaintenanceWorkflowService.commitWorldSample(id, {
+      operationId: protection.operationId,
+      expectedContentRevision: protection.expectedContentRevision,
+      expectedDecisionRevision: 0,
+      requestHash: buildWorldWriteRequestHash(
+        id,
+        protection.operationId,
+        protection.expectedContentRevision,
+        sourceRef,
+        requestIntent,
+      ),
+      candidateAggregate: candidate,
+      selectedPatchIds: [],
+      sourceRef,
+    });
+    const updated = await prisma.world.findUnique({ where: { id } });
+    if (!updated) {
+      throw new WorldMaintenanceError(404, "WORLD_TARGET_NOT_FOUND", "世界样本不存在。", { targetId: id });
+    }
+    return { ...updated, maintenance };
   }
 
   async deleteWorld(id: string) {
@@ -396,10 +545,15 @@ export class WorldService {
       ];
   }
 
-  async updateAxioms(worldId: string, axioms: string[]) {
+  async updateAxioms(
+    worldId: string,
+    axioms: string[],
+    protectionInput: WorldWriteProtection = {},
+  ): Promise<WorldWriteResult> {
+    const protection = requireWorldWriteProtection(protectionInput);
     const world = await prisma.world.findUnique({ where: { id: worldId } });
     if (!world) {
-      throw new Error("World not found.");
+      throw new WorldMaintenanceError(404, "WORLD_TARGET_NOT_FOUND", "世界样本不存在。", { targetId: worldId });
     }
 
     const parsed = parseWorldStructurePayload(world.structureJson, world.bindingSupportJson);
@@ -411,23 +565,45 @@ export class WorldService {
       },
       metadata: {
         ...parsed.structure.metadata,
-        lastGeneratedAt: nowISO(),
+        // Keep the candidate deterministic for an operation replay. The
+        // persisted metadata is already the durable save marker; generating a
+        // fresh timestamp here would turn an identical retry into a new hash.
+        lastGeneratedAt: parsed.structure.metadata.lastGeneratedAt ?? world.updatedAt.toISOString(),
       },
     };
     const nextBindingSupport = buildWorldBindingSupport(nextStructure);
-    const structuredFields = applyStructuredWorldToLegacyFields(nextStructure, world, nextBindingSupport);
 
-    const updated = await prisma.world.update({
-      where: { id: worldId },
-      data: {
-        ...structuredFields,
-        axioms: JSON.stringify(axioms),
-        version: { increment: 1 },
-      },
+    const candidate = buildWorldMaintenanceCandidate(world, {
+      axioms: JSON.stringify(axioms),
+      structure: nextStructure,
+      bindingSupport: nextBindingSupport,
+      operationId: protection.operationId,
+      expectedContentRevision: protection.expectedContentRevision,
     });
-    await this.createSnapshot(worldId, "axioms-updated");
-    this.queueRagUpsert("world", worldId);
-    return updated;
+    const sourceRef = worldSampleSourceRoute(worldId);
+    const maintenance = await worldMaintenanceWorkflowService.commitWorldSample(worldId, {
+      operationId: protection.operationId,
+      expectedContentRevision: protection.expectedContentRevision,
+      expectedDecisionRevision: 0,
+      requestHash: buildWorldWriteRequestHash(
+        worldId,
+        protection.operationId,
+        protection.expectedContentRevision,
+        sourceRef,
+        { axioms },
+      ),
+      candidateAggregate: candidate,
+      selectedPatchIds: [],
+      sourceRef,
+    });
+    if (maintenance.state === "committed") {
+      await this.createSnapshot(worldId, "axioms-updated");
+    }
+    const updated = await prisma.world.findUnique({ where: { id: worldId } });
+    if (!updated) {
+      throw new WorldMaintenanceError(404, "WORLD_TARGET_NOT_FOUND", "世界样本不存在。", { targetId: worldId });
+    }
+    return { ...updated, maintenance };
   }
 
   async generateLayer(worldId: string, layerKey: WorldLayerKey, input: LayerGenerateInput) {

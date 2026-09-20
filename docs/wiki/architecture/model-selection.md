@@ -59,6 +59,31 @@
 - attempt 观测是 side channel。存储 start/finalize 失败不得重发模型、改写正文、改变任务状态、升级质量债或清除人工暂停；调用结果应显式携带 `complete|partial|missing` 观测状态。
 - `promptRunner.ts` 超过硬阈值时，先按 execution context、text execution 与 structured execution 拆分并保持 facade 等价，再接 attempt recorder；不得继续把观测逻辑堆进巨型核心文件。
 
+### 首批显式归因入口与内部读投影
+
+模型 attempt 的归因必须来自调用开始时捕获的显式 context，而不是从当前页面、按钮文案、默认设置或实况订阅倒推。首批生产接线只覆盖以下三个入口：
+
+| 入口 | 必要归因 | 事实来源与边界 |
+| --- | --- | --- |
+| 自动导演 runtime | `novelId`、`taskId`、`directorRunId`、step idempotency key、node key、entrypoint | 使用同一时点的完整 runtime frame；frame 内字段必须整体一致，不能与旧 telemetry 或局部对象拼接 |
+| 本书世界生成 | `novelId`、`entrypoint=novel-world-generate` | 使用 prompt invocation context；不从世界名称、URL 或顶部模型选择推断作品 |
+| 章节改稿预览 | `novelId`、`chapterId`、`entrypoint=ai-revision-preview` | 使用 prompt invocation context；chapter label 或当前页面不能替代显式身份 |
+
+读投影必须把“没有持久记录”和“有记录但身份不完整”分开：
+
+- `reconstructRequest(...) === null` 只表示 `not_found`，不得由此制造 `evidenceStatus=missing`。
+- 持久记录缺少可靠身份时使用独立的 `attributionStatus=unattributed|partial`；必要身份完整时才是 `attributionStatus=complete`。
+- `evidenceStatus=complete|partial|missing` 仍属于实际执行观察事实，只能透传调用方同时提供的真实 `ModelAttemptExecutionEvidence`，不能由读服务按归因缺失、空投影或 repository 读取结果推断。
+- 未覆盖入口和历史旧记录保留 `legacy_unknown/unattributed`；不得回填新身份，也不得因为读投影完成而扩大为公开 API 或调用历史 UI。
+
+这套读投影是内部平台能力，供后续受控消费；它不等于作者已经能在界面查看所有调用来源。只读显示应另行冻结数据合同、身份隔离和用户验收，不得把内部归因 PASS 夸大为全系统透明度已交付。
+
+#### 失败模式
+
+- runtime frame 与 telemetry 字段冲突：保留冲突/缺失证据，不选择“看起来最新”的字段继续归因。
+- repository 找不到 request：返回 `not_found`，不显示为执行失败，也不触发模型重试。
+- 记录存在但归因不完整：返回 `attributionStatus=partial|unattributed`，保留可用的脱敏记录，不补造 novel、task 或 chapter 身份。
+
 ## 示例
 
 推荐做法：
@@ -107,3 +132,4 @@
 - [S2-04a 模型选择来源与有效参数完成证据](../../plans/s2-04a-model-selection-provenance.md)
 - [S2-04b0 实际模型调用尝试证据合同](../../plans/s2-04b-model-attempt-evidence-contract.md)
 - [S2-04b1 通用 attempt store 完成证据](../../plans/s2-04b1-model-attempt-store.md)
+- [S2-04b4 首批身份归因与内部读投影合同](../../plans/s2-04b4-attribution-read-projection-contract.md)

@@ -7,6 +7,7 @@ import type {
   WorldConsistencyReport,
   WorldDeepeningQuestion,
   WorldLayerKey,
+  WorldMaintenanceCommitResult,
   WorldSnapshot,
   WorldStructuredData,
   WorldStructureSectionKey,
@@ -106,6 +107,15 @@ export interface WorldInspirationAnalysisResult {
 
 export const WORLD_INSPIRATION_ANALYZE_STREAM_PATH = "/worlds/inspiration/analyze/stream";
 
+export interface WorldWriteProtection {
+  operationId: string;
+  expectedContentRevision: number;
+}
+
+export type WorldWriteResponse = World & {
+  maintenance?: WorldMaintenanceCommitResult;
+};
+
 export async function getWorldList() {
   const { data } = await apiClient.get<ApiResponse<World[]>>("/worlds");
   return data;
@@ -130,9 +140,10 @@ export async function createWorld(
 
 export async function updateWorld(
   id: string,
-  payload: Partial<World> & { structure?: WorldStructuredData; bindingSupport?: WorldBindingSupport },
+  payload: Partial<World> & { structure?: WorldStructuredData; bindingSupport?: WorldBindingSupport }
+    & WorldWriteProtection,
 ) {
-  const { data } = await apiClient.put<ApiResponse<World>>(`/worlds/${id}`, payload);
+  const { data } = await apiClient.put<ApiResponse<WorldWriteResponse>>(`/worlds/${id}`, payload);
   return data;
 }
 
@@ -277,8 +288,15 @@ export async function suggestWorldAxioms(
   };
 }
 
-export async function updateWorldAxioms(id: string, axioms: string[]) {
-  const { data } = await apiClient.put<ApiResponse<World>>(`/worlds/${id}/axioms`, { axioms });
+export async function updateWorldAxioms(
+  id: string,
+  axioms: string[],
+  protection: WorldWriteProtection,
+) {
+  const { data } = await apiClient.put<ApiResponse<WorldWriteResponse>>(`/worlds/${id}/axioms`, {
+    axioms,
+    ...protection,
+  });
   return data;
 }
 

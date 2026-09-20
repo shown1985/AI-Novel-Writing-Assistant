@@ -279,6 +279,35 @@ test("same operation replays its receipt, while a different request hash is reje
   }
 });
 
+test("a stable adapter intent hash replays after the current candidate has changed", async () => {
+  const { client, tempDir } = await createIsolatedDatabase();
+  try {
+    const store = new PrismaWorldSampleCommitStore(client);
+    const service = createService(store);
+    const firstRequest = command("op-partial-replay", createCandidate("第一次"));
+    firstRequest.requestHash = "stable-intent-hash";
+    const first = await service.commitWorldSample("world-1", firstRequest);
+
+    const replayRequest = command("op-partial-replay", createCandidate("作者后来内容"));
+    replayRequest.requestHash = "stable-intent-hash";
+    const replay = await service.commitWorldSample("world-1", replayRequest);
+    assert.equal(first.state, "committed");
+    assert.equal(replay.state, "replayed");
+    assert.deepEqual(replay.receipt, first.receipt);
+
+    const changedRequest = command("op-partial-replay", createCandidate("另一保存意图"));
+    changedRequest.requestHash = "different-intent-hash";
+    await assert.rejects(
+      service.commitWorldSample("world-1", changedRequest),
+      (error) => error.code === "OPERATION_ID_REUSED",
+    );
+    assert.equal((await client.world.findUnique({ where: { id: "world-1" } })).name, "第一次");
+  } finally {
+    await client.$disconnect();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("receipt lookup resolves a committed operation after the caller loses its response", async () => {
   const { client, tempDir } = await createIsolatedDatabase();
   try {

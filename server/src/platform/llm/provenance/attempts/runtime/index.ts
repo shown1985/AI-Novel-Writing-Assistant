@@ -1,6 +1,7 @@
 export {
   getModelAttemptExecutionEvidence,
   getModelAttemptRequestState,
+  buildPromptInvocationAttribution,
   runWithModelAttemptRequestContext,
   runWithModelAttemptRequestState,
   updateModelAttemptPromptIdentity,
@@ -12,3 +13,11 @@ export {
   type StartModelTransportAttemptInput,
 } from "./modelAttemptRecorder";
 export { setModelAttemptRepositoryForTests } from "./modelAttemptRepositoryProvider";
+export {
+  readModelAttemptRequest,
+  projectModelAttemptRead,
+  type ModelAttemptAttributionStatus,
+  type ModelAttemptReadProjection,
+  type ModelAttemptReadStatus,
+} from "./modelAttemptReadProjection";
+export type { ModelAttemptAttributionIssue } from "../contracts";

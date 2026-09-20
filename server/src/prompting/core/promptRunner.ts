@@ -45,6 +45,7 @@ import type {
   PromptStreamRunResult,
 } from "./promptTypes";
 import {
+  buildPromptInvocationAttribution,
   getModelAttemptExecutionEvidence,
   getModelAttemptRequestState,
   runWithModelAttemptRequestContext,
@@ -344,6 +345,11 @@ export async function runStructuredPrompt<I, O, R = O>(input: {
       promptVersion: input.asset.version,
       taskType: input.asset.taskType,
     },
+    attribution: buildPromptInvocationAttribution({
+      novelId: input.options?.novelId,
+      chapterId: input.options?.chapterId,
+      entrypoint: input.options?.entrypoint,
+    }),
   }, () => runStructuredPromptInContext(input));
 }
 
@@ -547,6 +553,11 @@ export async function streamStructuredPrompt<I, O, R = O>(input: {
       promptVersion: input.asset.version,
       taskType: input.asset.taskType,
     },
+    attribution: buildPromptInvocationAttribution({
+      novelId: input.options?.novelId,
+      chapterId: input.options?.chapterId,
+      entrypoint: input.options?.entrypoint,
+    }),
   }, () => streamStructuredPromptInContext(input));
 }
 

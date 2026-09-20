@@ -4,6 +4,7 @@ import { z } from "zod";
 import { featureFlags } from "../../../../config/featureFlags";
 import { llmProviderSchema } from "../../../../llm/providerSchema";
 import { KnowledgeService } from "../../../../services/knowledge/KnowledgeService";
+import { WorldMaintenanceError } from "../../../../services/world/maintenance";
 import { WorldService } from "../../../../services/world/WorldService";
 
 export const worldService = new WorldService();
@@ -81,7 +82,12 @@ export const createWorldSchema = z.object({
   bindingSupport: z.unknown().optional(),
 });
 
-export const updateWorldSchema = createWorldSchema.partial();
+const worldWriteProtectionSchema = z.object({
+  operationId: z.string().trim().min(1).optional(),
+  expectedContentRevision: z.number().int().min(0).optional(),
+});
+
+export const updateWorldSchema = createWorldSchema.partial().extend(worldWriteProtectionSchema.shape);
 
 export const worldGenerateSchema = z.object({
   name: z.string().trim().min(1),
@@ -153,7 +159,20 @@ export const suggestAxiomsSchema = z.object({
 
 export const updateAxiomsSchema = z.object({
   axioms: z.array(z.string().trim().min(1)).min(1),
-});
+}).extend(worldWriteProtectionSchema.shape);
+
+export function handleWorldMaintenanceError(error: unknown, res: Parameters<RequestHandler>[1]): boolean {
+  if (!(error instanceof WorldMaintenanceError)) {
+    return false;
+  }
+  res.status(error.status).json({
+    success: false,
+    error: error.code,
+    message: error.message,
+    details: error.details,
+  });
+  return true;
+}
 
 export const layerGenerateSchema = z.object({
   provider: providerSchema.optional(),

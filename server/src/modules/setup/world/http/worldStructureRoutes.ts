@@ -20,6 +20,7 @@ import {
   updateAxiomsSchema,
   worldIdSchema,
   worldService,
+  handleWorldMaintenanceError,
 } from "./worldHttpContext";
 
 export function registerStructureWorldRoutes(router: Router): void {
@@ -114,13 +115,20 @@ export function registerStructureWorldRoutes(router: Router): void {
     try {
       const { id } = req.params as z.infer<typeof worldIdSchema>;
       const { axioms } = req.body as z.infer<typeof updateAxiomsSchema>;
-      const data = await worldService.updateAxioms(id, axioms);
+      const { operationId, expectedContentRevision } = req.body as z.infer<typeof updateAxiomsSchema>;
+      const data = await worldService.updateAxioms(id, axioms, {
+        operationId,
+        expectedContentRevision,
+      });
       res.status(200).json({
         success: true,
         data,
         message: "Axioms updated.",
       } satisfies ApiResponse<typeof data>);
     } catch (error) {
+      if (handleWorldMaintenanceError(error, res)) {
+        return;
+      }
       next(error);
     }
   });
