@@ -62,7 +62,7 @@ R1-S2G 是 Release 1 已完成实施 Sprint，承诺/完成 `8/8` 点、无 Stre
 
 ### R1-S2H 已完成窗口
 
-R1-S2H 承诺并完成 [S2-04c1 实况模型来源只读显示](./s2-04c1-live-model-provenance-contract.md) 3 点、无 Stretch。Terra Computer Use 已在固定 mock 隔离场景通过：作者可看到预计 `openai/gpt-expected`、实际 adopted `deepseek/deepseek-chat`、首选失败与备用采用顺序详情、无 requestId/not_found/error 文案，并确认 A→B→C 切换不串线；未使用真实库或付费模型。任务抽屉、运行记录、全局历史、按 task/novel 反查、schema/migration、S3 与 RC 不属于本窗口。完整 Review/Retrospective 见 [R1-S2H Sprint 承诺](./r1-s2h-sprint-commitment.md)。
+R1-S2H 承诺并完成 [S2-04c1 实况模型来源只读显示](./s2-04c1-live-model-provenance-contract.md) 3 点、无 Stretch。Terra Computer Use 已在固定 mock 隔离场景通过：作者可看到预计 `openai/gpt-expected`、实际 adopted `deepseek/deepseek-chat`、首选失败与备用采用顺序详情、无 requestId/not_found/error 文案，并确认 A→B→C 切换不串线；未使用真实库或付费模型。`beta@8a76e079` 组合验证 PASS（shared/server build、client typecheck、server `5/5`、client `4/4`）。任务抽屉、运行记录、全局历史、按 task/novel 反查、schema/migration、S3 与 RC 不属于本窗口。完整 Review/Retrospective 见 [R1-S2H Sprint 承诺](./r1-s2h-sprint-commitment.md)。
 
 原 S2-04c 父范围不重复计点；未进入 S2-04c1 的任务/历史展示保持 Refinement。R1-S2H 完成不代表 Release 1 或发布门完成，也不启动下一 Story。
 

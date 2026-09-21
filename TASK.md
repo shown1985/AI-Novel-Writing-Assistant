@@ -247,6 +247,7 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 - 非范围：Task Center、`NovelTaskDrawer`、全局历史或按 task/novel 反查、schema/migration、配置/任务写入、S3 与 RC。
 - Owner：单一 GPT-5.6 Luna xhigh 全栈 Agent；根 Agent 负责 PO/Scrum/集成；实现完成后由 GPT-5.6 Terra medium 独立 QC。
 - 证据：shared/server/client build/typecheck PASS；server 聚焦 `5/5`、client 最终 `4/4`，Terra QC 已修复预计文案 P1 并复验 PASS，`git diff --check` PASS。Terra Computer Use 在隔离路径 `/tmp/ai-novel-s2-04c1-ui-IwRF6R` 完成五场景：预计 `openai/gpt-expected`、实际 adopted `deepseek/deepseek-chat`、首选失败与备用采用顺序详情、无 requestId/not_found/error 文案、A→B→C 切换不串线。固定 mock 验收未使用真实库或付费模型；4174/API 4100 已停止，隔离路径已移入废纸篓。
+- beta 集成：`8a76e079` 合并 S2H 与已冻结的 S3-03a 规划，无冲突；隔离 worktree 完成 shared/server build、client typecheck、server `5/5`、client `4/4`，集成门 PASS。安装依赖、生成 Prisma Client 与构建 SQLite 原生模块只用于该 worktree 验证，未迁移或修改业务数据库。
 
 - Review：7 项 AC、自动化、脱敏/只读边界和五场景 Computer Use 均通过；本卡只交付 `LiveExecutionDialog`，未覆盖父范围的任务抽屉、运行记录和全局历史。
 - Retrospective：承诺/完成 `3/3`，carryover `0`。改进：①为下一张 UI 验收卡预先固定可复现 mock 场景与清理路径；②在 Sprint 收口前集中核对“候选/待验收”文案，避免证据通过后残留旧状态。

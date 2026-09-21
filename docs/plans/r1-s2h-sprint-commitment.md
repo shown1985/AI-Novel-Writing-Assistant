@@ -62,5 +62,5 @@
 
 ## Review 与 Retrospective 出口
 
-- Review：7 项 AC、自动化结果、脱敏/只读边界和五场景 Computer Use 均通过；完成 `S2-04c1` 只代表实况窗口切片完成，不代表原 `S2-04c` 父范围、Release 1 或发布门通过，也不自动启动下一 Story。
+- Review：7 项 AC、自动化结果、脱敏/只读边界和五场景 Computer Use 均通过；`beta@8a76e079` 无冲突合并并通过 shared/server build、client typecheck、server `5/5`、client `4/4` 组合门。完成 `S2-04c1` 只代表实况窗口切片完成，不代表原 `S2-04c` 父范围、Release 1 或发布门通过，也不自动启动下一 Story。
 - Retrospective：承诺/完成 `3/3`，carryover `0`。改进：①为下一张 UI 验收卡预先固定可复现 mock 场景与清理路径；②在 Sprint 收口前集中核对“候选/待验收”文案，避免证据通过后残留旧状态。
