@@ -1537,6 +1537,7 @@ model NovelWorld {
   syncEnabled           Boolean  @default(false)
   syncDirection         String   @default("none")
   syncBaseVersion       Int?
+  contentRevision       Int      @default(1)
   syncPendingChangesJson String?
   lastSyncedAt          DateTime?
   generationPolicyJson  String?
