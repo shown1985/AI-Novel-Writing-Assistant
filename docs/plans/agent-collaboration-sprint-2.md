@@ -309,13 +309,14 @@
 - AC：三入口身份与两个小说并发隔离；runtime frame 冲突不拼字段；`reconstructRequest=null` 只产生 `not_found`；persisted legacy/unattributed 产生 `attributionStatus=unattributed`；只有调用方带真实 execution evidence 时才可出现 `evidenceStatus=missing`；修改默认模型不改变旧记录；读取不触发模型调用。
 - 验证：内部身份矩阵、read service 聚合、重启/默认变化、并发/stream scope、脱敏和零模型读取检查；不以公共 API/UI 覆盖率宣称全系统透明。完整 DoR/AC/验证见 [S2-04b4 合同](./s2-04b4-attribution-read-projection-contract.md)。
 
-R1-S2G 当前验收进展：S2-04b4 已完成 5 点；S2-04c 仍受内部读投影的数据合同与显示边界约束，不能因本卡 Done 自动进入 UI 实现或标为 Ready。
+R1-S2G 当前验收进展：S2-04b4 已完成 5 点。后续 Refinement 已将 S2-04c 拆为 3 点的 S2-04c1 实况切片与尚未估点的任务/历史展示范围；父范围不重复计点。
 
-## S2-04c：预计模型与实际来源的只读显示
+## S2-04c：预计模型与实际来源的只读显示（父范围）
 
 - 用户价值：提交前知道选择意图，运行后看到实际调用与备用原因，技术参数保持按需查看。
-- 状态：Blocked by S2-04b4；04a 已完成，持久 read DTO 冻结后才能 Ready。
-- 点数：3；Owner：Agent B，04a完成后可设计纯展示模型；由根集成人接线共享/全局组件保留范围。
+- 状态：已拆分；父范围不重复计点。
+- 子卡：`S2-04c1` 3 点、**Done（R1-S2H）**，只接实况窗口；任务抽屉、运行记录与按 task/novel 反查保持 Refinement，后续重新估点。
+- Owner：S2-04c1 由单一全栈 owner 串行完成；共享/全局组件仍由根集成人明确授权。
 - 真实源码：client/src/components/common/LLMSelector.tsx、components/layout/Navbar.tsx、components/liveExecution/LiveExecutionDialog.tsx、hooks/useLlmLiveFeed.ts、pages/novels/components/NovelTaskDrawer.tsx、pages/tasks/TaskCenterPage.tsx。以上跨作品/全局文件由根集成人逐项授权，Agent 不默认抢占。
 - 拟建归属：client/src/components/common/ 下明确模型来源展示能力及行为测试；不复制来源解析业务，不新增全局执行按钮。
 - 非范围：不把全局持久选择改名为本次覆盖，不在运行记录执行恢复，不让实况覆盖已保存正文，不强迫作者理解11类路由。
@@ -325,7 +326,7 @@ R1-S2G 当前验收进展：S2-04b4 已完成 5 点；S2-04c 仍受内部读投�
 1. 明确提交前“预计/当前选择”与正式调用“实际使用”的文案和数据来源。
 2. 展示摘要模型与来源；混合来源、有效参数、备用链和缺失字段进入可展开详情。
 3. 运行历史读取04b证据；旧字段兼容，切书/切任务不沿用旧记录。
-4. 通过根集成人接入全局实况/运行记录只读区域和本书drawer，检查低边框与用户任务语言。
+4. S2-04c1 仅接入全局实况窗口并检查低边框与用户任务语言；运行记录和本书 drawer 留在后续 Refinement。
 
 可检验 AC：
 
@@ -340,7 +341,7 @@ R1-S2G 当前验收进展：S2-04b4 已完成 5 点；S2-04c 仍受内部读投�
 
 数据安全与失败恢复：只读展示不改变模型配置。查询失败允许重新读取，保持已保存正文，不发生成重试来补来源；敏感字段在服务端及展示层两次检查。
 
-交付证据：预计和实际响应样例、历史配置变化测试、查询/调用计数、只读边界检查、用户验收或缺口。
+交付证据：预计和实际响应样例（预计 `openai/gpt-expected`、实际 adopted `deepseek/deepseek-chat`）、首选失败与备用采用顺序详情、无 requestId/not_found/error 文案、A→B→C 切换不串线；查询/调用计数、只读边界检查和 Terra Computer Use 已通过。固定 mock 未使用真实库或付费模型；父范围的任务/历史展示仍为 Refinement。
 
 ## 并发 Wave 与接线所有权
 

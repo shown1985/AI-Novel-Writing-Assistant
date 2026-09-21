@@ -5,6 +5,7 @@ import { llmLiveBroker, type LlmLiveSession } from "./LlmLiveBroker";
 export function beginLlmLiveSession(input: {
   label: string;
   mode: "text" | "structured";
+  requestId: string | null;
   promptMeta?: PromptInvocationMeta;
   provider?: string | null;
   model?: string | null;
@@ -14,6 +15,7 @@ export function beginLlmLiveSession(input: {
   return llmLiveBroker.begin({
     label: meta ? formatPromptLiveLabel(meta) : input.label,
     mode: input.mode,
+    requestId: input.requestId,
     promptId: meta?.promptId ?? null,
     promptVersion: meta?.promptVersion ?? null,
     taskId: meta?.taskId ?? null,

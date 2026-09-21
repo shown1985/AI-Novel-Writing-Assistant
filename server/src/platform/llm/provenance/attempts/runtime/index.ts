@@ -20,4 +20,5 @@ export {
   type ModelAttemptReadProjection,
   type ModelAttemptReadStatus,
 } from "./modelAttemptReadProjection";
+export { projectModelAttemptProvenance } from "./modelAttemptPublicProvenance";
 export type { ModelAttemptAttributionIssue } from "../contracts";

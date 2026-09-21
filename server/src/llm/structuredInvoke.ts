@@ -39,6 +39,7 @@ import { ReasoningStreamCollector } from "./reasoning";
 import {
   buildPromptInvocationAttribution,
   getModelAttemptExecutionEvidence,
+  getModelAttemptRequestState,
   runWithModelAttemptRequestContext,
   startModelTransportAttempt,
 } from "../platform/llm/provenance";
@@ -285,6 +286,7 @@ async function invokeStructuredAttempt<T>(input: {
   const liveSession = beginLlmLiveSession({
     label: input.baseInput.label,
     mode: "structured",
+    requestId: getModelAttemptRequestState()?.requestId ?? null,
     promptMeta: input.baseInput.promptMeta,
     provider: resolved.provider,
     model: resolved.model,

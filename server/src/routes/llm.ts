@@ -14,6 +14,10 @@ import { authMiddleware } from "../middleware/auth";
 import { AppError } from "../middleware/errorHandler";
 import { validate } from "../middleware/validate";
 import { checkModelRouteReadiness, getModelRouteReadiness } from "../modules/diagnostics";
+import {
+  projectModelAttemptProvenance,
+  readModelAttemptRequest,
+} from "../platform/llm/provenance";
 
 const router = Router();
 
@@ -80,7 +84,39 @@ const structuredFallbackSchema = z.object({
   retryCount: z.number().int().min(0).max(3).optional(),
 });
 
+const attemptRequestProvenanceParamsSchema = z.object({
+  requestId: z.string().trim().min(1).max(128),
+});
+
 router.use(authMiddleware);
+
+router.get("/attempt-requests/provenance", (_req, _res, next) => {
+  next(new AppError("请求参数校验失败。", 400));
+});
+
+router.get(
+  "/attempt-requests/:requestId/provenance",
+  validate({ params: attemptRequestProvenanceParamsSchema }),
+  async (req, res, next) => {
+    try {
+      const { requestId } = attemptRequestProvenanceParamsSchema.parse(req.params);
+      const projection = await readModelAttemptRequest({ requestId });
+      const data = projectModelAttemptProvenance(projection);
+      const message = data.status === "found"
+        ? "本次调用的模型来源已加载。"
+        : data.status === "not_found"
+          ? "暂未找到本次调用的来源记录，无法确认实际采用模型。"
+          : "本次调用的来源记录暂时无法读取，无法确认实际采用模型。";
+      res.status(200).json({
+        success: true,
+        data,
+        message,
+      } satisfies ApiResponse<typeof data>);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 router.get("/providers", async (_req, res, next) => {
   try {

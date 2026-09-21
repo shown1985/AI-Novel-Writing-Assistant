@@ -108,6 +108,7 @@ export {
   updateModelAttemptPromptIdentity,
   readModelAttemptRequest,
   projectModelAttemptRead,
+  projectModelAttemptProvenance,
   setModelAttemptRepositoryForTests,
   type ModelAttemptCandidate,
   type ModelAttemptAttributionStatus,
