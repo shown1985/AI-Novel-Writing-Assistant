@@ -3,7 +3,7 @@
 更新时间：2026-09-21
 当前分支：`codex/r1-s3a1-world-revision`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S3A 只承诺 S3-03a1 5 点、无 Stretch，Story 为 Ready、实施未开始；R1-S2H 已通过 beta 组合验证。Release 1 仍未完成。
+当前状态：R1-S3A 只承诺 S3-03a1 5 点、无 Stretch，Story 为 In Progress；R1-S2H 已通过 beta 组合验证。Release 1 仍未完成。
 
 ## 权威文档
 
@@ -255,8 +255,8 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 ## 当前 Sprint：R1-S3A 本书世界实例版本基础
 
 - Sprint Goal：旧作品继续按既有兼容路径读取；现有本书世界创建和显式替换拥有独立内容版本，缓存读取与世界库样本更新不误增版本。
-- 承诺：仅 `S3-03a1`，5 点、无 Stretch；PO/QC 已确认 DoR，状态 Ready，完成 `0/5`。Sprint 合同：[R1-S3A](./docs/plans/r1-s3a-sprint-commitment.md)，Story 合同：[S3-03a1](./docs/plans/s3-03a1-novel-world-content-revision-contract.md)。
-- Owner：单一 Luna xhigh Runtime 全栈 Agent 负责四个现有实例写入口及聚焦测试；根 PM/集成人独占双 schema、增量 migration 和共享合同；Terra medium QA/QC 分别负责验收与独立复核。
+- 承诺：仅 `S3-03a1`，5 点、无 Stretch；PO/QC 已确认 DoR，状态 In Progress，完成 `0/5`。Sprint 合同：[R1-S3A](./docs/plans/r1-s3a-sprint-commitment.md)，Story 合同：[S3-03a1](./docs/plans/s3-03a1-novel-world-content-revision-contract.md)。
+- Owner：一位 Luna xhigh Runtime 全栈 Agent 负责四个现有实例写入口及聚焦测试，另一位 Luna xhigh 数据合同 Agent 独占双 schema、增量 migration 和迁移检查；根 PM 唯一集成审核，Terra medium QA/QC 分别负责验收与独立复核。
 - 退出门：四类旧数据、显式替换 `1→2`、重复 lazy 幂等与事务失败有隔离行为证据；双 schema/migration 检查、服务端聚焦验证及 beta 组合门通过。无新 UI，UI 验收不适用；PostgreSQL apply 保留 Release gate。
 - 非范围：S3-03a2 切片主读切换、S3-03b 同步、原 S3-02b 其余旧入口、真实用户库迁移、Release 2。
 

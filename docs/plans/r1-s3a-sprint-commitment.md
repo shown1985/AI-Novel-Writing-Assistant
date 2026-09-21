@@ -7,14 +7,14 @@
 - Release / Epic：Release 1 / S3 可信世界。
 - 基线：`beta@072cdfd9`；DoR 冻结于 `codex/r1-s3a1-world-revision@fe91908f`。
 - 承诺：仅 [S3-03a1 实例内容版本与兼容迁移](./s3-03a1-novel-world-content-revision-contract.md)，5 点；Stretch：无。
-- 当前状态：Ready / Sprint 已承诺，尚未开始实施；完成点数 `0/5`。
+- 当前状态：In Progress / Sprint 已承诺并分配实现；完成点数 `0/5`。
 - 容量：单卡 5 点，不把后继 a2 或同步旧入口算作本 Sprint 产出。
 
 ## 依赖、Owner 与顺序
 
 - `S1-06` 内容版本原则、`S3-02a` 世界样本 CAS 已完成；PO 与独立 QC 已复核 a1 DoR。
 - 单一 Luna xhigh 全栈 Runtime owner 负责 `NovelWorldInstanceService.ts`、`NovelWorldManualService.ts` 和必要的内部版本投影/聚焦测试；一次只做本 Story。
-- 根 PM/集成人独占双 Prisma schema、PostgreSQL/SQLite 增量 migration、migration completeness 和共享合同；先冻结字段/默认值，再由 Runtime owner 接四个写入口，避免多人同时改共享文件。
+- 根 PM 指定另一位 Luna xhigh 数据合同工程师，单独独占双 Prisma schema、PostgreSQL/SQLite 增量 migration 和 migration completeness；根 PM 保留共享合同的唯一集成审核权。两位工程师按上述文件边界并行，不同时编辑同一文件。
 - Terra medium QA 做 AC/失败与旧数据场景验收；Terra medium QC 独立复核差异、范围、迁移合同与验证证据。根 PM 负责 Sprint 门、阶段提交和 beta 集成。
 - 任何用户真实数据库均不用于开发验证；本卡不执行 reset、drop、truncate 或真实库升级。
 

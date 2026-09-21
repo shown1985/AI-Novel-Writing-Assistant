@@ -4,7 +4,7 @@
 
 - Release / Epic：Release 1 / S3 可信世界
 - 点数：5
-- 状态：Ready（PO/QC 已确认 DoR；已进入 R1-S3A 承诺，实施未开始）
+- 状态：In Progress（R1-S3A；两个 Luna 实现任务按文件边界并行，根集成人负责集成）
 - 用户价值：作者修改本书世界时，系统能区分本书实例内容版本与世界库样本版本；旧作品升级后仍能安全读取，不会把缓存刷新或来源样本更新误报为本书修改。
 - 依赖：S1-06 已冻结内容版本与兼容原则；S3-02a 已完成 `World.contentRevision` 样本 CAS。a2 依赖本卡完成；S3-03b 不属于本卡依赖或范围。
 
@@ -50,7 +50,7 @@
   - `server/src/services/novel/worldContext/NovelWorldInstanceService.ts`
   - `server/src/services/novel/worldContext/NovelWorldManualService.ts`
   - 必要时仅调整 `server/src/services/novel/worldContext/NovelWorldLibrarySaveService.ts` 的版本投影。
-- 根集成人独占：
+- 根集成人指定的单一 Luna 数据合同工程师独占编辑，根集成人负责集成审核：
   - `server/src/prisma/schema.prisma`
   - `server/src/prisma/schema.sqlite.prisma`
   - 对应 PostgreSQL/SQLite 增量 migration 与 schema/migration completeness 检查。
