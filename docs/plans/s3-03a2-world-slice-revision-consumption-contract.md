@@ -6,7 +6,7 @@
 - 点数：3
 - 状态：Refinement（Not Ready，依赖 S3-03a1）
 - 用户价值：作者刷新或阅读世界上下文时，系统不会把缓存动作算成创作修改；本书世界内容改变后，生成链会读取当前实例而不是继续使用旧切片。
-- 依赖：S3-03a1 完成并冻结 `NovelWorld.contentRevision`、内容/缓存字段分类、legacy 停止条件和失效输入；S1-06、S3-02a 间接满足。
+- 依赖：S3-03a1 完成并冻结 `NovelWorld.contentRevision`、内容/缓存字段分类和 legacy 停止条件；S1-06、S3-02a 间接满足。a1 的版本只覆盖四个实例创建/替换入口，现有同步 pull 在 S3-03b 前仍须按来源/同步基线与切片 digest 处理失效。
 
 ## 当前 DoR blocker
 
@@ -15,9 +15,9 @@
 ## 范围
 
 - 让 `NovelWorldSliceService.persistSlice`、`ensureStoryWorldSlice`、`refreshWorldSlice` 明确把切片 JSON、override、digest、builtAt 作为派生缓存处理，不递增 a1 的实例 `contentRevision`。
-- 以 a1 冻结的实例内容版本/来源版本/故事输入 digest 组成失效判断；实例内容改变后旧 slice 不得继续作为当前上下文。
+- 以 a1 冻结的实例内容版本、来源/同步基线和故事输入 digest 组成失效判断；当前同步 pull 会清空实例切片缓存，在 S3-03b 接入版本/CAS 前，不能仅靠 `contentRevision` 判断它造成的内容变化。实例内容改变后旧 slice 不得继续作为当前上下文。
 - 让 `WorldContextGateway.getWorldContextBlock`、`hasActiveWorld` 和按 purpose 的上下文组装读取当前 `NovelWorld` 实例；保留 `outline`、`character`、`chapter`、`bible`、`optimize` 五种 purpose。
-- 对 legacy 过渡记录沿用 a1 的兼容读取停止条件，不新增第二套世界上下文源。
+- 对 legacy 过渡记录执行 a1 冻结的兼容读取停止条件：由 a2 完成主读取切换与旧切片退出，不新增第二套世界上下文源。
 
 ## 非范围
 
@@ -27,7 +27,7 @@
 
 ## 权威源与兼容停止条件
 
-- `NovelWorld.contentRevision`（a1）是实例内容变化的失效主依据。
+- `NovelWorld.contentRevision`（a1）是其四个受控写入口的失效主依据；同步 pull 属 S3-03b 尚未覆盖的阶段性例外，a2 必须保留来源/同步基线和 digest 失效输入。
 - `storySliceDigest`、`storySliceBuiltAt`、override 和切片 JSON 是派生缓存，不得被视为作者内容版本。
 - Gateway 读取必须优先使用 `NovelWorld`；legacy `Novel.storyWorldSlice*` 只在 a1 规定的过渡条件下读取，完成初始化后不再作为并行事实源。
 

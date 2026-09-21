@@ -1,9 +1,9 @@
 # 当前项目看板：Release 1 单机成书版
 
-更新时间：2026-09-20
-当前分支：`codex/r1-s2h-model-provenance-ui`
+更新时间：2026-09-21
+当前分支：`codex/r1-s3a1-refinement`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S2H 已完成 S2-04c1 3 点、无 Stretch；实况模型来源只读显示已通过自动化与 Terra Computer Use 验收。Release 1 仍未完成。
+当前状态：R1-S2H 已完成 S2-04c1 3 点、无 Stretch，且通过 beta 组合验证；下一窗口尚未承诺，S3-03a1 为 Ready、S3-03a2 仍在 Refinement。Release 1 仍未完成。
 
 ## 权威文档
 
