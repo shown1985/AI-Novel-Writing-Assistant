@@ -79,6 +79,7 @@ export interface NovelWorldInstanceRow {
   novelId: string;
   sourceWorldId: string | null;
   sourceType: string;
+  contentRevision: number;
   title: string | null;
   coverSummary: string | null;
   structuredDataJson: string | null;
@@ -219,6 +220,7 @@ export class NovelWorldInstanceService {
         "novelId",
         "sourceWorldId",
         "sourceType",
+        "contentRevision",
         "title",
         "coverSummary",
         "structuredDataJson",
@@ -289,6 +291,7 @@ export class NovelWorldInstanceService {
         "novelId",
         "sourceWorldId",
         "sourceType",
+        "contentRevision",
         "title",
         "coverSummary",
         "structuredDataJson",
@@ -308,6 +311,7 @@ export class NovelWorldInstanceService {
         ${source.novelId},
         ${source.worldId},
         ${sourceType},
+        ${1},
         ${source.worldName},
         ${source.worldSummary},
         ${source.structureJson},
@@ -396,6 +400,7 @@ export class NovelWorldInstanceService {
           "novelId",
           "sourceWorldId",
           "sourceType",
+          "contentRevision",
           "title",
           "coverSummary",
           "structuredDataJson",
@@ -415,6 +420,7 @@ export class NovelWorldInstanceService {
           ${input.novelId},
           ${world.id},
           ${"imported"},
+          ${1},
           ${world.name},
           ${world.overviewSummary ?? world.description},
           ${world.structureJson},
@@ -433,6 +439,7 @@ export class NovelWorldInstanceService {
         ON CONFLICT ("novelId") DO UPDATE SET
           "sourceWorldId" = EXCLUDED."sourceWorldId",
           "sourceType" = EXCLUDED."sourceType",
+          "contentRevision" = COALESCE("contentRevision", 1) + 1,
           "title" = EXCLUDED."title",
           "coverSummary" = EXCLUDED."coverSummary",
           "structuredDataJson" = EXCLUDED."structuredDataJson",
@@ -631,6 +638,7 @@ export class NovelWorldInstanceService {
           "novelId",
           "sourceWorldId",
           "sourceType",
+          "contentRevision",
           "title",
           "coverSummary",
           "structuredDataJson",
@@ -653,6 +661,7 @@ export class NovelWorldInstanceService {
           ${input.novelId},
           ${sourceWorldId},
           ${"generated"},
+          ${1},
           ${title},
           ${coverSummary},
           ${structuredDataJson},
@@ -674,6 +683,7 @@ export class NovelWorldInstanceService {
         ON CONFLICT ("novelId") DO UPDATE SET
           "sourceWorldId" = EXCLUDED."sourceWorldId",
           "sourceType" = EXCLUDED."sourceType",
+          "contentRevision" = COALESCE("contentRevision", 1) + 1,
           "title" = EXCLUDED."title",
           "coverSummary" = EXCLUDED."coverSummary",
           "structuredDataJson" = EXCLUDED."structuredDataJson",

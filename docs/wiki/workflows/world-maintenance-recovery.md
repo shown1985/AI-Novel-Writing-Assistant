@@ -106,7 +106,9 @@ UI 不自行判断 proposal 是否仍可提交，也不把本地 pending 当作�
 ## 旧数据兼容
 
 - 现有 `World.version` 只作为迁移初始下界，不能补造历史每次编辑都已计数的证据。
-- 有结构的旧 `NovelWorld` 初始化 revision 1，无内容初始化 0；初始化必须幂等。
+- S3-03a1 为所有已存在的 `NovelWorld` 行统一初始化 `contentRevision=1`；有无结构都使用同一兼容起点，不用 `0` 暗示可证明的历史状态。
+- 旧小说首次 lazy 创建实例时：仅 `worldId`、仅旧切片、两者兼有均从 revision 1 开始，两者皆无则不创建；已有实例不得被重复初始化覆盖。仅有旧 World 扁平字段时保留来源和现有兼容读取，不在迁移中伪造结构 JSON。
+- 该版本边界当前只覆盖 legacy 初始化、世界库导入、主题生成和手动创建/替换。同步 pull 的版本/CAS 归 S3-03b，旧切片双读/双写与 Gateway 主读切换归 S3-03a2；两者完成前不得宣称所有实例内容变化均由 `contentRevision` 捕获。
 - 旧 `integrated` 回答、`resolved/ignored` 问题与 consistency report 保留为历史声明，但不补造 verifiedAt、输入版本或当前通过证据。
 - 旧同步记录可读，但 revision 与 operation 身份为 unknown；下一次同步必须重新 diff 并携双侧 expected revision。
 - 快照恢复产生新的当前 revision，不把版本号倒退到快照中的旧值。
