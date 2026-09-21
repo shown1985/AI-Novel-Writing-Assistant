@@ -79,6 +79,22 @@ test("实况来源摘要区分预计、实际和备用采用结果", () => {
   });
   assert.equal(partial.actual, "未记录");
   assert.match(partial.note, /未标记实际采用模型/);
+  assert.match(partial.note, /来源归因信息不完整/);
+
+  const unattributed = buildLlmSourceSummaryModel({
+    requestId: "request-unattributed",
+    provenance: {
+      status: "found",
+      requestId: "request-unattributed",
+      attributionStatus: "unattributed",
+      adoptedAttemptId: null,
+      attempts: [baseAttempt({ status: "succeeded", failure: null })],
+    },
+  });
+  assert.equal(unattributed.actual, "未记录");
+  assert.match(unattributed.note, /未标记实际采用模型/);
+  assert.match(unattributed.note, /未能关联到具体创作来源/);
+  assert.notEqual(partial.note, unattributed.note);
 });
 
 test("没有 requestId、未找到和读取失败不猜测实际模型", () => {

@@ -5,11 +5,11 @@
 - Story：`S2-04c1`
 - Release / Epic：Release 1 / S2 模型透明度
 - 点数：3
-- 状态：User Acceptance（代码与自动化验证完成，Computer Use 用户验收待完成）
+- 状态：Done（R1-S2H；代码、自动化与 Terra Computer Use 验收完成）
 - 用户价值：作者在模型运行时能区分“准备使用的模型”和“这次实际采用的模型”，发生重试或备用时能看懂结果，不需要理解内部路由实现。
 - 依赖：`S2-04a`、`S2-04b1～04b4` 均 Done；`S2-04b4` 已提供持久 request 读投影和首批显式身份归因。
 
-实现收口证据：shared/server/client build/typecheck PASS；server 聚焦 `5/5`、client 最终 `4/4`，Terra QC 已修复预计文案 P1 并复验 PASS。Computer Use 真实尝试因 macOS 锁屏阻塞，故本 Story 不能标记 Done；未使用真实库或付费模型，隔离 fixture 已移除。
+实现收口证据：shared/server/client build/typecheck PASS；server 聚焦 `5/5`、client 最终 `4/4`，Terra QC 已修复预计文案 P1 并复验 PASS。Terra Computer Use 在隔离路径 `/tmp/ai-novel-s2-04c1-ui-IwRF6R` 完成五场景：预计 `openai/gpt-expected`、实际 adopted `deepseek/deepseek-chat`、首选失败与备用采用顺序详情、无 requestId/not_found/error 文案、A→B→C 切换不串线。固定 mock 验收未使用真实库或付费模型；4174/API 4100 已停止，隔离路径已移入废纸篓。
 
 原 `S2-04c` 作为父范围不再重复计点。它被拆为本卡与仍在 Refinement 的历史任务展示范围；本卡完成不能宣称任务抽屉、运行记录或全系统调用历史已完成。
 
@@ -80,4 +80,4 @@ HTTP 语义：合法 requestId 无论 found/not_found/error 均返回 `200` 与�
 
 ## DoD 与文档判断
 
-业务 AC、聚焦自动化和 Computer Use 均通过后才能 Done；只有 build/typecheck 或隐藏 UI 不算完成。当前仅完成代码与自动化门，保持 User Acceptance。该能力对用户可见，release notes/README 只能标为候选验收中；public DTO/实况 requestId 传播形成的长期边界已记录到模型调用归因 Wiki；不得把本合同写成全系统历史能力。
+业务 AC、聚焦自动化和 Computer Use 均通过后才能 Done；本 Story 已满足三者并标记 Done。该能力对用户可见，release notes/README 记录为已完成用户结果；public DTO/实况 requestId 传播形成的长期边界已记录到模型调用归因 Wiki。该完成不代表父 S2-04c、Release 1 或发布门完成，不扩张为全系统历史能力。

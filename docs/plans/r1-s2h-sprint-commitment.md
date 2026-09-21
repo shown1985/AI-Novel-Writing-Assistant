@@ -7,7 +7,7 @@
 - 基线：`codex/r1-s2h-model-provenance-ui` 从 `beta@92a39f5b` 创建。
 - 承诺：`S2-04c1`，3 点。
 - Stretch：无。
-- 当前结果：代码与自动化验证完成，但 Computer Use 因 macOS 锁屏阻塞；Story 保持 User Acceptance，Sprint 完成点数 `0/3`，不得标记 Done。
+- 当前结果：代码、自动化与 Terra Computer Use 验证完成；Story 为 Done，Sprint 完成 `3/3` 点，无 carryover。
 - 容量依据：上一窗口虽完成 8 点，但本卡首次增加 public DTO、HTTP read adapter 与 UI 接线；为防止调用历史、任务投影和全局组件膨胀，本 Sprint 只承诺一个 3 点垂直切片。
 - 产品边界：只接 `LiveExecutionDialog`；Task Center、任务抽屉、全局历史查询、S3 与 RC 全部不进入本 Sprint。
 
@@ -49,9 +49,9 @@
 - 行为：实际模型来自持久 adopted attempt，不来自当前设置或 live label；fallback lineage 有序且脱敏。
 - 只读：查询计数可证明零模型调用、零配置/attempt/task 写入。
 - 隔离：两个 request/task/session 切换不串线，迟到响应不能覆盖当前显示。
-- UI：Computer Use PASS；若 UI 尚未验收，Story 保持 User Acceptance，不得 Done。
+- UI：Computer Use PASS；已在隔离 mock 场景完成验收，Story 可标记 Done。
 
-当前验收证据：shared/server/client build/typecheck PASS；server 聚焦 `5/5`、client 最终 `4/4`，Terra QC 已修复预计文案 P1 并复验 PASS。Computer Use 真实尝试因 macOS 锁屏 FAIL/blocked；未使用真实库或付费模型，隔离 fixture 已移除，相关服务已停止。
+当前验收证据：shared/server/client build/typecheck PASS；server 聚焦 `5/5`、client 最终 `4/4`，Terra QC 已修复预计文案 P1 并复验 PASS。Terra Computer Use 在隔离路径 `/tmp/ai-novel-s2-04c1-ui-IwRF6R` 完成五场景：预计 `openai/gpt-expected`、实际 adopted `deepseek/deepseek-chat`、首选失败与备用采用顺序详情、无 requestId/not_found/error 文案、A→B→C 切换不串线。固定 mock 验收未使用真实库或付费模型；4174/API 4100 已停止，隔离路径已移入废纸篓。
 
 ## 明确不承诺
 
@@ -62,6 +62,5 @@
 
 ## Review 与 Retrospective 出口
 
-- Review：逐条记录 7 项 AC、自动化结果、Computer Use 场景、未覆盖入口和 beta 组合验证状态。
-- Retrospective：记录承诺/完成点数、carryover 原因、返修与最多两项流程改进。
-- 当前验收状态：代码切片完成，用户验收未完成；承诺/完成 `0/3`。Sprint 尚未关闭，Computer Use 环境阻塞是当前未完成原因，不提前记为 carryover。完成 `S2-04c1` 只代表实况窗口切片完成，不代表原 `S2-04c` 父范围、Release 1 或发布门通过，也不自动启动下一 Story。
+- Review：7 项 AC、自动化结果、脱敏/只读边界和五场景 Computer Use 均通过；完成 `S2-04c1` 只代表实况窗口切片完成，不代表原 `S2-04c` 父范围、Release 1 或发布门通过，也不自动启动下一 Story。
+- Retrospective：承诺/完成 `3/3`，carryover `0`。改进：①为下一张 UI 验收卡预先固定可复现 mock 场景与清理路径；②在 Sprint 收口前集中核对“候选/待验收”文案，避免证据通过后残留旧状态。

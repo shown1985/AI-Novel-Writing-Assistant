@@ -315,7 +315,7 @@ R1-S2G 当前验收进展：S2-04b4 已完成 5 点。后续 Refinement 已将 S
 
 - 用户价值：提交前知道选择意图，运行后看到实际调用与备用原因，技术参数保持按需查看。
 - 状态：已拆分；父范围不重复计点。
-- 子卡：`S2-04c1` 3 点、Ready/已进入 R1-S2H，只接实况窗口；任务抽屉、运行记录与按 task/novel 反查保持 Refinement，后续重新估点。
+- 子卡：`S2-04c1` 3 点、**Done（R1-S2H）**，只接实况窗口；任务抽屉、运行记录与按 task/novel 反查保持 Refinement，后续重新估点。
 - Owner：S2-04c1 由单一全栈 owner 串行完成；共享/全局组件仍由根集成人明确授权。
 - 真实源码：client/src/components/common/LLMSelector.tsx、components/layout/Navbar.tsx、components/liveExecution/LiveExecutionDialog.tsx、hooks/useLlmLiveFeed.ts、pages/novels/components/NovelTaskDrawer.tsx、pages/tasks/TaskCenterPage.tsx。以上跨作品/全局文件由根集成人逐项授权，Agent 不默认抢占。
 - 拟建归属：client/src/components/common/ 下明确模型来源展示能力及行为测试；不复制来源解析业务，不新增全局执行按钮。
@@ -341,7 +341,7 @@ R1-S2G 当前验收进展：S2-04b4 已完成 5 点。后续 Refinement 已将 S
 
 数据安全与失败恢复：只读展示不改变模型配置。查询失败允许重新读取，保持已保存正文，不发生成重试来补来源；敏感字段在服务端及展示层两次检查。
 
-交付证据：预计和实际响应样例、历史配置变化测试、查询/调用计数、只读边界检查、用户验收或缺口。
+交付证据：预计和实际响应样例（预计 `openai/gpt-expected`、实际 adopted `deepseek/deepseek-chat`）、首选失败与备用采用顺序详情、无 requestId/not_found/error 文案、A→B→C 切换不串线；查询/调用计数、只读边界检查和 Terra Computer Use 已通过。固定 mock 未使用真实库或付费模型；父范围的任务/历史展示仍为 Refinement。
 
 ## 并发 Wave 与接线所有权
 

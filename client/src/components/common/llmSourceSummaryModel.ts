@@ -69,7 +69,11 @@ export function buildLlmSourceSummaryModel(input: {
     attempt.routeTier === "fallback" || attempt.role === "fallback"
   ));
   const note = !adopted
-    ? "本次调用已记录尝试，但未标记实际采用模型。"
+    ? provenance.attributionStatus === "partial"
+      ? "本次调用已记录尝试，但未标记实际采用模型；来源归因信息不完整。"
+      : provenance.attributionStatus === "unattributed"
+        ? "本次调用已记录尝试，但未标记实际采用模型；未能关联到具体创作来源。"
+        : "本次调用已记录尝试，但未标记实际采用模型。"
     : provenance.attributionStatus === "partial"
       ? "本次实际采用模型已记录，但来源归因信息不完整。"
       : provenance.attributionStatus === "unattributed"
