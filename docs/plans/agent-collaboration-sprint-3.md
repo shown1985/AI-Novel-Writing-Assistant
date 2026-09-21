@@ -87,7 +87,7 @@ R1-S2G 已完成 `8/8`：S2-04b4 `5` 点与 S3-02b1 `3` 点均为 Done，且 S3-
 - [S3-03a1 实例内容版本与兼容迁移](./s3-03a1-novel-world-content-revision-contract.md)：5 点，负责实例版本字段、双 schema 增量迁移、现有创建/导入/生成/legacy 初始化写路径和事务边界。
 - [S3-03a2 切片缓存与 Gateway 版本消费](./s3-03a2-world-slice-revision-consumption-contract.md)：3 点，依赖 a1，负责切片缓存不递增、版本失效和 Gateway 按用途读取当前实例。
 
-`S3-03a1` 已冻结四个现有写入口、四类旧记录初始化、版本递增和同步/旧切片阶段例外，PO/QC 确认进入 `Ready`，但尚未被 Sprint 承诺或实施。`S3-03a2` 保持 `Refinement`，由它执行旧切片主读取切换，必须等待 a1 完成；S3-03b 仍为独立 5 点卡，不因本拆分提前进入实施。
+`S3-03a1` 已冻结四个现有写入口、四类旧记录初始化、版本递增和同步/旧切片阶段例外，PO/QC 确认 `Ready`，并单独进入 R1-S3A 承诺；实施尚未开始。`S3-03a2` 保持 `Refinement`，由它执行旧切片主读取切换，必须等待 a1 完成；S3-03b 仍为独立 5 点卡，不因本拆分提前进入实施。
 
 ## S3-03b：双侧同步安全与引用完整性
 
@@ -180,7 +180,7 @@ R1-S2G 已完成 `8/8`：S2-04b4 `5` 点与 S3-02b1 `3` 点均为 Done，且 S3-
 
 1. Wave 0：S1-06、共享schema/迁移和写入口覆盖表冻结。未证明版本或运行恢复能力的卡保持Not Ready。
 2. Wave 1：Prompt Agent做S3-01；Runtime Agent已完成S3-02a。R1-S2G 仅由同一 Runtime 全栈 owner 接稳定 ID `S3-02b1` 的 `updateWorld`/`updateAxioms` 两条保存路径；不借此启动原 S3-02b 父项其他旧入口，也不新增普通编辑 UI。
-3. Wave 2：Runtime Agent 可在后续 Sprint Planning 领取 Ready 的 S3-03a1；a2 等待 a1 完成。S3-03b、S3-04 与 S3-06a 仍等待原 S3-02b 父项其余入口的 Refinement/解锁，不因 S3-02b1 完成自动 Ready。Prompt 与 Runtime owned 文件彼此串行接线；根集成人只做共享合同、迁移与隔离验证，不抢 Runtime owned 文件。
+3. Wave 2：R1-S3A 只承诺 Ready 的 S3-03a1，由 Runtime Agent 在计划冻结后领取；a2 等待 a1 完成。S3-03b、S3-04 与 S3-06a 仍等待原 S3-02b 父项其余入口的 Refinement/解锁，不因 S3-02b1 完成自动 Ready。Prompt 与 Runtime owned 文件彼此串行接线；根集成人只做共享合同、迁移与隔离验证，不抢 Runtime owned 文件。
 4. Wave 3：Runtime Agent接S3-04与S3-05a/b；Prompt Agent做S3-06b Prompt消费，Runtime后接Gateway；UI Agent验证来源/过期/未知状态的消费。相同文件不并发写。
 
 通用Done：真实持久化/投影/版本行为、定向检查、迁移兼容和源码最新构建证据；更新长期wiki；用户可见行为进入发布记录。R1-S2G 的 S3-02b1 不新增迁移，复用 S3-02a 数据底座；原 S3-02b 父项其余旧入口仍是 Refinement/非范围。根集成人review并阶段提交，子Agent不commit/switch/merge。UI验收交用户，不默认浏览器/截图。未通过beta组合验收不晋级main。
