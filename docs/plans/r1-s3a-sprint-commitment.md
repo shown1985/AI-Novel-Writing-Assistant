@@ -7,7 +7,7 @@
 - Release / Epic：Release 1 / S3 可信世界。
 - 基线：`beta@072cdfd9`；DoR 冻结于 `codex/r1-s3a1-world-revision@fe91908f`。
 - 承诺：仅 [S3-03a1 实例内容版本与兼容迁移](./s3-03a1-novel-world-content-revision-contract.md)，5 点；Stretch：无。
-- 当前状态：In Progress / Sprint 已承诺并分配实现；完成点数 `0/5`。
+- 当前状态：Done；承诺/完成 `5/5`，无 carryover。
 - 容量：单卡 5 点，不把后继 a2 或同步旧入口算作本 Sprint 产出。
 
 ## 依赖、Owner 与顺序
@@ -33,5 +33,5 @@
 
 ## Review 与 Retrospective 出口
 
-- Review：按 AC1～6 展示四类旧数据、重复初始化、替换与事务失败；核对未覆盖入口、a2 依赖、beta 集成和 Release gate。未通过项回到 Refinement，不用 build 代替业务验收。
-- Retrospective：记录 Sprint Goal、承诺/完成点数、carryover/原因、返工或逸出缺陷；最多保留 1～2 条可执行改进。当前尚未举行。
+- Review：AC1～6、四类旧数据、重复初始化、显式替换、事务失败与不误增路径均通过；Terra QA/QC PASS。`beta@f96386fd` 完成 shared/server build、Prisma generate 和 `17/17` 定向检查；未接入 a2、同步或其他旧入口，PostgreSQL apply 仍为 Release gate。
+- Retrospective：承诺/完成 `5/5`，carryover `0`。保留做法：迁移与 Runtime 以不重叠文件并行，最后用同一隔离 fixture 组合验证。改进：① DoR 先盘点所有真实写入口并记录阶段例外；②实现测试同时覆盖真实 SQLite 状态变化与服务边界，不只断言 SQL 文本。

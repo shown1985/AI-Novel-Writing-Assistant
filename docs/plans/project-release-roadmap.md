@@ -66,9 +66,9 @@ R1-S2H 承诺并完成 [S2-04c1 实况模型来源只读显示](./s2-04c1-live-m
 
 原 S2-04c 父范围不重复计点；未进入 S2-04c1 的任务/历史展示保持 Refinement。R1-S2H 完成不代表 Release 1 或发布门完成，也不启动下一 Story。
 
-### R1-S3A 当前窗口
+### R1-S3A 已完成窗口
 
-本窗口仅承诺 [S3-03a1 本书世界实例内容版本](./s3-03a1-novel-world-content-revision-contract.md)。目标是让旧作品可继续读取，并让既有实例创建与显式替换路径拥有独立版本；切片主读切换、双侧同步和其他世界旧入口仍属于后续卡。Goal、Owner、验证和非范围见 [R1-S3A Sprint 承诺](./r1-s3a-sprint-commitment.md)。本窗口启动不改变 Release 1 发布门状态。
+本窗口仅承诺并完成 [S3-03a1 本书世界实例内容版本](./s3-03a1-novel-world-content-revision-contract.md) `5/5` 点。旧作品兼容、四个既有实例写入口、双 schema/migration 和版本递增均通过隔离验证；`beta@f96386fd` 组合门 PASS。切片主读切换、双侧同步和其他世界旧入口仍属于后续卡。Review/Retrospective 见 [R1-S3A Sprint 承诺](./r1-s3a-sprint-commitment.md)。本窗口完成不代表 Release 1 或 PostgreSQL apply 发布门通过。
 
 ### R1-S0 新增 Story
 

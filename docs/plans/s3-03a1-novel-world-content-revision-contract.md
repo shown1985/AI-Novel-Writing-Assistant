@@ -4,13 +4,13 @@
 
 - Release / Epic：Release 1 / S3 可信世界
 - 点数：5
-- 状态：In Progress（R1-S3A；两个 Luna 实现任务按文件边界并行，根集成人负责集成）
+- 状态：Done（R1-S3A；beta 组合验证通过）
 - 用户价值：作者修改本书世界时，系统能区分本书实例内容版本与世界库样本版本；旧作品升级后仍能安全读取，不会把缓存刷新或来源样本更新误报为本书修改。
 - 依赖：S1-06 已冻结内容版本与兼容原则；S3-02a 已完成 `World.contentRevision` 样本 CAS。a2 依赖本卡完成；S3-03b 不属于本卡依赖或范围。
 
 ## 当前证据与阶段边界
 
-当前 `NovelWorld` 没有独立 `contentRevision`，只有 `syncBaseVersion`；`World.contentRevision` 不能复用为本书实例版本。PostgreSQL 与 SQLite 的 `20260529120000_novel_world_instance` migration 也没有该字段。
+实施前基线中，`NovelWorld` 没有独立 `contentRevision`，只有 `syncBaseVersion`；`World.contentRevision` 不能复用为本书实例版本。PostgreSQL 与 SQLite 的 `20260529120000_novel_world_instance` migration 也没有该字段，因此本卡以新增量 migration 补齐实例版本。
 
 本卡只覆盖四个已存在的实例写入口：`ensureFromLegacyNovel`、`importFromWorldLibrary`、`generateFromNovelTheme`、`createManualNovelWorld`。当前没有独立的实例编辑 API，不能把原 S3-02b 的旧入口视为本卡入口。导入、生成、手动创建显式替换已有实例时，实例内容与版本在原事务内一起更新；lazy 初始化的 `ON CONFLICT DO NOTHING` 保持幂等，不覆盖已有实例。
 
@@ -79,3 +79,10 @@
 - a2 所需版本/内容/缓存边界已由根集成人确认；sync pull 与旧切片消费分别留给 S3-03b、S3-03a2，未覆盖的实例编辑入口明确进入后续 Refinement。
 - 通过 server build/typecheck、定向测试和 migration completeness；更新相关长期架构 Wiki 的必要性由集成人判断。
 - 不包含同步、评估、提案、原 S3-02b 旧入口或过度安全设计；未满足上述 DoR 不得标记 Ready/Done。
+
+## 完成证据
+
+- Terra QA/QC 对 AC1～6、迁移、事务失败、内部投影和非范围均 PASS。
+- 功能分支验证：server build、Runtime `12/12`、migration `3/3`、migration completeness `2/2`，双 schema validate PASS。
+- `beta@f96386fd` 组合验证：shared/server build、Prisma generate、上述三组定向检查合计 `17/17` 与 `git diff --check` PASS。
+- 验证仅使用内存或隔离 SQLite fixture；未执行用户库迁移、真实 PostgreSQL apply 或破坏性数据库操作。S3-03a2、S3-03b 与原 S3-02b 剩余入口仍不属于本卡。

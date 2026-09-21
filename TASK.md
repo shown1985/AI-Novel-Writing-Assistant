@@ -1,9 +1,9 @@
 # 当前项目看板：Release 1 单机成书版
 
 更新时间：2026-09-21
-当前分支：`codex/r1-s3a1-world-revision`
+当前分支：`beta`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S3A 只承诺 S3-03a1 5 点、无 Stretch，Story 为 In Progress；R1-S2H 已通过 beta 组合验证。Release 1 仍未完成。
+当前状态：R1-S3A 已完成 S3-03a1 5 点、无 Stretch，并通过 beta 组合验证；S3-03a2 仍未承诺。Release 1 仍未完成。
 
 ## 权威文档
 
@@ -252,19 +252,21 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 - Review：7 项 AC、自动化、脱敏/只读边界和五场景 Computer Use 均通过；本卡只交付 `LiveExecutionDialog`，未覆盖父范围的任务抽屉、运行记录和全局历史。
 - Retrospective：承诺/完成 `3/3`，carryover `0`。改进：①为下一张 UI 验收卡预先固定可复现 mock 场景与清理路径；②在 Sprint 收口前集中核对“候选/待验收”文案，避免证据通过后残留旧状态。
 
-## 当前 Sprint：R1-S3A 本书世界实例版本基础
+## 已完成 Sprint：R1-S3A 本书世界实例版本基础
 
 - Sprint Goal：旧作品继续按既有兼容路径读取；现有本书世界创建和显式替换拥有独立内容版本，缓存读取与世界库样本更新不误增版本。
-- 承诺：仅 `S3-03a1`，5 点、无 Stretch；PO/QC 已确认 DoR，状态 In Progress，完成 `0/5`。Sprint 合同：[R1-S3A](./docs/plans/r1-s3a-sprint-commitment.md)，Story 合同：[S3-03a1](./docs/plans/s3-03a1-novel-world-content-revision-contract.md)。
+- 承诺/完成：仅 `S3-03a1`，`5/5` 点、无 Stretch，状态 Done，无 carryover。Sprint 合同：[R1-S3A](./docs/plans/r1-s3a-sprint-commitment.md)，Story 合同：[S3-03a1](./docs/plans/s3-03a1-novel-world-content-revision-contract.md)。
 - Owner：一位 Luna xhigh Runtime 全栈 Agent 负责四个现有实例写入口及聚焦测试，另一位 Luna xhigh 数据合同 Agent 独占双 schema、增量 migration 和迁移检查；根 PM 唯一集成审核，Terra medium QA/QC 分别负责验收与独立复核。
-- 退出门：四类旧数据、显式替换 `1→2`、重复 lazy 幂等与事务失败有隔离行为证据；双 schema/migration 检查、服务端聚焦验证及 beta 组合门通过。无新 UI，UI 验收不适用；PostgreSQL apply 保留 Release gate。
+- 证据：双 schema 与增量 migration、四类旧数据、显式替换 `1→2→3`、重复 lazy 幂等、事务失败回滚、缓存/样本不误增均通过；`beta@f96386fd` 完成 shared/server build、Prisma generate 与定向检查 `17/17`，`git diff --check` PASS。无新 UI，UI 验收不适用；PostgreSQL apply 保留 Release gate。
 - 非范围：S3-03a2 切片主读切换、S3-03b 同步、原 S3-02b 其余旧入口、真实用户库迁移、Release 2。
+- Review：AC1～6、内部版本投影、公开 DTO 不扩张和非范围均由 Terra QA/QC 通过；本卡不宣称同步 pull 或旧切片已受实例版本保护。
+- Retrospective：承诺/完成 `5/5`，carryover `0`。改进：① DoR 阶段先盘点所有真实写入口并明确阶段例外；②迁移与 Runtime 按不重叠文件并行，最终使用同一隔离 fixture 组合验证。
 
 ## Release 1 后续队列
 
 1. R1-S1：配置、诊断、阅读恢复和世界归属安全（已完成，15/15 点）。
 2. R1-S2：R1-S2A～S2H 已完成（S2H `3/3`）；S2-04c1 实况切片已 Done，父 S2-04c 的任务/历史展示范围仍在 Refinement。
-3. R1-S3～4：可信世界、提案采用和失败复核；S3-01、S3-02a、S3-02b1 已完成，S3-03a1 已进入 R1-S3A 实施中。原 S3-02b 其余旧入口、S3-03a2/03b～06 保持 Refinement/依赖状态，不顺手启动或承诺。
+3. R1-S3～4：可信世界、提案采用和失败复核；S3-01、S3-02a、S3-02b1、S3-03a1 已完成。原 S3-02b 其余旧入口、S3-03a2/03b～06 保持 Refinement/依赖状态，不顺手启动或承诺。
 4. R1-S5～6：本机Agent委托、预算、记忆和资产。
 5. R1-S7：十章长链、有限撤回和导航收束。
 6. R1-RC：桌面升级、备份恢复、包装与用户验收。
