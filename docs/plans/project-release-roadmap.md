@@ -74,6 +74,10 @@ R1-S2H 承诺并完成 [S2-04c1 实况模型来源只读显示](./s2-04c1-live-m
 
 本窗口仅承诺并完成 [S3-03a2 世界切片缓存与 Gateway 版本消费](./s3-03a2-world-slice-revision-consumption-contract.md) `5/5` 点、无 Stretch；`beta@67361baf` 的 shared/server build 和聚焦组合检查 `40/40` PASS。生成上下文只消费当前本书世界实例对应的切片，缓存刷新、legacy 兼容、模型失败或晚到结果均按 Story 合同处理。同步、其他旧写入口、shared/schema、UI 与 Release 2 均不属于本窗口；Review/Retrospective 见 [R1-S3B Sprint 承诺](./r1-s3b-sprint-commitment.md)。本窗口完成不代表 Release 1 或 PostgreSQL apply 发布门通过。
 
+### R1-S3C 当前窗口
+
+本窗口仅承诺 [S3-02b2 世界手册手动结构保存 CAS](./s3-02b2-world-structure-cas-contract.md) `5` 点、无 Stretch；[限时 Spike](./s3-02b2s-structure-save-feasibility-spike.md)与独立 DoR 复核已完成。实施仅限手动 `PUT /structure` 及两个既有编辑视图，AI backfill、其他世界旧入口和同步均不在本窗口。退出门与 owner 见 [R1-S3C Sprint 承诺](./r1-s3c-sprint-commitment.md)；当前未实现、未验收，不代表 Release 1 完成。
+
 ### R1-S0 新增 Story
 
 #### R1-00 上游实现与计划重对账（3 点）
