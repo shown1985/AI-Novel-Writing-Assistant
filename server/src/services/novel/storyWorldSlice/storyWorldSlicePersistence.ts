@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type {
   StoryWorldSlice,
   StoryWorldSliceBuilderMode,
@@ -18,6 +19,33 @@ import type {
 } from "@ai-novel/shared/types/world";
 
 export const STORY_WORLD_SLICE_SCHEMA_VERSION = 1;
+
+/**
+ * The digest is deliberately an internal cache key rather than a public slice
+ * field. Keep the object order stable: it is part of the cache contract.
+ */
+export interface StoryWorldSliceCacheFingerprintInput {
+  novelWorldId: string;
+  contentRevision: number;
+  sourceWorldId: string | null;
+  syncBaseVersion: number | null;
+  storyInputDigest: string;
+  sliceSchemaVersion: number;
+}
+
+export function buildStoryWorldSliceCacheDigest(
+  input: StoryWorldSliceCacheFingerprintInput,
+): string {
+  const payload = JSON.stringify({
+    novelWorldId: input.novelWorldId,
+    contentRevision: input.contentRevision,
+    sourceWorldId: input.sourceWorldId,
+    syncBaseVersion: input.syncBaseVersion,
+    storyInputDigest: input.storyInputDigest,
+    sliceSchemaVersion: input.sliceSchemaVersion,
+  });
+  return createHash("sha256").update(payload).digest("hex");
+}
 
 function uniqueStrings(values: string[], limit: number): string[] {
   return Array.from(new Set(values.map((item) => item.trim()).filter(Boolean))).slice(0, limit);

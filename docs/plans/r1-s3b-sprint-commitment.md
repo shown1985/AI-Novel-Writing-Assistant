@@ -7,7 +7,7 @@
 - Release / Epic：Release 1 / S3 可信世界。
 - 基线：`beta@24f34333`；DoR 在 `codex/r1-s3a2-refinement` 经 PO、Scrum Master、Terra QA/QC 复核。
 - 承诺：仅 [S3-03a2 切片缓存与 Gateway 版本消费](./s3-03a2-world-slice-revision-consumption-contract.md)，5 点；Stretch：无。
-- 当前状态：In Progress；完成点数 `0/5`。
+- 当前状态：In Review；实现与独立 QA/QC 已通过，等待 beta 组合验证；完成点数仍为 `0/5`。
 - 容量：单卡 5 点，不把同步、其他旧写入口、UI 或发布门算作本 Sprint 产出。
 
 ## 依赖、Owner 与顺序

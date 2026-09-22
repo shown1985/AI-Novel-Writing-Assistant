@@ -3,7 +3,7 @@
 更新时间：2026-09-21
 当前分支：`codex/r1-s3a2-refinement`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S3B 仅承诺 S3-03a2 5 点、无 Stretch；DoR 已经 PO、Scrum Master、QA、QC 复核，Story 进入 In Progress。Release 1 仍未完成。
+当前状态：R1-S3B 仅承诺 S3-03a2 5 点、无 Stretch；实现与独立 QA/QC 已通过，Story 进入 In Review，等待 beta 组合验证。Release 1 仍未完成。
 
 ## 权威文档
 
@@ -265,7 +265,7 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 ## 当前 Sprint：R1-S3B 世界切片版本消费
 
 - Sprint Goal：世界切片只对应当前本书世界实例版本；缓存刷新不计为内容修改，旧切片、失败或晚到模型结果不会进入生成上下文。
-- 承诺：仅 `S3-03a2`，5 点、无 Stretch，状态 In Progress，完成 `0/5`。Sprint 合同：[R1-S3B](./docs/plans/r1-s3b-sprint-commitment.md)，Story 合同：[S3-03a2](./docs/plans/s3-03a2-world-slice-revision-consumption-contract.md)。
+- 承诺：仅 `S3-03a2`，5 点、无 Stretch，状态 In Review，完成 `0/5`（beta 组合验证前不计 Done）。Sprint 合同：[R1-S3B](./docs/plans/r1-s3b-sprint-commitment.md)，Story 合同：[S3-03a2](./docs/plans/s3-03a2-world-slice-revision-consumption-contract.md)。
 - Owner：单一 Luna xhigh Runtime 全栈 Agent 独占 Slice service、Gateway、内部 persistence 辅助模块与聚焦测试；根 PM 唯一集成，Terra medium QA/QC 独立验收。
 - 退出门：唯一内部缓存指纹、四格 legacy 退出、无世界零写入、条件提交拒绝晚到结果、Gateway 五种 purpose 与失败保持均有隔离行为证据；shared/server build 和定向测试通过后才进入 beta 组合验证。
 - 非范围：S3-03b 同步、原 S3-02b 旧入口、shared DTO/schema、数据库 migration、UI、模型策略、任务中心、Release 2 或新增安全体系。

@@ -5,7 +5,7 @@
 - Release / Epic：Release 1 / S3 可信世界
 - 点数：5
 - 优先级：P0
-- 状态：In Progress（R1-S3B；DoR 已经 PO、Scrum Master、QA、QC 复核）
+- 状态：In Review（R1-S3B；AC1～7 已经 Terra QA/QC 复核，等待 beta 组合验证）
 - 用户价值：作为作者，我希望刷新或读取世界上下文不会被算作一次创作修改，并且本书世界内容改变后，后续规划、角色和章节生成只使用当前实例对应的切片，从而避免旧设定继续影响正文。
 - 依赖：S3-03a1 已 Done 并在 `beta@f96386fd` 通过组合验证；S1-06、S3-02a 的版本/缓存分类已满足。当前同步 pull 未接实例版本/CAS，仍由 S3-03b 收敛；本卡只消费其既有“更新同步基线并清空切片”结果。
 
@@ -55,7 +55,7 @@
    - 仅 `worldId`：a1 初始化带 `sourceWorldId` 的实例；a2 可一次性读取所引用 `World` 的现有结构或扁平兼容投影生成 slice，`rawSlice.worldId=sourceWorldId`，只写实例缓存。
    - 仅旧 slice：a1 初始化 manual 实例并把 slice 复制到实例；a2 验证实例中的 slice，保持 `rawSlice.worldId` 原值与其余可见内容不变，仅写内部当前指纹，不调用模型、不再读取旧 `Novel` slice。
    - `worldId + slice`：a1 同时复制来源引用和 slice；旧 digest 视为 stale，a2 使用实例内容或其一次性来源兼容投影重建，成功后 `rawSlice.worldId=sourceWorldId` 并只写实例缓存。模型失败时保留实例中的旧 slice 供检查，但它仍是 stale，不能进入 Gateway 上下文。
-   - 两者皆无：不创建实例；所有读取/刷新/override 路径按“无世界精确语义”返回且绝对零写入。
+   - 两者皆无：`worldId` 与旧 slice 字段均无时不创建实例；仅剩 `storyWorldSliceOverridesJson` 也归此格，偏好字段本身不构成可用世界或第五种切片来源。所有读取/刷新/override 路径按“无世界精确语义”返回且绝对零写入。a1 的独立初始化入口保持原合同，本卡不修改它。
 3. 仅旧 slice 的实例是明确兼容终点：有效 raw slice 可继续形成 `WorldContextBlock`，其 `worldId` 只保留历史来源标识，不代表当前 `NovelWorld.id` 或版本；内部指纹把它绑定到当前实例。无法按现有 schema 解析的 JSON 返回不可用，不写指纹、不调用模型。
 4. 旧 `Novel` 字段保留供历史兼容/回退检查，但一旦实例初始化成功便不是并行权威源；本卡不做数据清理 migration。
 
@@ -63,7 +63,7 @@
 
 - `getWorldSliceView`、`refreshWorldSlice`、`updateWorldSliceOverrides` 均返回同一空世界 view：`hasWorld=false`、`worldId/worldName/slice/storyInputSource=null`、`overrides={}`、三个 available 列表为空、`isStale=false`。
 - `ensureStoryWorldSlice` 返回 `null`；Gateway 的 `hasActiveWorld` 返回 `false`，normal 与 `forceRefresh` 的 `getWorldContextBlock` 都返回 `null`。
-- 上述路径不得创建 `NovelWorld`，不得写 `Novel` 或 `NovelWorld`，不得保存调用参数中的 override，也不得调用模型。只有既有 `ensureFromLegacyNovel` 发现四格矩阵前三类的 legacy 数据时，才按 a1 合同创建一次实例；真正“两者皆无”必须绝对零写入。
+- 上述路径不得创建 `NovelWorld`，不得写 `Novel` 或 `NovelWorld`，不得保存调用参数中的 override，也不得调用模型。只有 `worldId` 或旧 slice 字段属于四格矩阵前三类时，a2 才可调用既有 `ensureFromLegacyNovel` 创建一次实例；旧 slice JSON 损坏仍按不可用处理，不标 current。仅剩 overrides 和真正全空都必须在 a2 路径绝对零写入。
 
 ## 失败、并发与恢复语义
 
@@ -110,4 +110,4 @@
 - `NovelWorld` 主读、唯一缓存指纹、legacy 退场、失败保留和晚到结果拒写均有隔离 fixture 结果。
 - 不引入同步实现、评估/提案、原 S3-02b 旧入口、UI、schema/migration 或过度安全设计。
 - 本卡澄清了稳定的切片 freshness/legacy 规则，完成时应更新世界维护恢复 Wiki；它没有新增用户入口，README/release notes 默认跳过，除非实现产生额外可见行为。
-- 本卡已通过 DoR 并进入 R1-S3B；只有 AC、QA/QC、Wiki 判断、阶段提交与 beta 组合验证全部完成后才能标记 Done。本卡进入实施不代表 Release 1 已完成。
+- 本卡已通过 DoR 并进入 R1-S3B；AC、QA/QC 与 Wiki 已完成，阶段提交和 beta 组合验证仍须通过后才能标记 Done。本卡进入实施不代表 Release 1 已完成。
