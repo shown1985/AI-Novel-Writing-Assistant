@@ -7,7 +7,7 @@
 - Release / Epic：Release 1 / S3 可信世界。
 - 基线：`beta@24f34333`；DoR 在 `codex/r1-s3a2-refinement` 经 PO、Scrum Master、Terra QA/QC 复核。
 - 承诺：仅 [S3-03a2 切片缓存与 Gateway 版本消费](./s3-03a2-world-slice-revision-consumption-contract.md)，5 点；Stretch：无。
-- 当前状态：In Review；实现与独立 QA/QC 已通过，等待 beta 组合验证；完成点数仍为 `0/5`。
+- 当前状态：Done；承诺/完成 `5/5`，无 carryover。
 - 容量：单卡 5 点，不把同步、其他旧写入口、UI 或发布门算作本 Sprint 产出。
 
 ## 依赖、Owner 与顺序
@@ -34,5 +34,5 @@
 
 ## Review 与 Retrospective 出口
 
-- Review：按 AC1～7 展示缓存命中/失效、条件提交零命中、legacy 四格、无世界零写入、五 purpose 和失败保持；核对非范围、beta 集成与 Release gate。build 不能替代业务验收。
-- Retrospective：记录 Sprint Goal、承诺/完成点数、carryover/原因、返工或逸出缺陷；最多保留 1～2 条可执行改进。当前尚未举行。
+- Review：Sprint Goal 达成；AC1～7 已由 Terra QA/QC PASS。隔离 SQLite 覆盖条件写零命中、晚到拒写与失败保留，Gateway 五种 purpose 和 legacy 矩阵通过。`beta@67361baf` 完成 shared/server build、五文件定向检查 `40/40` 与 `git diff --check`。无新增 UI，UI 验收不适用；真实 PostgreSQL apply 仍为 Release gate。S3-03b、原 S3-02b 旧入口和其他非范围均未接入。
+- Retrospective：承诺/完成 `5/5`，carryover `0`。QA/QC 曾退回未覆盖的竞态/legacy 分支，并澄清 overrides-only 属无世界。改进：① Planning 时把边缘旧字段放进唯一 legacy 矩阵；②工程初稿即按 AC 配置行为 fixture，不用测试总数代替验收覆盖。

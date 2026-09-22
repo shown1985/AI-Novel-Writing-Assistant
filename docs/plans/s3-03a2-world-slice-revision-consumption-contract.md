@@ -5,7 +5,7 @@
 - Release / Epic：Release 1 / S3 可信世界
 - 点数：5
 - 优先级：P0
-- 状态：In Review（R1-S3B；AC1～7 已经 Terra QA/QC 复核，等待 beta 组合验证）
+- 状态：Done（R1-S3B；Terra QA/QC 与 beta 组合验证通过）
 - 用户价值：作为作者，我希望刷新或读取世界上下文不会被算作一次创作修改，并且本书世界内容改变后，后续规划、角色和章节生成只使用当前实例对应的切片，从而避免旧设定继续影响正文。
 - 依赖：S3-03a1 已 Done 并在 `beta@f96386fd` 通过组合验证；S1-06、S3-02a 的版本/缓存分类已满足。当前同步 pull 未接实例版本/CAS，仍由 S3-03b 收敛；本卡只消费其既有“更新同步基线并清空切片”结果。
 
@@ -110,4 +110,10 @@
 - `NovelWorld` 主读、唯一缓存指纹、legacy 退场、失败保留和晚到结果拒写均有隔离 fixture 结果。
 - 不引入同步实现、评估/提案、原 S3-02b 旧入口、UI、schema/migration 或过度安全设计。
 - 本卡澄清了稳定的切片 freshness/legacy 规则，完成时应更新世界维护恢复 Wiki；它没有新增用户入口，README/release notes 默认跳过，除非实现产生额外可见行为。
-- 本卡已通过 DoR 并进入 R1-S3B；AC、QA/QC 与 Wiki 已完成，阶段提交和 beta 组合验证仍须通过后才能标记 Done。本卡进入实施不代表 Release 1 已完成。
+- 本卡已完成 AC、QA/QC、Wiki、阶段提交与 beta 组合验证；这只证明 S3-03a2 Done，不代表 Release 1 已完成。
+
+## 完成证据
+
+- Terra QA/QC 对 AC1～7、四格 legacy、overrides-only 无世界、缓存条件写与非范围 PASS；功能分支完成 shared/server build、聚焦检查与 a1 回归。
+- `beta@67361baf` 组合验证：shared/server build、五文件定向检查 `40/40` 和 `git diff --check` PASS。验证使用内存或隔离 SQLite，未运行用户真实库、迁移或破坏性数据库操作。
+- 无新增 UI，UI 验收不适用；真实 PostgreSQL apply 仍是 Release gate。S3-03b 同步与原 S3-02b 其他旧入口未接入。
