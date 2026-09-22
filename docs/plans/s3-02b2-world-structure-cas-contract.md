@@ -1,8 +1,8 @@
-# S3-02b2：世界手册手动结构保存接入 CAS（Ready）
+# S3-02b2：世界手册手动结构保存接入 CAS（In Review）
 
 ## Story 身份与拆分决定
 
-- 稳定 ID：`S3-02b2`；Release 1 / S3 可信世界；P0；**Ready，待 Sprint Planning 承诺**。
+- 稳定 ID：`S3-02b2`；Release 1 / S3 可信世界；P0；**In Review，代码级 QA/QC PASS，待 beta 组合与用户 UI 验收**。
 - 估点：**5 点**。作为作者，我希望在既有世界手册编辑处保存结构时，不覆盖另一处刚保存的内容；若保存结果未知或版本冲突，草稿和已保存世界均可辨认。
 - 前置：S1-06、S3-02a 和 S3-02b1 已 Done；复用 `World.contentRevision`、`WorldMaintenanceOperation`、receipt 与 `commitWorldSample`，不增加 schema/migration。
 - 拆分理由：`PUT /worlds/:id/structure` 是现有作者手动保存；`POST /worlds/:id/structure/backfill` 会先调用模型再直接写库。两者虽位于同一 `worldStructureWorkspace.ts`，但 backfill 的模型结果、响应丢失后是否重算、重放结果与费用边界需要独立合同。若同卡覆盖两者，除 CAS 外还必须改变生成/重试语义，无法有把握维持 5 点。本卡只接手动保存；backfill、单区块生成后的保存以及其他旧写入口留在原 `S3-02b` 父项 Refinement，后续另建稳定子卡，不在本卡计点或默认为 Ready。
@@ -43,3 +43,8 @@
 2. 独立 Terra QA/QC 对最终 AC3、5 点、验收与 owner 边界给出 DoR PASS。根 PM 独占 `worldHttpContext.ts`、`worldStructureRoutes.ts` 并在 Runtime owner 完成后串行接线；测试由对应生产文件 owner 维护。
 
 Ready 不等于已开始或 Done。实施中若最窄实现超出 5 点上限，暂停并重新拆卡；AI backfill、同步及其他旧入口仍属原 S3-02b 父项 Refinement，且不计入本卡。
+
+## 当前验收证据与剩余门
+
+- Terra QA 对 AC1～6 代码级 PASS，独立 Terra QC 无 P0/P1/P2 代码阻断。shared/server build、client typecheck、结构 PUT HTTP 428/409、隔离 SQLite A 成功→B 成功→A replay 与自定义使用建议投影、客户端保存状态机测试及 `git diff --check` 已通过。
+- 本阶段尚未完成 beta 组合验证和来源页实际 UI 验收；因此 Story 不标 Done，Sprint 完成点数仍为 0。用户验收需在两处编辑视图确认保存、冲突/未知结果草稿保留、显式重读及快照失败提示。

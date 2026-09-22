@@ -57,6 +57,7 @@ async function requestJson(app, method, route, body) {
 test("world write routes keep protection fields optional at parse time and map service 428/409", async () => {
   const originalUpdateWorld = worldService.updateWorld;
   const originalUpdateAxioms = worldService.updateAxioms;
+  const originalUpdateStructure = worldService.updateStructure;
   const seen = [];
   let coreError = new WorldMaintenanceError(428, "REVISION_REQUIRED", "世界保存需要当前版本。", {
     field: "expectedContentRevision",
@@ -69,6 +70,13 @@ test("world write routes keep protection fields optional at parse time and map s
   worldService.updateAxioms = async (id, axioms, protection) => {
     seen.push({ kind: "axioms", id, axioms, protection });
     throw axiomsError;
+  };
+  worldService.updateStructure = async (id, body) => {
+    seen.push({ kind: "structure", id, body });
+    if (!body.operationId) {
+      throw new WorldMaintenanceError(428, "REVISION_REQUIRED", "结构保存需要操作标识。");
+    }
+    throw new WorldMaintenanceError(409, "CONTENT_REVISION_CONFLICT", "世界版本已变化。");
   };
 
   try {
@@ -108,9 +116,26 @@ test("world write routes keep protection fields optional at parse time and map s
     assert.equal(axiomsRequired.body.error, "REVISION_REQUIRED");
     assert.equal(seen[3].protection.operationId, undefined);
     assert.equal(seen[3].protection.expectedContentRevision, 7);
+
+    const structureMissing = await requestJson(app, "PUT", "/worlds/world-route-fixture/structure", {
+      structure: { profile: { summary: "结构" } },
+    });
+    assert.equal(structureMissing.status, 428);
+    assert.equal(structureMissing.body.error, "REVISION_REQUIRED");
+    assert.equal(seen[4].body.operationId, undefined);
+
+    const structureConflict = await requestJson(app, "PUT", "/worlds/world-route-fixture/structure", {
+      structure: { profile: { summary: "结构" } },
+      operationId: "op-route-structure",
+      expectedContentRevision: 7,
+    });
+    assert.equal(structureConflict.status, 409);
+    assert.equal(structureConflict.body.error, "CONTENT_REVISION_CONFLICT");
+    assert.equal(seen[5].body.operationId, "op-route-structure");
+    assert.equal(seen[5].body.expectedContentRevision, 7);
   } finally {
     worldService.updateWorld = originalUpdateWorld;
     worldService.updateAxioms = originalUpdateAxioms;
-    fs.rmSync(fixtureDir, { recursive: true, force: true });
+    worldService.updateStructure = originalUpdateStructure;
   }
 });

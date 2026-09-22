@@ -85,6 +85,16 @@ export interface WorldStructurePayload {
   bindingSupport: WorldBindingSupport;
 }
 
+export type WorldStructureSnapshotStatus = "created" | "failed" | "unknown";
+
+export interface WorldStructureSaveResponse {
+  world: World;
+  structure: WorldStructuredData;
+  bindingSupport: WorldBindingSupport;
+  maintenance?: WorldMaintenanceCommitResult;
+  snapshotStatus: WorldStructureSnapshotStatus;
+}
+
 export interface WorldInspirationAnalysisResult {
   mode: string;
   conceptCard: {
@@ -157,13 +167,9 @@ export async function updateWorldStructure(
   payload: {
     structure: WorldStructuredData;
     bindingSupport?: WorldBindingSupport;
-  },
+  } & WorldWriteProtection,
 ) {
-  const { data } = await apiClient.put<ApiResponse<{
-    world: World;
-    structure: WorldStructuredData;
-    bindingSupport: WorldBindingSupport;
-  }>>(`/worlds/${id}/structure`, payload);
+  const { data } = await apiClient.put<ApiResponse<WorldStructureSaveResponse>>(`/worlds/${id}/structure`, payload);
   return data;
 }
 

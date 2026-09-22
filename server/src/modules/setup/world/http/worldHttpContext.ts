@@ -271,7 +271,7 @@ const structureSectionSchema = z.enum(["profile", "rules", "factions", "location
 export const structureUpdateSchema = z.object({
   structure: z.unknown(),
   bindingSupport: z.unknown().optional(),
-});
+}).extend(worldWriteProtectionSchema.shape);
 
 export const structureBackfillSchema = z.object({
   provider: providerSchema.optional(),

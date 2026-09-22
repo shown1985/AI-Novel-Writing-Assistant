@@ -52,6 +52,9 @@ export function registerStructureWorldRoutes(router: Router): void {
           message: "Structured world saved.",
         } satisfies ApiResponse<typeof data>);
       } catch (error) {
+        if (handleWorldMaintenanceError(error, res)) {
+          return;
+        }
         next(error);
       }
     },

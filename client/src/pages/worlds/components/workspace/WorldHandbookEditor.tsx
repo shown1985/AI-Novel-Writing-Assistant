@@ -19,6 +19,12 @@ import WorldHandbookForceSection from "./handbook/WorldHandbookForceSection";
 import WorldHandbookLocationSection from "./handbook/WorldHandbookLocationSection";
 import WorldHandbookRuleSection from "./handbook/WorldHandbookRuleSection";
 import WorldHandbookTensionSection from "./handbook/WorldHandbookTensionSection";
+import {
+  shouldAdoptWorldStructurePayload,
+  structurePayloadKey,
+  type WorldStructureSaveGuard,
+  type WorldStructureSaveOutcome,
+} from "../../worldStructureSave";
 
 type EditableHandbookSection = "profile" | "rules" | "forces" | "locations" | "relations";
 
@@ -50,9 +56,15 @@ function joinPreview(items: Array<string | null | undefined>, fallback: string):
 export default function WorldHandbookEditor(props: {
   initialPayload?: WorldStructurePayload;
   savePending: boolean;
+  saveNotice?: string | null;
+  saveGuard?: WorldStructureSaveGuard;
+  replayServerPayloadKey?: string | null;
+  explicitReadPayloadKey?: string | null;
+  onReplayServerPayloadAdopted: () => void;
+  onReloadSavedStructure: () => Promise<void>;
   backfillPending: boolean;
   generatePending: boolean;
-  onSave: (structure: WorldStructuredData, bindingSupport: WorldBindingSupport) => Promise<void>;
+  onSave: (structure: WorldStructuredData, bindingSupport: WorldBindingSupport) => Promise<WorldStructureSaveOutcome>;
   onBackfill: () => Promise<{ structure: WorldStructuredData; bindingSupport: WorldBindingSupport } | undefined>;
   onGenerate: (
     section: WorldStructureSectionKey,
@@ -67,6 +79,12 @@ export default function WorldHandbookEditor(props: {
   const {
     initialPayload,
     savePending,
+    saveNotice,
+    saveGuard = "none",
+    replayServerPayloadKey = null,
+    explicitReadPayloadKey = null,
+    onReplayServerPayloadAdopted,
+    onReloadSavedStructure,
     backfillPending,
     generatePending,
     onSave,
@@ -81,6 +99,11 @@ export default function WorldHandbookEditor(props: {
   const [draftBindingSupport, setDraftBindingSupport] = useState<WorldBindingSupport | null>(
     initialPayload?.bindingSupport ?? null,
   );
+  const initialPayloadKey = structurePayloadKey(initialPayload?.structure, initialPayload?.bindingSupport);
+  const [syncedPayloadKey, setSyncedPayloadKey] = useState(initialPayloadKey);
+  const [syncedWorldId, setSyncedWorldId] = useState(initialPayload?.worldId ?? null);
+  const [replaySyncedPayloadKey, setReplaySyncedPayloadKey] = useState<string | null>(null);
+  const [explicitReadSyncedPayloadKey, setExplicitReadSyncedPayloadKey] = useState<string | null>(null);
   const [activeAiSection, setActiveAiSection] = useState<WorldStructureSectionKey>("profile");
   const [editingSection, setEditingSection] = useState<EditableHandbookSection | null>(null);
   const [editingSnapshot, setEditingSnapshot] = useState<WorldStructuredData | null>(null);
@@ -89,9 +112,52 @@ export default function WorldHandbookEditor(props: {
     if (!initialPayload) {
       return;
     }
+    const incomingPayloadKey = structurePayloadKey(initialPayload.structure, initialPayload.bindingSupport);
+    const replaySyncConsumed = Boolean(
+      replayServerPayloadKey && replaySyncedPayloadKey === replayServerPayloadKey,
+    );
+    const explicitReadConsumed = Boolean(
+      explicitReadPayloadKey && explicitReadSyncedPayloadKey === explicitReadPayloadKey,
+    );
+    if (!shouldAdoptWorldStructurePayload({
+      syncedWorldId,
+      incomingWorldId: initialPayload.worldId,
+      incomingPayloadKey,
+      draftPayloadKey: structurePayloadKey(draftStructure, draftBindingSupport),
+      syncedPayloadKey,
+      saveGuard,
+      replayServerPayloadKey,
+      replaySyncConsumed,
+      explicitReadPayloadKey,
+      explicitReadConsumed,
+    })) {
+      return;
+    }
     setDraftStructure(initialPayload.structure);
     setDraftBindingSupport(initialPayload.bindingSupport);
-  }, [initialPayload]);
+    setSyncedPayloadKey(incomingPayloadKey);
+    setSyncedWorldId(initialPayload.worldId);
+    if (replayServerPayloadKey && !replaySyncConsumed && replayServerPayloadKey === incomingPayloadKey) {
+      setReplaySyncedPayloadKey(replayServerPayloadKey);
+      onReplayServerPayloadAdopted();
+    }
+    if (explicitReadPayloadKey && !explicitReadConsumed && explicitReadPayloadKey === incomingPayloadKey) {
+      setExplicitReadSyncedPayloadKey(explicitReadPayloadKey);
+    }
+  }, [
+    draftBindingSupport,
+    draftStructure,
+    explicitReadPayloadKey,
+    explicitReadSyncedPayloadKey,
+    initialPayload,
+    initialPayloadKey,
+    replayServerPayloadKey,
+    replaySyncedPayloadKey,
+    onReplayServerPayloadAdopted,
+    saveGuard,
+    syncedPayloadKey,
+    syncedWorldId,
+  ]);
 
   if (!draftStructure || !draftBindingSupport) {
     return (
@@ -117,8 +183,18 @@ export default function WorldHandbookEditor(props: {
     );
   }
 
-  const saveDraft = async () => {
-    await onSave(draftStructure, draftBindingSupport);
+  const saveDraft = async (): Promise<WorldStructureSaveOutcome | null> => {
+    try {
+      const outcome = await onSave(draftStructure, draftBindingSupport);
+      if (outcome !== "replayed") {
+        setSyncedPayloadKey(structurePayloadKey(draftStructure, draftBindingSupport));
+        setSyncedWorldId(initialPayload?.worldId ?? null);
+      }
+      return outcome;
+    } catch {
+      // Keep the local draft visible after a conflict or an unknown result.
+      return null;
+    }
   };
 
   const generateSection = async () => {
@@ -143,7 +219,10 @@ export default function WorldHandbookEditor(props: {
   };
 
   const saveEditingAndReturn = async () => {
-    await saveDraft();
+    const saved = await saveDraft();
+    if (!saved || saved === "replayed") {
+      return;
+    }
     setEditingSnapshot(null);
     setEditingSection(null);
   };
@@ -259,6 +338,16 @@ export default function WorldHandbookEditor(props: {
             <p className="mt-1 text-sm leading-6 text-muted-foreground">
               只调整这一部分；保存后回到手册概览，取消则放弃本次编辑内容。
             </p>
+            {saveNotice ? (
+              <div role="status" aria-live="polite" className="mt-2 flex flex-wrap items-center gap-2 text-sm text-amber-700">
+                <span>{saveNotice}</span>
+                {saveGuard === "conflict" || saveGuard === "unknown" || saveGuard === "read_required" || saveGuard === "replayed" ? (
+                  <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => void onReloadSavedStructure()} disabled={savePending}>
+                    放弃当前草稿并读取已保存内容
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" variant="ghost" className="rounded-full" onClick={cancelEditing} disabled={savePending}>
@@ -297,6 +386,16 @@ export default function WorldHandbookEditor(props: {
             <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
               先确认世界给读者的印象与核心矛盾，再按需整理规则、势力、地点和冲突张力。
             </p>
+            {saveNotice ? (
+              <div role="status" aria-live="polite" className="mt-2 flex flex-wrap items-center gap-2 text-sm text-amber-700">
+                <span>{saveNotice}</span>
+                {saveGuard === "conflict" || saveGuard === "unknown" || saveGuard === "read_required" || saveGuard === "replayed" ? (
+                  <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => void onReloadSavedStructure()} disabled={savePending}>
+                    放弃当前草稿并读取已保存内容
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" variant="ghost" className="rounded-full" onClick={onOpenOverview}>

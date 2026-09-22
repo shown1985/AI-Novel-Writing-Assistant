@@ -844,7 +844,7 @@ export class WorldService {
     return getWorldStructure(worldId);
   }
 
-  async updateStructure(worldId: string, input: StructureUpdateInput) {
+  async updateStructure(worldId: string, input: StructureUpdateInput & WorldWriteProtection) {
     return updateWorldStructure(worldId, input, {
       createSnapshot: (id, label) => this.createSnapshot(id, label),
       queueWorldUpsert: (id) => this.queueRagUpsert("world", id),

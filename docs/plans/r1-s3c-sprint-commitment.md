@@ -6,7 +6,7 @@
 
 - Release / Epic：Release 1 / S3 可信世界。
 - 基线：`beta@f971cbe6`；[S3-02b2s Spike](./s3-02b2s-structure-save-feasibility-spike.md)已完成，S3-02b2 的最终合同经 PO、Scrum Master、Terra QA/QC 确认 DoR PASS。
-- 承诺：仅 [S3-02b2 世界手册手动结构保存接入 CAS](./s3-02b2-world-structure-cas-contract.md)，5 点；Stretch：无。当前状态：Active，Story 待实施；完成 `0/5`。
+- 承诺：仅 [S3-02b2 世界手册手动结构保存接入 CAS](./s3-02b2-world-structure-cas-contract.md)，5 点；Stretch：无。当前状态：Active，Story In Review；代码级 QA/QC PASS，待 beta 组合与用户 UI 验收；完成 `0/5`。
 - 容量：单卡 5 点。Spike 的 2 点是已完成的 Refinement 证据，不算本 Sprint 实施点数；原 S3-02b 概要点数不与本卡重复累计。
 
 ## 依赖、Owner 与顺序

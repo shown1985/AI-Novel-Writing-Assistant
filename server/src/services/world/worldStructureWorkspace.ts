@@ -1,4 +1,7 @@
-import type { WorldVisualizationPayload } from "@ai-novel/shared/types/world";
+import type {
+  WorldMaintenanceCandidateAggregate,
+  WorldVisualizationPayload,
+} from "@ai-novel/shared/types/world";
 import { prisma } from "../../db/prisma";
 import { runStructuredPrompt } from "../../prompting/core/promptRunner";
 import {
@@ -18,6 +21,13 @@ import {
 } from "../../prompting/prompts/world/world.prompts";
 import { buildWorldVisualizationPayload } from "./worldVisualization";
 import {
+  hashWorldMaintenanceValue,
+  WorldMaintenanceError,
+  worldMaintenanceWorkflowService,
+  worldSampleSourceRoute,
+  validateWorldMaintenanceCandidate,
+} from "./maintenance";
+import {
   type StructureBackfillInput,
   type StructureGenerateInput,
   type StructureUpdateInput,
@@ -29,6 +39,74 @@ import {
 interface WorldStructureCallbacks {
   createSnapshot: (worldId: string, label?: string) => Promise<unknown>;
   queueWorldUpsert: (worldId: string) => void;
+}
+
+type StructureWriteProtection = {
+  operationId?: string;
+  expectedContentRevision?: number;
+};
+
+type ProtectedStructureUpdateInput = StructureUpdateInput & StructureWriteProtection;
+
+type StructureSnapshotStatus = "created" | "failed" | "unknown";
+
+function requireStructureWriteProtection(input: StructureWriteProtection): {
+  operationId: string;
+  expectedContentRevision: number;
+} {
+  if (typeof input.operationId !== "string" || !input.operationId.trim()) {
+    throw new WorldMaintenanceError(428, "REVISION_REQUIRED", "世界结构保存需要操作标识。", {
+      field: "operationId",
+    });
+  }
+  if (
+    typeof input.expectedContentRevision !== "number"
+    || !Number.isInteger(input.expectedContentRevision)
+    || input.expectedContentRevision < 0
+  ) {
+    throw new WorldMaintenanceError(428, "REVISION_REQUIRED", "世界结构保存需要当前内容版本。", {
+      field: "expectedContentRevision",
+      operationId: input.operationId,
+    });
+  }
+  return {
+    operationId: input.operationId.trim(),
+    expectedContentRevision: input.expectedContentRevision,
+  };
+}
+
+function buildStructureCandidate(
+  world: NonNullable<Awaited<ReturnType<typeof prisma.world.findUnique>>>,
+  structuredFields: Record<string, unknown>,
+): WorldMaintenanceCandidateAggregate {
+  return {
+    name: world.name,
+    description: world.description,
+    worldType: world.worldType,
+    templateKey: world.templateKey,
+    axioms: world.axioms,
+    background: world.background,
+    geography: world.geography,
+    cultures: world.cultures,
+    magicSystem: world.magicSystem,
+    politics: world.politics,
+    races: world.races,
+    religions: world.religions,
+    technology: world.technology,
+    conflicts: world.conflicts,
+    history: world.history,
+    economy: world.economy,
+    factions: world.factions,
+    status: world.status,
+    selectedDimensions: world.selectedDimensions,
+    selectedElements: world.selectedElements,
+    layerStates: world.layerStates,
+    overviewSummary: world.overviewSummary,
+    structureJson: world.structureJson,
+    bindingSupportJson: world.bindingSupportJson,
+    structureSchemaVersion: world.structureSchemaVersion,
+    ...structuredFields,
+  } as WorldMaintenanceCandidateAggregate;
 }
 
 async function getRequiredWorld(worldId: string) {
@@ -108,10 +186,25 @@ export async function getWorldStructure(worldId: string) {
 
 export async function updateWorldStructure(
   worldId: string,
-  input: StructureUpdateInput,
+  input: ProtectedStructureUpdateInput,
   callbacks: WorldStructureCallbacks,
 ) {
-  const world = await getRequiredWorld(worldId);
+  const protection = requireStructureWriteProtection(input);
+  const world = await prisma.world.findUnique({ where: { id: worldId } });
+  if (!world) {
+    throw new WorldMaintenanceError(404, "WORLD_TARGET_NOT_FOUND", "世界样本不存在。", {
+      targetId: worldId,
+    });
+  }
+
+  // Validate the raw relation graph before normalization can silently remove
+  // dangling references. The maintenance facade validates again after
+  // canonicalization, but this first pass must see the author's exact input.
+  validateWorldMaintenanceCandidate(buildStructureCandidate(world, {
+    structureJson: JSON.stringify(input.structure),
+    bindingSupportJson: input.bindingSupport == null ? null : JSON.stringify(input.bindingSupport),
+    structureSchemaVersion: world.structureSchemaVersion || WORLD_STRUCTURE_SCHEMA_VERSION,
+  }));
 
   const nextStructure = normalizeWorldStructuredData(input.structure);
   nextStructure.metadata = {
@@ -122,20 +215,53 @@ export async function updateWorldStructure(
     ? normalizeWorldBindingSupport(input.bindingSupport)
     : buildWorldBindingSupport(nextStructure);
   const structuredFields = applyStructuredWorldToLegacyFields(nextStructure, world, nextBindingSupport);
-
-  const updated = await prisma.world.update({
-    where: { id: worldId },
-    data: {
-      ...structuredFields,
-      version: { increment: 1 },
-    },
+  const sourceRef = worldSampleSourceRoute(worldId);
+  const candidate = buildStructureCandidate(world, structuredFields);
+  const maintenance = await worldMaintenanceWorkflowService.commitWorldSample(worldId, {
+    operationId: protection.operationId,
+    expectedContentRevision: protection.expectedContentRevision,
+    expectedDecisionRevision: 0,
+    requestHash: hashWorldMaintenanceValue({
+      targetType: "world",
+      targetId: worldId,
+      operationType: "commit_world_sample",
+      operationId: protection.operationId,
+      expectedContentRevision: protection.expectedContentRevision,
+      sourceRef,
+      intent: {
+        structure: input.structure,
+        bindingSupport: input.bindingSupport,
+      },
+    }),
+    candidateAggregate: candidate,
+    selectedPatchIds: [],
+    sourceRef,
   });
-  await callbacks.createSnapshot(worldId, "structure-saved");
-  callbacks.queueWorldUpsert(worldId);
+
+  let snapshotStatus: StructureSnapshotStatus = "unknown";
+  if (maintenance.state === "committed") {
+    snapshotStatus = "created";
+    try {
+      await callbacks.createSnapshot(worldId, "structure-saved");
+    } catch {
+      snapshotStatus = "failed";
+    }
+    // The CAS maintenance facade already enqueues the RAG refresh and records
+    // a pending debt when that best-effort refresh cannot be queued.
+  }
+
+  const updated = await prisma.world.findUnique({ where: { id: worldId } });
+  if (!updated) {
+    throw new WorldMaintenanceError(404, "WORLD_TARGET_NOT_FOUND", "世界样本不存在。", {
+      targetId: worldId,
+    });
+  }
   return {
     world: updated,
     structure: nextStructure,
     bindingSupport: nextBindingSupport,
+    maintenance,
+    snapshotStatus,
   };
 }
 

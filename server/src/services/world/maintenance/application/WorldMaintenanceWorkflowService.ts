@@ -5,6 +5,8 @@ import type {
 } from "@ai-novel/shared/types/world";
 import {
   applyStructuredWorldToLegacyFields,
+  buildWorldBindingSupport,
+  normalizeWorldBindingSupport,
   normalizeWorldStructuredData,
 } from "../../worldStructure";
 import {
@@ -67,7 +69,11 @@ function buildCommittedCandidate(
 ): WorldMaintenanceCandidateAggregate {
   const rawStructure = validateWorldMaintenanceCandidate(candidate);
   const structure = normalizeWorldStructuredData(rawStructure);
-  const compatibilityProjection = applyStructuredWorldToLegacyFields(structure, candidate);
+  const defaultBindingSupport = buildWorldBindingSupport(structure);
+  const bindingSupport = candidate.bindingSupportJson
+    ? normalizeWorldBindingSupport(JSON.parse(candidate.bindingSupportJson), defaultBindingSupport)
+    : defaultBindingSupport;
+  const compatibilityProjection = applyStructuredWorldToLegacyFields(structure, candidate, bindingSupport);
   return {
     ...candidate,
     ...compatibilityProjection,
