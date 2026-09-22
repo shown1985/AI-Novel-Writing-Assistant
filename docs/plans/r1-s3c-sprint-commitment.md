@@ -6,7 +6,7 @@
 
 - Release / Epic：Release 1 / S3 可信世界。
 - 基线：`beta@f971cbe6`；[S3-02b2s Spike](./s3-02b2s-structure-save-feasibility-spike.md)已完成，S3-02b2 的最终合同经 PO、Scrum Master、Terra QA/QC 确认 DoR PASS。
-- 承诺：仅 [S3-02b2 世界手册手动结构保存接入 CAS](./s3-02b2-world-structure-cas-contract.md)，5 点；Stretch：无。当前状态：Active，Story User Acceptance；代码级 QA/QC 与 beta 组合 PASS，待用户 UI 验收；完成 `0/5`。
+- 承诺：仅 [S3-02b2 世界手册手动结构保存接入 CAS](./s3-02b2-world-structure-cas-contract.md)，5 点；Stretch：无。当前状态：Done；代码级 QA/QC、beta 组合验证与隔离 Chrome 来源页验收均 PASS；完成 `5/5`。
 - 容量：单卡 5 点。Spike 的 2 点是已完成的 Refinement 证据，不算本 Sprint 实施点数；原 S3-02b 概要点数不与本卡重复累计。
 
 ## 依赖、Owner 与顺序
@@ -33,4 +33,8 @@
 
 ## Review 与 Retrospective 出口
 
-代码级 QA/QC 对 AC1～6 PASS；`beta@d7df4af2` 的 shared/server build、client typecheck、结构 HTTP/隔离 SQLite 定向检查 `5/5`、客户端状态机 `4/4` 均 PASS，beta 工作树干净。Sprint Goal 的最终结果、完成点数、carryover、用户 UI 验收和 Retrospective 待 UI 门关闭后记录；当前 `0/5`，不写 Done。
+代码级 QA/QC 对 AC1～6 PASS；`beta@d7df4af2` 的 shared/server build、client typecheck、结构 HTTP/隔离 SQLite 定向检查 `5/5`、客户端状态机 `4/4` 均 PASS，beta 工作树干净。2026-09-22 的隔离 Chrome 来源页验收覆盖两视图成功保存与刷新、真实 409 草稿保留、已提交但响应丢失、显式重读和快照失败提示；隔离路径为 `/tmp/ai-novel-s3c-ui.CDE9eE`，未使用用户库或真实模型。
+
+- Review：Sprint Goal 达成；两处既有编辑现场使用同一受保护结构写入口，冲突和结果未知都不覆盖服务器较新内容或清除当前草稿，快照失败提示不否认内容保存事实。
+- 完成度：承诺/完成 `5/5`，carryover `0`，escaped defect `0`；AI backfill、单区块生成、同步及其他旧入口未被带入。
+- Retrospective：① UI 验收启动时直接固定隔离 SQLite、独立浏览器 profile 和有界 DOM 等待，避免常驻 SSE 让 `networkidle` 形成假超时；②服务端快照失败与前端提示分别在最窄 seam 验证，不为制造故障增加生产开关。

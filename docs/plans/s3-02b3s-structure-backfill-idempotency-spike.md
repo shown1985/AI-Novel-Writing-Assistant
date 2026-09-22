@@ -4,7 +4,7 @@
 
 - Release / Epic：Release 1 / S3 可信世界；稳定 ID：`S3-02b3s`；2 点，Refinement Spike，未进入任何 Sprint 承诺。
 - 用户价值：作者点击“AI 补全世界结构”后，即使响应丢失或世界内容同时变化，也不会重复付费、误覆盖较新内容，且能知道模型结果是否已保存。
-- 依赖：S3-02a、S3-02b1 已 Done；S3-02b2 处于 User Acceptance。Spike 可只读进行，但后续实施卡不得在 S3-02b2 UI 验收和独立 DoR 前启动。
+- 依赖：S3-02a、S3-02b1、S3-02b2 已 Done。Spike 可进入下一次 Sprint Planning，但后续实施卡仍须等待本 Spike 决策和独立 DoR，不因前置完成自动启动。
 - Owner：一名 Luna xhigh 全栈工程师负责只读主链审计和隔离 seam proof；根 PM/PO 冻结合同。若 Luna 额度不可用，由根 PM 继续只读证据，不改为低能力模型直接实施。
 
 ## 为什么不能直接复用 S3-02b2

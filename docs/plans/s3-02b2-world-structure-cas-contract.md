@@ -1,8 +1,8 @@
-# S3-02b2：世界手册手动结构保存接入 CAS（User Acceptance）
+# S3-02b2：世界手册手动结构保存接入 CAS（Done）
 
 ## Story 身份与拆分决定
 
-- 稳定 ID：`S3-02b2`；Release 1 / S3 可信世界；P0；**User Acceptance，代码级 QA/QC 与 beta 组合 PASS，待用户 UI 验收**。
+- 稳定 ID：`S3-02b2`；Release 1 / S3 可信世界；P0；**Done，代码级 QA/QC、beta 组合验证与隔离 Chrome 来源页验收均 PASS**。
 - 估点：**5 点**。作为作者，我希望在既有世界手册编辑处保存结构时，不覆盖另一处刚保存的内容；若保存结果未知或版本冲突，草稿和已保存世界均可辨认。
 - 前置：S1-06、S3-02a 和 S3-02b1 已 Done；复用 `World.contentRevision`、`WorldMaintenanceOperation`、receipt 与 `commitWorldSample`，不增加 schema/migration。
 - 拆分理由：`PUT /worlds/:id/structure` 是现有作者手动保存；`POST /worlds/:id/structure/backfill` 会先调用模型再直接写库。两者虽位于同一 `worldStructureWorkspace.ts`，但 backfill 的模型结果、响应丢失后是否重算、重放结果与费用边界需要独立合同。若同卡覆盖两者，除 CAS 外还必须改变生成/重试语义，无法有把握维持 5 点。本卡只接手动保存；backfill、单区块生成后的保存以及其他旧写入口留在原 `S3-02b` 父项 Refinement，后续另建稳定子卡，不在本卡计点或默认为 Ready。
@@ -44,8 +44,13 @@
 
 DoR 通过不等于 Done。AI backfill、同步及其他旧入口仍属原 S3-02b 父项 Refinement，且不计入本卡。
 
-## 当前验收证据与剩余门
+## 完成验收证据
 
 - Terra QA 对 AC1～6 代码级 PASS，独立 Terra QC 无 P0/P1/P2 代码阻断。shared/server build、client typecheck、结构 PUT HTTP 428/409、隔离 SQLite A 成功→B 成功→A replay 与自定义使用建议投影、客户端保存状态机测试及 `git diff --check` 已通过。
 - `beta@d7df4af2` 组合验证通过：shared/server build、client typecheck、结构保存 HTTP/隔离 SQLite 5/5、客户端状态机 4/4，beta 工作树干净。
-- 来源页实际 UI 验收尚未完成；因此 Story 不标 Done，Sprint 完成点数仍为 0。用户需在两处编辑视图确认保存、冲突/未知结果草稿保留、显式重读及快照失败提示。
+- 2026-09-22 在独立 SQLite `/tmp/ai-novel-s3c-ui.CDE9eE/app.db` 和独立 Chrome profile 中完成来源页验收，全程未访问用户数据库或真实模型：
+  - 世界手册编辑和高级结构维护均实际调用同一结构 PUT；高级视图保存返回 `committed`、`snapshotStatus=created`，revision `3→4`，刷新后调性和核心冲突仍显示。
+  - 外部操作先提交 revision 5 后，旧页面保存得到真实 409；页面保留“冲突时保留的本地草稿”，显示冲突说明和“放弃当前草稿并读取已保存内容”。点击后同时重读结构与世界详情，采用服务端内容并清除恢复按钮。
+  - 浏览器在服务端已提交 revision 6 后丢弃响应，来源页显示保存状态待确认、保留原草稿和显式重读入口；重读后显示服务端已保存的同一内容，证明未知结果没有被误报为失败或自动覆盖。
+  - 服务端快照失败行为由聚焦测试证明内容与 receipt 仍保留；浏览器把成功提交响应的 `snapshotStatus` 隔离注入为 `failed` 后，来源页显示“世界内容已保存，历史快照未完成”，服务端内容仍已提交至 revision 7。该注入只验证 UI 投影，未修改生产代码。
+- Story 完成不代表 AI backfill、单区块生成或其他旧入口已受保护；这些范围仍按父项 Refinement 单独拆分。

@@ -3,7 +3,7 @@
 更新时间：2026-09-22
 当前分支：`beta`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S3C 的 S3-02b2 已通过代码级 QA/QC 与 beta 组合验证，处于 User Acceptance；承诺 5 点、完成 0 点。Release 1 仍未完成。
+当前状态：R1-S3C 已完成 `5/5` 点并关闭 Review/Retrospective；S3-02b2 的代码级 QA/QC、beta 组合验证与隔离 Chrome 来源页验收均 PASS。Release 1 仍未完成，下一张 Story 须经独立 Planning 承诺。
 
 ## 权威文档
 
@@ -273,20 +273,22 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 - Review：Sprint Goal 达成；缓存指纹、四格 legacy、无世界零写入、晚到结果拒写、失败保留和当前实例消费均有行为证据；发布说明与长期 Wiki 已分别更新，不把同步或旧写入口误报为完成。
 - Retrospective：承诺/完成 `5/5`，carryover `0`。返工：QA/QC 退回了未测的竞态/legacy 分支，并发现 overrides-only 解释冲突。改进：① Planning 时把边缘旧字段归类写进唯一矩阵；②首次交付测试直接按 AC 建立行为矩阵，避免“总数全绿但关键分支缺证据”。
 
-## 当前 Sprint：R1-S3C 世界结构保存版本保护
+## 已完成 Sprint：R1-S3C 世界结构保存版本保护
 
 - Sprint Goal：两处既有世界结构编辑现场共用 CAS；冲突或结果未知不覆盖、不丢当前草稿，快照失败不误报内容未保存。
-- 承诺：仅 `S3-02b2`，5 点、无 Stretch；当前 `0/5`，Story User Acceptance，代码级 QA/QC 与 beta 组合 PASS，待用户 UI 验收。Sprint 合同：[R1-S3C](./docs/plans/r1-s3c-sprint-commitment.md)，Story 合同：[S3-02b2](./docs/plans/s3-02b2-world-structure-cas-contract.md)。
+- 承诺/完成：仅 `S3-02b2`，`5/5` 点、无 Stretch，Story Done，无 carryover。Sprint 合同：[R1-S3C](./docs/plans/r1-s3c-sprint-commitment.md)，Story 合同：[S3-02b2](./docs/plans/s3-02b2-world-structure-cas-contract.md)。
 - DoR：限时 Spike 已完成重放、快照和草稿边界，独立 Terra QA/QC 与 Scrum Master PASS；S1-06、S3-02a/b1 已 Done。
 - Owner：单 Luna xhigh 全栈工程师负责 Runtime、客户端与定向测试；根 PM 串行接线共享 HTTP 文件、控制范围与 beta 集成；Terra medium QA/QC 独立验收。
-- 退出门：AC1～6 的 428/409、重放、候选拒绝、快照三态与当前视图草稿有行为证据；shared/server build、client typecheck、聚焦测试和 beta 组合验证通过。UI 保存与冲突体验留待用户来源页验收，未验收不标 Done。
+- 退出门：AC1～6 的 428/409、重放、候选拒绝、快照三态与当前视图草稿已有行为证据；shared/server build、client typecheck、聚焦测试和 beta 组合验证通过。隔离 Chrome 实际验证两视图保存、刷新持久化、409 与未知结果保留草稿、显式重读及快照失败提示。
 - 非范围：AI backfill、其他旧世界写入口、同步、评估/提案、跨视图草稿、schema/migration、Release 2 与新增安全体系。
+- Review：Sprint Goal 达成；世界手册和高级结构维护均通过受保护的同一结构 PUT 保存。高级视图一次保存将 `contentRevision 3→4`，刷新后结构与兼容投影仍在；并发外部提交至 revision 5 后旧页面收到 409 且草稿保留，显式重读采用较新内容；服务端提交至 revision 6 后浏览器丢失响应时显示状态待确认并保留草稿，重读恢复已保存结果；快照失败投影显示“世界内容已保存，历史快照未完成”。
+- Retrospective：承诺/完成 `5/5`，carryover `0`。改进：① UI 验收启动时直接使用隔离 SQLite 与独立浏览器 profile，并对常驻 SSE 使用有界 DOM 等待；② 独立快照失败由服务端行为测试证明保存事实、由浏览器响应注入验证提示投影，避免为制造故障改生产代码。
 
 ## Release 1 后续队列
 
 1. R1-S1：配置、诊断、阅读恢复和世界归属安全（已完成，15/15 点）。
 2. R1-S2：R1-S2A～S2H 已完成（S2H `3/3`）；S2-04c1 实况切片已 Done，父 S2-04c 的任务/历史展示范围仍在 Refinement。
-3. R1-S3～4：可信世界、提案采用和失败复核；S3-01、S3-02a、S3-02b1、S3-03a1、S3-03a2 已完成。R1-S3C 仅承诺 S3-02b2 手动结构保存；原 S3-02b 其他旧入口、S3-03b～06 保持 Refinement/依赖状态，不顺手启动或承诺。
+3. R1-S3～4：可信世界、提案采用和失败复核；S3-01、S3-02a、S3-02b1、S3-02b2、S3-03a1、S3-03a2 已完成。原 S3-02b 其他旧入口、S3-03b～06 保持 Refinement/依赖状态；S3-02b3s 仅为下一 Planning 候选 Spike，不因 R1-S3C 完成自动承诺。
 4. R1-S5～6：本机Agent委托、预算、记忆和资产。
 5. R1-S7：十章长链、有限撤回和导航收束。
 6. R1-RC：桌面升级、备份恢复、包装与用户验收。

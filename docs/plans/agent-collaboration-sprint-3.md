@@ -80,7 +80,7 @@ S3-04 读取 S1-06 冻结的可空决定集合，不等待 S3-06 的写操作。
 
 R1-S2G 已完成 `8/8`：S2-04b4 `5` 点与 S3-02b1 `3` 点均为 Done，且 S3-02b1 已完成真实来源页 UI QC。原 S3-02b 父项其余入口继续 Refinement，不启动或承诺下一 Story。
 
-原 S3-02b 剩余入口的下一张卡是 [S3-02b2 世界手册手动结构保存接入 CAS](./s3-02b2-world-structure-cas-contract.md)，5 点，只覆盖既有手动 `PUT /structure`；[S3-02b2s 限时 Spike](./s3-02b2s-structure-save-feasibility-spike.md) 已冻结重放、快照失败与两处编辑草稿边界。b2 已进入 R1-S3C 并通过代码级 QA/QC 与 beta 组合验证，待用户 UI 验收，不计 Done。AI backfill 与其他写入口仍为父项 Refinement，不因 b2 进展自动承诺。b2 是父项滚动拆分，不与原 S3-02 概要点数重复累计；上表仍只统计已完成的 S3-02a/b1，后续 Sprint 承诺和点数另列。
+原 S3-02b 的手动结构保存子卡 [S3-02b2](./s3-02b2-world-structure-cas-contract.md) 已在 R1-S3C 完成 `5/5` 点：代码级 QA/QC、beta 组合验证与隔离 Chrome 来源页验收均 PASS，范围只覆盖既有手动 `PUT /structure`。AI backfill 与其他写入口仍为父项 Refinement，不因 b2 完成自动承诺。b2 是父项滚动拆分，不与原 S3-02 概要点数重复累计；后续子卡的 Sprint 承诺和点数另列。
 
 AI 结构补全的下一步只进入 [S3-02b3s 幂等与费用边界 Spike](./s3-02b3s-structure-backfill-idempotency-spike.md)，2 点候选、未承诺。该入口在模型输出产生前没有最终 candidate，现有 commit receipt 不能证明模型是否已经调用或保存其结果；必须先冻结调用前 claim、生成后 CAS 和响应丢失恢复合同，再判断实施卡能否保持 5 点。单区块 `POST /structure/generate` 与其他旧入口均不并入该 Spike。
 
