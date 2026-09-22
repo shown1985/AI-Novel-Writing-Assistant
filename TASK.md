@@ -3,7 +3,7 @@
 更新时间：2026-09-22
 当前分支：`beta`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S3C 的 S3-02b2 代码级 QA/QC 已通过，待 beta 组合和用户 UI 验收；承诺 5 点、完成 0 点。Release 1 仍未完成。
+当前状态：R1-S3C 的 S3-02b2 已通过代码级 QA/QC 与 beta 组合验证，处于 User Acceptance；承诺 5 点、完成 0 点。Release 1 仍未完成。
 
 ## 权威文档
 
@@ -276,7 +276,7 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 ## 当前 Sprint：R1-S3C 世界结构保存版本保护
 
 - Sprint Goal：两处既有世界结构编辑现场共用 CAS；冲突或结果未知不覆盖、不丢当前草稿，快照失败不误报内容未保存。
-- 承诺：仅 `S3-02b2`，5 点、无 Stretch；当前 `0/5`，Story In Review、代码级 QA/QC PASS，待 beta 组合与用户 UI 验收。Sprint 合同：[R1-S3C](./docs/plans/r1-s3c-sprint-commitment.md)，Story 合同：[S3-02b2](./docs/plans/s3-02b2-world-structure-cas-contract.md)。
+- 承诺：仅 `S3-02b2`，5 点、无 Stretch；当前 `0/5`，Story User Acceptance，代码级 QA/QC 与 beta 组合 PASS，待用户 UI 验收。Sprint 合同：[R1-S3C](./docs/plans/r1-s3c-sprint-commitment.md)，Story 合同：[S3-02b2](./docs/plans/s3-02b2-world-structure-cas-contract.md)。
 - DoR：限时 Spike 已完成重放、快照和草稿边界，独立 Terra QA/QC 与 Scrum Master PASS；S1-06、S3-02a/b1 已 Done。
 - Owner：单 Luna xhigh 全栈工程师负责 Runtime、客户端与定向测试；根 PM 串行接线共享 HTTP 文件、控制范围与 beta 集成；Terra medium QA/QC 独立验收。
 - 退出门：AC1～6 的 428/409、重放、候选拒绝、快照三态与当前视图草稿有行为证据；shared/server build、client typecheck、聚焦测试和 beta 组合验证通过。UI 保存与冲突体验留待用户来源页验收，未验收不标 Done。

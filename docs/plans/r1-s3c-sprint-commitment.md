@@ -6,7 +6,7 @@
 
 - Release / Epic：Release 1 / S3 可信世界。
 - 基线：`beta@f971cbe6`；[S3-02b2s Spike](./s3-02b2s-structure-save-feasibility-spike.md)已完成，S3-02b2 的最终合同经 PO、Scrum Master、Terra QA/QC 确认 DoR PASS。
-- 承诺：仅 [S3-02b2 世界手册手动结构保存接入 CAS](./s3-02b2-world-structure-cas-contract.md)，5 点；Stretch：无。当前状态：Active，Story In Review；代码级 QA/QC PASS，待 beta 组合与用户 UI 验收；完成 `0/5`。
+- 承诺：仅 [S3-02b2 世界手册手动结构保存接入 CAS](./s3-02b2-world-structure-cas-contract.md)，5 点；Stretch：无。当前状态：Active，Story User Acceptance；代码级 QA/QC 与 beta 组合 PASS，待用户 UI 验收；完成 `0/5`。
 - 容量：单卡 5 点。Spike 的 2 点是已完成的 Refinement 证据，不算本 Sprint 实施点数；原 S3-02b 概要点数不与本卡重复累计。
 
 ## 依赖、Owner 与顺序
@@ -33,4 +33,4 @@
 
 ## Review 与 Retrospective 出口
 
-待逐项记录 Sprint Goal 结果、承诺/完成点数、carryover/原因、QA/QC 与用户 UI 验收状态、beta 组合证据，以及至多两项具体流程改进。代码检查通过不替代用户 UI 验收；如 UI 未验收，Story 保持 User Acceptance，Sprint 不写 Done。
+代码级 QA/QC 对 AC1～6 PASS；`beta@d7df4af2` 的 shared/server build、client typecheck、结构 HTTP/隔离 SQLite 定向检查 `5/5`、客户端状态机 `4/4` 均 PASS，beta 工作树干净。Sprint Goal 的最终结果、完成点数、carryover、用户 UI 验收和 Retrospective 待 UI 门关闭后记录；当前 `0/5`，不写 Done。

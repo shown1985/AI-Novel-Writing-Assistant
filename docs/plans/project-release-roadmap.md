@@ -76,7 +76,7 @@ R1-S2H 承诺并完成 [S2-04c1 实况模型来源只读显示](./s2-04c1-live-m
 
 ### R1-S3C 当前窗口
 
-本窗口仅承诺 [S3-02b2 世界手册手动结构保存 CAS](./s3-02b2-world-structure-cas-contract.md) `5` 点、无 Stretch；[限时 Spike](./s3-02b2s-structure-save-feasibility-spike.md)与独立 DoR 复核已完成。实施仅限手动 `PUT /structure` 及两个既有编辑视图，AI backfill、其他世界旧入口和同步均不在本窗口。退出门与 owner 见 [R1-S3C Sprint 承诺](./r1-s3c-sprint-commitment.md)；当前未实现、未验收，不代表 Release 1 完成。
+本窗口仅承诺 [S3-02b2 世界手册手动结构保存 CAS](./s3-02b2-world-structure-cas-contract.md) `5` 点、无 Stretch；[限时 Spike](./s3-02b2s-structure-save-feasibility-spike.md)、独立 DoR、代码级 QA/QC 与 `beta@d7df4af2` 组合验证已通过，Story 处于 User Acceptance，尚未计入完成点数。实施仅限手动 `PUT /structure` 及两个既有编辑视图，AI backfill、其他世界旧入口和同步均不在本窗口。退出门与 owner 见 [R1-S3C Sprint 承诺](./r1-s3c-sprint-commitment.md)；用户 UI 未验收，不代表 Release 1 完成。
 
 ### R1-S0 新增 Story
 
