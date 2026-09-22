@@ -78,6 +78,10 @@ R1-S2H 承诺并完成 [S2-04c1 实况模型来源只读显示](./s2-04c1-live-m
 
 本窗口仅承诺并完成 [S3-02b2 世界手册手动结构保存 CAS](./s3-02b2-world-structure-cas-contract.md) `5/5` 点、无 Stretch；[限时 Spike](./s3-02b2s-structure-save-feasibility-spike.md)、独立 DoR、代码级 QA/QC、`beta@d7df4af2` 组合验证与隔离 Chrome 来源页验收均通过。实际 UI 覆盖两视图成功保存、刷新持久化、409/未知结果草稿保留、显式重读和快照失败提示。实施仅限手动 `PUT /structure` 及两个既有编辑视图，AI backfill、其他世界旧入口和同步均不在本窗口。Review/Retrospective 见 [R1-S3C Sprint 承诺](./r1-s3c-sprint-commitment.md)；本窗口完成不代表 Release 1 完成。
 
+### R1-S3D 当前窗口
+
+本窗口仅承诺 [S3-02b3s AI 结构补全幂等与费用边界 Spike](./s3-02b3s-structure-backfill-idempotency-spike.md) `2` 点、无 Stretch，基线为 `beta@88e0e00d`。目标只冻结模型调用前 durable claim、生成结果与世界 revision/CAS 的绑定、响应丢失恢复和最小持久状态决定，并用 mock 模型与隔离 SQLite seam proof 验证；不实现生产 backfill、schema/migration 或来源页新状态。S3-02b3 及 S3-03b～06 继续保持 Refinement / Not Ready。退出门、角色和文件边界见 [R1-S3D Sprint 承诺](./r1-s3d-sprint-commitment.md)。
+
 ### R1-S0 新增 Story
 
 #### R1-00 上游实现与计划重对账（3 点）

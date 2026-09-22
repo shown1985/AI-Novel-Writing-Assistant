@@ -2,9 +2,9 @@
 
 ## 身份与决定范围
 
-- Release / Epic：Release 1 / S3 可信世界；稳定 ID：`S3-02b3s`；2 点，Refinement Spike，未进入任何 Sprint 承诺。
+- Release / Epic：Release 1 / S3 可信世界；稳定 ID：`S3-02b3s`；2 点，R1-S3D 已承诺，当前 Ready。
 - 用户价值：作者点击“AI 补全世界结构”后，即使响应丢失或世界内容同时变化，也不会重复付费、误覆盖较新内容，且能知道模型结果是否已保存。
-- 依赖：S3-02a、S3-02b1、S3-02b2 已 Done。Spike 可进入下一次 Sprint Planning，但后续实施卡仍须等待本 Spike 决策和独立 DoR，不因前置完成自动启动。
+- 依赖：S3-02a、S3-02b1、S3-02b2 已 Done；Spike 已进入 R1-S3D。后续实施卡仍须等待本 Spike 决策和独立 DoR，不因前置完成自动启动。
 - Owner：一名 Luna xhigh 全栈工程师负责只读主链审计和隔离 seam proof；根 PM/PO 冻结合同。若 Luna 额度不可用，由根 PM 继续只读证据，不改为低能力模型直接实施。
 
 ## 为什么不能直接复用 S3-02b2
@@ -23,10 +23,10 @@
 
 - 只检查 `POST /worlds/:id/structure/backfill`、`WorldService.backfillStructure`、`worldStructureWorkspace.backfillWorldStructure`、`world.structure.backfill` Prompt、模型 attempt evidence、既有世界 CAS/operation/receipt 与两处来源页的“AI 补全结构”动作。
 - 产出：时序图或状态表、operation/request hash 合同、是否需要持久化生成结果或租约的决定、单张实现 Story 是否可保持 5 点、owner/文件边界和行为 AC。
-- 最窄 seam proof：mock 模型与隔离 SQLite，证明同 operation 并发/重放最多一次模型调用；生成期间 revision 冲突零世界写入；提交成功响应丢失可读回原 receipt；不得调用真实模型或用户数据库。
+- 最窄 seam proof：新增非生产原型 `server/tests/worldStructureBackfillIdempotencySpike.test.js`，mock 模型与 `/tmp/ai-novel-s3-02b3s-*` 隔离 SQLite 证明同 operation 并发/重放最多发起一次模型调用；模型成功但提交前中断后复用持久结果；调用状态未知或 lease 到期不自动重新付费调用；生成期间 revision 冲突零世界写入；提交成功响应丢失可按 operation 读回原 receipt，并从拟议 result record 读回归一化结构。命令为 `pnpm --filter @ai-novel/server build && node --test server/tests/worldStructureBackfillIdempotencySpike.test.js`；该 proof 只证明拟议 claim/result 合同可行，不证明现有生产 `/backfill` 已安全。不得调用真实模型或用户数据库。
 - 非范围：`POST /structure/generate` 单区块建议、手动 PUT、分层/深化/导入/同步/评估/提案、Prompt 内容改写、新模型路由策略、通用任务中心动作、Release 2 或额外安全体系。
-- 若不新增持久状态便无法区分“模型未调用”和“模型已调用但结果未保存”，Spike 必须明确最小 owned store/既有表扩展及迁移影响，并据此拆分；不得为了守住 5 点而宣称模型调用天然幂等。
+- 若不新增持久状态便无法区分“模型未调用”和“模型已调用但结果未保存”，Spike 必须明确最小 owned store/既有表扩展、可查询 operation 身份、归一化生成结果的持久位置及 migration 影响，并据此拆分；commit receipt 只证明世界提交，不能冒充生成结果仓库。不得为了守住 5 点而宣称模型调用天然幂等。
 
 ## 当前 DoR 结论
 
-S3-02b3 实施卡保持 **Refinement / Not Ready**。最大未决项是模型调用前的 durable claim 与生成结果恢复合同，它会改变核心数据方案，符合敏捷规范中必须先 Spike 的条件。当前 S3-02b3s 只冻结调查范围，不代表 backfill 已受版本保护，也不计入 R1-S3C 的 5 点承诺。
+S3-02b3 实施卡保持 **Refinement / Not Ready**。最大未决项是模型调用前的 durable claim 与生成结果恢复合同，它会改变核心数据方案，符合敏捷规范中必须先 Spike 的条件。S3-02b3s 已进入 R1-S3D，但只冻结调查范围和隔离证据，不代表 backfill 已受版本保护。

@@ -3,7 +3,7 @@
 更新时间：2026-09-22
 当前分支：`beta`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S3C 已完成 `5/5` 点并关闭 Review/Retrospective；S3-02b2 的代码级 QA/QC、beta 组合验证与隔离 Chrome 来源页验收均 PASS。Release 1 仍未完成，下一张 Story 须经独立 Planning 承诺。
+当前状态：R1-S3C 已完成 `5/5`；R1-S3D 仅承诺 `S3-02b3s` 2 点 Spike，当前 Ready、完成 `0/2`。生产实施 S3-02b3 仍为 Refinement / Not Ready，Release 1 未完成。
 
 ## 权威文档
 
@@ -284,11 +284,19 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 - Review：Sprint Goal 达成；世界手册和高级结构维护均通过受保护的同一结构 PUT 保存。高级视图一次保存将 `contentRevision 3→4`，刷新后结构与兼容投影仍在；并发外部提交至 revision 5 后旧页面收到 409 且草稿保留，显式重读采用较新内容；服务端提交至 revision 6 后浏览器丢失响应时显示状态待确认并保留草稿，重读恢复已保存结果；快照失败投影显示“世界内容已保存，历史快照未完成”。
 - Retrospective：承诺/完成 `5/5`，carryover `0`。改进：① UI 验收启动时直接使用隔离 SQLite 与独立浏览器 profile，并对常驻 SSE 使用有界 DOM 等待；② 独立快照失败由服务端行为测试证明保存事实、由浏览器响应注入验证提示投影，避免为制造故障改生产代码。
 
+## 当前 Sprint：R1-S3D AI 结构补全幂等边界 Spike
+
+- Sprint Goal：冻结 backfill 在模型调用前、生成后 CAS 和响应丢失后的唯一恢复合同，使后续实现不会重复付费或覆盖作者较新的世界内容。
+- 承诺：仅 `S3-02b3s`，2 点、无 Stretch；当前 `0/2`，Story Ready。Sprint 合同：[R1-S3D](./docs/plans/r1-s3d-sprint-commitment.md)，Spike 合同：[S3-02b3s](./docs/plans/s3-02b3s-structure-backfill-idempotency-spike.md)。
+- Owner：单一 Luna xhigh 全栈工程师负责只读主链审计与隔离 seam proof；根 PM/PO 冻结合同和集成；Terra medium Scrum Master 与 QA/QC 独立验收。
+- 退出门：实际时序与持久事实、durable claim/request hash、生成结果与 revision 绑定、未知状态恢复表、隔离 seam proof、后续 ≤5 点 Story 拆分均有证据。
+- 非范围：不实现生产 backfill、store/schema/migration、来源页新状态；不改单区块生成、手动 PUT、同步、评估、Prompt 内容/模型路由、任务中心或 Release 2。
+
 ## Release 1 后续队列
 
 1. R1-S1：配置、诊断、阅读恢复和世界归属安全（已完成，15/15 点）。
 2. R1-S2：R1-S2A～S2H 已完成（S2H `3/3`）；S2-04c1 实况切片已 Done，父 S2-04c 的任务/历史展示范围仍在 Refinement。
-3. R1-S3～4：可信世界、提案采用和失败复核；S3-01、S3-02a、S3-02b1、S3-02b2、S3-03a1、S3-03a2 已完成。原 S3-02b 其他旧入口、S3-03b～06 保持 Refinement/依赖状态；S3-02b3s 仅为下一 Planning 候选 Spike，不因 R1-S3C 完成自动承诺。
+3. R1-S3～4：可信世界、提案采用和失败复核；S3-01、S3-02a、S3-02b1、S3-02b2、S3-03a1、S3-03a2 已完成。R1-S3D 当前仅承诺 S3-02b3s Spike；原 S3-02b 其他旧入口、S3-02b3 生产实现和 S3-03b～06 保持 Refinement/依赖状态。
 4. R1-S5～6：本机Agent委托、预算、记忆和资产。
 5. R1-S7：十章长链、有限撤回和导航收束。
 6. R1-RC：桌面升级、备份恢复、包装与用户验收。
