@@ -45,6 +45,14 @@ domain   Prompt port   persistence / lease / index ports
 
 诊断配置 fingerprint、Prompt 版本和模型来源属于调用证据，不进入上述内容版本体系。
 
+### 本书世界切片的派生缓存
+
+`NovelWorld.storySliceJson`、override、digest 与 builtAt 是派生缓存，刷新它们不递增 `NovelWorld.contentRevision`。`storySliceDigest` 是实例内部的 freshness 指纹，固定绑定实例 ID、`contentRevision`、`sourceWorldId`、`syncBaseVersion`、故事输入 digest 和切片 schema 版本；公开切片中的 `metadata.storyInputDigest` 仍只表示故事输入，`rawSlice.worldId` 仍保留来源世界或既有兼容标识，不承担实例版本语义。不得以 `updatedAt`、来源样本后续修改或切片构建时间代替内容版本。
+
+切片读取与写入以 `NovelWorld` 为唯一实例来源。生成或刷新开始时冻结指纹输入；提交时按实例版本、来源与同步基线条件更新同一行的全部派生字段。条件不匹配时丢弃晚到结果，仅读一次最新状态；Gateway 只将与当前指纹匹配的切片组装为上下文，不把 stale 切片作为回退来源，也不重复写缓存。模型或缓存提交失败保留旧缓存供检查，但旧缓存不能因失败被标为 current。同步 pull 在双侧 CAS 实施前仍由其既有清空缓存与同步基线变化触发失效；这不等于同步已完成版本保护。
+
+旧作品首次读取允许 `worldId`、旧 slice 或两者兼有按既有 a1 规则建立实例；有效的仅旧 slice 可在实例内无模型补指纹，后续不再读取或双写 `Novel.storyWorldSlice*`。仅有 overrides 而无 `worldId`/旧 slice，不是可用世界：a2 的读取、刷新与偏好更新均返回空世界且零写入。a1 独立初始化入口仍保留自己的兼容规则，本节不修改它。旧 slice JSON 损坏时不可标 current，也不能伪造结构或调用模型来掩盖损坏。
+
 ## 提交与幂等
 
 正式链路固定为 `evaluation → proposal → commit → verification`。AI 负责语义评估、方案和复核；Runtime 负责归属、版本、保护范围、引用完整性、patch 应用、事务、幂等和租约。Prompt 不能宣称内容已经提交。
@@ -108,7 +116,7 @@ UI 不自行判断 proposal 是否仍可提交，也不把本地 pending 当作�
 - 现有 `World.version` 只作为迁移初始下界，不能补造历史每次编辑都已计数的证据。
 - S3-03a1 为所有已存在的 `NovelWorld` 行统一初始化 `contentRevision=1`；有无结构都使用同一兼容起点，不用 `0` 暗示可证明的历史状态。
 - 旧小说首次 lazy 创建实例时：仅 `worldId`、仅旧切片、两者兼有均从 revision 1 开始，两者皆无则不创建；已有实例不得被重复初始化覆盖。仅有旧 World 扁平字段时保留来源和现有兼容读取，不在迁移中伪造结构 JSON。
-- 该版本边界当前只覆盖 legacy 初始化、世界库导入、主题生成和手动创建/替换。同步 pull 的版本/CAS 归 S3-03b，旧切片双读/双写与 Gateway 主读切换归 S3-03a2；两者完成前不得宣称所有实例内容变化均由 `contentRevision` 捕获。
+- 内容版本递增目前只覆盖 legacy 初始化、世界库导入、主题生成和手动创建/替换。S3-03a2 将切片双读/双写收敛为实例缓存单写与 Gateway 主读，但不接入其他旧内容写入口。同步 pull 的版本/CAS 归 S3-03b；它与其他旧入口完成前不得宣称所有实例内容变化均由 `contentRevision` 捕获。
 - 旧 `integrated` 回答、`resolved/ignored` 问题与 consistency report 保留为历史声明，但不补造 verifiedAt、输入版本或当前通过证据。
 - 旧同步记录可读，但 revision 与 operation 身份为 unknown；下一次同步必须重新 diff 并携双侧 expected revision。
 - 快照恢复产生新的当前 revision，不把版本号倒退到快照中的旧值。
