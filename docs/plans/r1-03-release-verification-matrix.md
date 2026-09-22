@@ -13,7 +13,7 @@
 ## beta 组合验证状态
 
 - R1-S2G beta 组合验证：PASS。权威合并提交为 `eaa8cce8`，双亲 `32b2e9c7` / `21c7642e`，merge tree 一致；shared/server/client build/typecheck PASS，服务端 8 文件 `45/45`、client `3/3`，合计 `48/48`；验证前后工作树均 clean。Computer Use 证据复用既有 Sprint/Story 合同。
-- Release 1 尚未完成。R1-03 当前静态状态仍为 `PASS=9 / BLOCKED=2 / REVIEW=1`；剩余待处理项：公开发布 workflow 触发规则、macOS 打包 workflow、macOS x64 支持范围。
+- Release 1 尚未完成。R1-03 当前静态状态仍为 `PASS=9 / BLOCKED=2 / REVIEW=1`；公开发布 workflow 触发规则与 macOS arm64 候选 workflow 仍待实现。PO 已决定 Release 1 只支持 Windows x64 与 macOS arm64、不支持 macOS x64，但审计器须在 R1-G01 实现卡中消费该口径后才能关闭 `REVIEW`。
 
 ## 证据类型与判定
 
@@ -57,7 +57,7 @@
 | 本机网页 | R1-P01、R1-C01/C02、R1-R01、R1-E01 | 开书、十章结果、来源页恢复、TXT 下载；确认无 LAN 使用说明 | 公共 idea→导演交接和浏览器 UI 未验收 |
 | Windows x64 桌面 | 共通门 + R1-D01～03、R1-W01/W02 | 安装、首次配置、完整主链、关闭/重开、导出、卸载/重装数据保留 | 完整历史版本/备份恢复与候选包装/UI 未运行 |
 | macOS arm64 桌面 | 共通门 + R1-D01～03、R1-M01/M02 | DMG 安装、首次配置、完整主链、关闭/重开、导出 | 完整历史版本/备份恢复待接入；公开 CI 无 macOS job；候选包装/UI 未运行 |
-| macOS x64 | 无 | 无 | 当前 `electron-builder` 只声明 arm64。发布范围必须明确限定 arm64，或另建 Story 增加并验证 x64；不得泛称已支持全部 macOS |
+| macOS x64 | 不适用 | 不适用 | **Release 1 不支持**。当前无 builder target、runtime 或 UI 验收入口；候选说明不得泛称支持全部 macOS。未来若要支持，必须另建 Story 并重新估点/验收 |
 
 ## 用户 UI 验收清单
 
@@ -98,7 +98,7 @@
 | 公共 idea→导演准备交接缺少自动化长链 | R1-02 已固定想法与已验收导演产物，但明确不调用公共交接入口和真实资产生成器 | R1-RC03 的来源页 UI 验收与后续公共入口回归 | 用隔离作品验证来源页真实交接；不得把 R1-02 的固定产物证据扩大解释 |
 | 公开发布触发不符合版本规则 | `.github/workflows/desktop-release.yml` 接受 `desktop-v*` 与 `workflow_dispatch`，发布 step 可直接执行 | R1-G01、R1-RC02/04 | 公共发布只允许与 `desktop/package.json` 一致的 `vX.Y.Z` tag；非匹配触发仅验证不得上传 |
 | 公开工作流仅 Windows | release/beta workflow 只有 `windows-latest`；macOS 验证仅有本地脚本 | macOS 候选组合证据、R1-G01 | 为 macOS arm64 建受控候选 job 或形成同 SHA 的可审计平台证据；不得用 Windows 包装替代 |
-| macOS 支持范围含糊 | builder 和验证脚本只覆盖 arm64 | “支持 macOS”的公开声明 | 明确 Release 1 仅 macOS arm64，或新增 x64 包装、runtime 与 UI 验收 |
+| 静态审计尚未消费 macOS 支持决定 | PO 已冻结 Release 1 为 macOS arm64-only，但现行审计仍无条件输出 `MACOS-X64-SCOPE REVIEW` | R1-G01 关闭判断与候选说明一致性 | R1-G01 实现卡令审计器核对明确的 arm64-only 发布合同；不得为消除 REVIEW 新增 x64 范围 |
 | TXT 用户打开证据未执行 | R1-02 已断言十章顺序、完整标题/正文和 UTF-8 content type，但未在系统编辑器中打开文件 | R1-E02、R1-A01 | 在每个平台从来源页下载并记录文件名、大小、SHA-256 与首尾章人工核对 |
 | 真实模型无授权/预算 | R1-00 将 S8-07 标为 Not Ready，本 Story 禁止真实调用 | 只能声称 mock 回归，不能声称真实模型验收 | 固定模型/参数/样本/预算、测试作品与人工 rubric 获批后单独执行并保留所有 attempt |
 
@@ -119,6 +119,8 @@ node scripts/release/r1-03-static-gate-audit.cjs --strict
 ```
 
 R1-MIG01 已解除视觉资产双迁移历史的静态阻断；严格模式仍因公开发布触发和 macOS 工作流缺口返回 `2`。静态 PASS 只证明兼容保护与 fixture 存在，R1-D01/D02 的行为结论必须来自实际迁移测试。
+
+R1-G01 已完成 [Backlog 拆分](./r1-g01-release-governance-contract.md)：G01a 只关闭公开标签门，G01b 只建立 macOS arm64 候选 CI，G01c 已冻结平台范围。三者均未修改当前门禁事实；不得把 Ready 或 PO 决定写成 workflow 已通过。
 
 ## 文档与发布判断
 

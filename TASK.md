@@ -237,7 +237,7 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 - beta 合并提交：`eaa8cce8`，双亲为 `32b2e9c7` / `21c7642e`，merge tree 一致。
 - Terra 权威验证：shared/server/client build/typecheck PASS；服务端 8 文件 `45/45`、client `3/3`，合计 `48/48`；验证前后工作树均 clean。Computer Use 证据复用既有 Sprint/Story 合同，不重复执行。
 - R1-S2G beta 集成结论：PASS。该结论只关闭本 Sprint 的 beta 组合门，不代表 Release 1 完成，也不启动下一 Story。
-- R1-03 当前发布静态门仍为 `PASS=9 / BLOCKED=2 / REVIEW=1`；待处理项为公开发布 workflow 触发规则、macOS 打包 workflow，以及 macOS x64 支持范围。
+- R1-03 当前发布静态门仍为 `PASS=9 / BLOCKED=2 / REVIEW=1`；待处理项为公开发布 workflow 触发规则、macOS arm64 候选 workflow，以及让审计器消费已冻结的 arm64-only 支持决定。
 
 ## 已完成 Sprint：R1-S2H 实况模型来源可见
 
@@ -301,6 +301,8 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 5. R1-S7：十章长链、有限撤回和导航收束。
 6. R1-RC：桌面升级、备份恢复、包装与用户验收。
 
+R1-RC 独立 Refinement（不属于当前 R1-S3D 承诺）：[R1-G01 发布治理拆分合同](./docs/plans/r1-g01-release-governance-contract.md)已冻结。`R1-G01a` 严格公开标签门 3 点与 `R1-G01b` macOS arm64 候选 CI 5 点为 Ready；`R1-G01c` 1 点 PO 决定已 Done，Release 1 只支持 Windows x64 与 macOS arm64，不支持 macOS x64。两张实现卡须经后续 Sprint Planning 才能开始，当前静态门仍为 `PASS=9 / BLOCKED=2 / REVIEW=1`。
+
 ## 强制敏捷门
 
 - 没有Story ID、用户价值、AC、非范围和验证方式，不开始开发。
@@ -316,5 +318,5 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 - 已识别发布阻断：当前分支与 v0.4.25 存在重叠的视觉资产迁移历史；空库全迁移和新增部分迁移 fixture 均失败，须在 R1-03 验证矩阵和后续明确 Story 中处理。
 - R1-01 已强制服务端、Vite 和桌面入口只使用回环地址；LAN、wildcard、私网主机和非回环 CORS 配置会在迁移及后台恢复前失败。
 - R1-02 的确定性长链在隔离临时 SQLite 中完成十章，验证一次人工恢复、前五章正文哈希不变、第八章质量债继续、显式世界/人物编辑和 TXT 顺序完整；公共 idea→导演交接、真实模型和 UI 仍不在该证据范围内。
-- R1-03 静态审计为 `PASS=8 / BLOCKED=3 / REVIEW=1`；当前硬阻断是重叠 SQLite 迁移、非标准 tag/手动触发可公开发布、公开工作流无 macOS job，另须冻结 macOS x64 是否进入支持范围。
+- R1-S0 当时的静态审计为 `PASS=8 / BLOCKED=3 / REVIEW=1`；当时硬阻断是重叠 SQLite 迁移、非标准 tag/手动触发可公开发布、公开工作流无 macOS job，且 macOS x64 支持范围尚未冻结。后续 R1-MIG01 已解除迁移阻断，PO 已冻结 Release 1 为 macOS arm64-only；当前门以本页前述 `PASS=9 / BLOCKED=2 / REVIEW=1` 为准。
 - R1-04 已冻结 15 点 R1-S1；新增 R1-MIG01 独立承接迁移阻断，四张既有 Ready 卡进入明确波次，未满足依赖的诊断生产卡未被提前承诺。

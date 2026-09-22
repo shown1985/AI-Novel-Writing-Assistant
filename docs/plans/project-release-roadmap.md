@@ -23,6 +23,7 @@
 - 自动导演、章节生产、质量债、恢复、世界维护、人物和写法资产形成单机闭环。
 - AI Agent 协作是“作者与本机 AI 协作”，不是多人账号或远程团队。
 - Windows/macOS 开发启动、升级兼容、备份恢复和安装包验证进入发布门。
+- Release 1 桌面候选明确限定为 Windows x64 与 macOS arm64；macOS x64 不在本 Release 支持范围，若未来需要必须另立 Story 和验收入口。
 - 默认只监听回环地址。需要 LAN、账号或多人访问时，进入 Release 2，不以宽松 CORS 代替认证。
 
 ### 非范围
@@ -58,7 +59,7 @@ R1-S2G 是 Release 1 已完成实施 Sprint，承诺/完成 `8/8` 点、无 Stre
 | [S2-04b4 首批身份归因与内部读投影](./s2-04b4-attribution-read-projection-contract.md) | 5 | Done | 自动导演完整 runtime frame、本书 `novel-world-generate`、章节 `ai-revision-preview` 三个显式 context；director frame 整体优先；内部 read service/tests；Terra 最终 PASS，shared/server build、三文件定向检查 `20/20`，无 UI | 公开 API/UI、shared/public DTO、schema/migration、S2-04c、其他入口/batch/旧记录回填 |
 | [S3-02b1 世界编辑与公理保存 CAS 兼容](./s3-02b1-world-edit-axiom-cas-contract.md) | 3 | Done | `WorldService.updateWorld` 兼容 HTTP/API；既有 `updateAxioms` UI 显式 revision + 稳定 operationId；统一 CAS；Terra 代码级 PASS（maintenance/runtime/migration/service/route `25/25`、client CAS `3/3`，shared/server/client build/typecheck PASS）；Computer Use PASS，隔离路径保存/刷新、并发冲突与草稿保留、两条 committed operation、client retry harness `3/3` 均通过 | 普通编辑新 UI、原 S3-02b 父项其余旧写入口、提案/评估/同步/快照、schema/migration |
 
-两张卡均已写明 DoR、AC、owner、非范围和最窄验证。R1-S2G 已完成 `8/8` 点并通过 beta 组合验证，但这不代表 Release 1 可发布；R1-03 仍为 `PASS=9 / BLOCKED=2 / REVIEW=1`，公开发布 workflow 触发规则、macOS 打包 workflow、macOS x64 支持范围仍待处理。S2-04c、S3-03～06、原 S3-02b 父项其余旧世界入口、S4+ 均不因本窗口完成自动标为 Ready，也不启动或承诺下一 Story。
+两张卡均已写明 DoR、AC、owner、非范围和最窄验证。R1-S2G 已完成 `8/8` 点并通过 beta 组合验证，但这不代表 Release 1 可发布；R1-03 仍为 `PASS=9 / BLOCKED=2 / REVIEW=1`，公开发布 workflow 触发规则与 macOS arm64 候选 workflow 仍待实现，arm64-only 范围决定尚待审计器消费。S2-04c、S3-03～06、原 S3-02b 父项其余旧世界入口、S4+ 均不因本窗口完成自动标为 Ready，也不启动或承诺下一 Story。
 
 ### R1-S2H 已完成窗口
 
@@ -81,6 +82,10 @@ R1-S2H 承诺并完成 [S2-04c1 实况模型来源只读显示](./s2-04c1-live-m
 ### R1-S3D 当前窗口
 
 本窗口仅承诺 [S3-02b3s AI 结构补全幂等与费用边界 Spike](./s3-02b3s-structure-backfill-idempotency-spike.md) `2` 点、无 Stretch，基线为 `beta@88e0e00d`。目标只冻结模型调用前 durable claim、生成结果与世界 revision/CAS 的绑定、响应丢失恢复和最小持久状态决定，并用 mock 模型与隔离 SQLite seam proof 验证；不实现生产 backfill、schema/migration 或来源页新状态。S3-02b3 及 S3-03b～06 继续保持 Refinement / Not Ready。退出门、角色和文件边界见 [R1-S3D Sprint 承诺](./r1-s3d-sprint-commitment.md)。
+
+### R1-G01 发布治理 Backlog Refinement
+
+[R1-G01 拆分合同](./r1-g01-release-governance-contract.md)已把混合父项拆成 `R1-G01a` 严格公开标签门 3 点、`R1-G01b` macOS arm64 候选 CI 5 点和 `R1-G01c` 支持范围决定 1 点。PO 已完成 G01c：Release 1 只支持 Windows x64 与 macOS arm64，不支持 macOS x64。G01a/G01b Ready 但未进入当前 R1-S3D；当前静态门仍为 `PASS=9 / BLOCKED=2 / REVIEW=1`，拆卡不代表 workflow、包装或发布缺口已经关闭。
 
 ### R1-S0 新增 Story
 
