@@ -80,7 +80,7 @@ S3-04 读取 S1-06 冻结的可空决定集合，不等待 S3-06 的写操作。
 
 R1-S2G 已完成 `8/8`：S2-04b4 `5` 点与 S3-02b1 `3` 点均为 Done，且 S3-02b1 已完成真实来源页 UI QC。原 S3-02b 父项其余入口继续 Refinement，不启动或承诺下一 Story。
 
-原 S3-02b 剩余入口的下一张候选是 [S3-02b2 世界手册手动结构保存接入 CAS](./s3-02b2-world-structure-cas-contract.md)，只覆盖既有手动 `PUT /structure`，AI backfill 与其他写入口仍分开。它目前为 Refinement、候选 5 点，重放、快照失败和两处编辑草稿边界未过 DoR，不纳入任何 Sprint 承诺。该候选是父项的滚动拆分，不与原 S3-02 概要点数重复累计；上表仍只统计已冻结的 S3-02a/b1，待 b2 Ready 并重新校准父项时再更新总量。
+原 S3-02b 剩余入口的下一张 Ready 卡是 [S3-02b2 世界手册手动结构保存接入 CAS](./s3-02b2-world-structure-cas-contract.md)，5 点，只覆盖既有手动 `PUT /structure`；[S3-02b2s 限时 Spike](./s3-02b2s-structure-save-feasibility-spike.md) 已冻结重放、快照失败与两处编辑草稿边界，独立 QA/QC 已通过 DoR。AI backfill 与其他写入口仍为父项 Refinement，不因 b2 Ready 自动承诺。b2 是父项滚动拆分，不与原 S3-02 概要点数重复累计；上表仍只统计已完成的 S3-02a/b1，后续 Sprint 承诺和点数另列。
 
 ## S3-03a 拆分：本书世界独立内容版本与上下文消费
 
