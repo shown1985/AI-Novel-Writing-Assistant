@@ -6,7 +6,7 @@
 
 - Release / Epic：Release 1 / R1-RC 桌面发布候选。
 - 基线：`beta@ab411deb`；R1-S3E 已完成 `3/3`，G01a 严格标签门在 beta 的本地静态与 guard 测试通过，`MACOS-WORKFLOW` 仍 BLOCKED。
-- 承诺：仅 [R1-G01b macOS arm64 候选包装 CI 证据](./r1-g01-release-governance-contract.md)，5 点；Stretch：无。Story Ready，完成 `0/5`。
+- 承诺：仅 [R1-G01b macOS arm64 候选包装 CI 证据](./r1-g01-release-governance-contract.md)，5 点；Stretch：无。Story In Review，完成 `0/5`，待 beta 集成复核。
 - 容量：5 点。S3-02b3a～e 生产卡仍在 Refinement / Not Ready，不进入本 Sprint。
 
 ## Owner 与文件边界

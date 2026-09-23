@@ -130,8 +130,11 @@ function collectReleaseWorkflowViolations(workflow, desktopPackage) {
     violations.push("desktop/package.json does not declare a stable X.Y.Z version");
   }
   const jobNames = jobs.map((job) => job.name).sort();
-  if (jobNames.length !== 2 || jobNames[0] !== "publish-release" || jobNames[1] !== "validate-release") {
-    violations.push("the public release workflow must contain only validate-release and publish-release jobs");
+  if (jobNames.length !== 3
+    || jobNames[0] !== "macos-candidate"
+    || jobNames[1] !== "publish-release"
+    || jobNames[2] !== "validate-release") {
+    violations.push("the public release workflow must contain only validate-release, publish-release, and macos-candidate jobs");
   }
   if (!/^    permissions:\n\s+contents:\s+read\s*$/m.test(validationJob)) {
     violations.push("the validation job does not have read-only contents permission");
@@ -166,6 +169,66 @@ function collectReleaseWorkflowViolations(workflow, desktopPackage) {
   return violations;
 }
 
+function collectMacCandidateViolations(workflow) {
+  function extractJobs() {
+    const jobsStart = workflow.indexOf("jobs:\n");
+    if (jobsStart < 0) return [];
+    const bodyOffset = jobsStart + "jobs:\n".length;
+    const body = workflow.slice(bodyOffset);
+    const matches = [...body.matchAll(/^  ([A-Za-z0-9_-]+):\n/gm)];
+    return matches.map((match, index) => ({
+      name: match[1],
+      text: workflow.slice(
+        bodyOffset + match.index,
+        index + 1 < matches.length ? bodyOffset + matches[index + 1].index : workflow.length,
+      ),
+    }));
+  }
+
+  const candidateJob = extractJobs().find((job) => job.name === "macos-candidate")?.text ?? "";
+  const expectedIf = "needs.validate-release.outputs.allowed == 'true' && github.event_name == 'push' && github.ref_type == 'tag'";
+  const candidateIf = candidateJob.match(/^\s+if:\s+\$\{\{\s*([\s\S]*?)\s*\}\}\s*$/m)?.[1]?.trim() ?? "";
+  const installIndex = candidateJob.indexOf("pnpm install --frozen-lockfile");
+  const migrationIndex = candidateJob.indexOf("tests/prismaMigrationCompleteness.test.js");
+  const stageIndex = candidateJob.indexOf("run: pnpm stage:desktop\n");
+  const buildIndex = candidateJob.indexOf("pnpm dist:desktop:mac:reuse-stage");
+  const verifyIndex = candidateJob.indexOf("pnpm verify:desktop-package:mac:reuse-stage");
+  const violations = [];
+
+  if (!candidateJob) {
+    return ["the macos-candidate job is missing"];
+  }
+  if (!/^    permissions:\n\s+contents:\s+read\s*$/m.test(candidateJob)) {
+    violations.push("the macos-candidate job must use contents: read");
+  }
+  if (!/^    runs-on:\s+macos-15\s*$/m.test(candidateJob)) {
+    violations.push("the macos-candidate job must use the macos-15 runner");
+  }
+  if (!candidateJob.includes("needs: validate-release") || candidateIf !== expectedIf) {
+    violations.push("the macos-candidate job must use the complete validate-release push-tag guard");
+  }
+  if (!candidateJob.includes("uses: actions/checkout@v6")
+    || /(^|\n)\s+ref:\s*|(^|\n)\s+repository:\s*/m.test(candidateJob)) {
+    violations.push("the macos-candidate checkout must use the default event SHA without ref or repository overrides");
+  }
+  if (!candidateJob.includes('machine_arch="$(uname -m)"') || !candidateJob.includes('"$machine_arch" != "arm64"')) {
+    violations.push("the macos-candidate job must assert uname -m is arm64");
+  }
+  if (installIndex < 0 || stageIndex < 0 || installIndex > stageIndex) {
+    violations.push("the macos-candidate job must install dependencies before staging the desktop app");
+  }
+  if (migrationIndex < 0 || !candidateJob.includes("tests/runtimeMigrations.test.js")
+    || stageIndex < 0 || buildIndex < 0 || verifyIndex < 0
+    || !(stageIndex < migrationIndex && migrationIndex < buildIndex && buildIndex < verifyIndex)) {
+    violations.push("the macos-candidate job must run stage, migrations, arm64 dist, and verification in order");
+  }
+  if (/publish:desktop:|scripts\/update-desktop-release-notes\.cjs|gh\s+release|GH_TOKEN|CSC_LINK|CSC_KEY_PASSWORD|APPLE_ID|APPLE_APP_SPECIFIC_PASSWORD|APPLE_TEAM_ID|codesign|notarytool|notarize/i.test(candidateJob)) {
+    violations.push("the macos-candidate job must not publish, update release notes, sign, notarize, or receive a release token");
+  }
+
+  return violations;
+}
+
 function auditDesktopReleaseWorkflow() {
   const workflow = read(".github/workflows/desktop-release.yml");
   const desktopPackage = JSON.parse(read("desktop/package.json"));
@@ -182,7 +245,12 @@ function auditDesktopReleaseWorkflow() {
   }
 
   if (/runs-on:\s*macos-/m.test(workflow)) {
-    record("PASS", "MACOS-WORKFLOW", "the public workflow contains a macOS packaging job");
+    const macViolations = collectMacCandidateViolations(workflow);
+    if (macViolations.length === 0) {
+      record("PASS", "MACOS-WORKFLOW", "the macos-15 arm64 candidate job has a read-only guarded packaging and verification chain");
+    } else {
+      record("BLOCKED", "MACOS-WORKFLOW", macViolations.join("; "));
+    }
   } else {
     record("BLOCKED", "MACOS-WORKFLOW", "the public workflow has no macOS packaging job");
   }
@@ -262,4 +330,4 @@ if (require.main === module) {
   runAudit();
 }
 
-module.exports = { collectReleaseWorkflowViolations };
+module.exports = { collectMacCandidateViolations, collectReleaseWorkflowViolations };

@@ -3,7 +3,7 @@
 更新时间：2026-09-23
 集成分支：`beta`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S3E 的 `R1-G01a` 已完成 `3/3` 并合入 beta；R1-S3F 仅承诺 Ready 的 `R1-G01b` 5 点，尚未开始实现。AI backfill 生产实施卡仍为 Refinement / Not Ready，Release 1 未完成。
+当前状态：R1-S3E 的 `R1-G01a` 已完成 `3/3` 并合入 beta；R1-S3F 仅承诺 `R1-G01b` 5 点，Story In Review、完成 `0/5`，待 beta 集成复核。AI backfill 生产实施卡仍为 Refinement / Not Ready，Release 1 未完成。
 
 ## 权威文档
 
@@ -316,12 +316,13 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 ## 当前 Sprint：R1-S3F macOS arm64 候选包装 CI 合同
 
 - Sprint Goal：同一候选 SHA 拥有独立的 macOS arm64 只读包装验证链，不触发公开上传。
-- 承诺：仅 `R1-G01b`，5 点、无 Stretch；当前 `0/5`，Story Ready。[Sprint 合同](./docs/plans/r1-s3f-sprint-commitment.md)与 [Story 合同](./docs/plans/r1-g01-release-governance-contract.md)。
+- 承诺：仅 `R1-G01b`，5 点、无 Stretch；当前 `0/5`，Story In Review，待 beta 集成复核。[Sprint 合同](./docs/plans/r1-s3f-sprint-commitment.md)与 [Story 合同](./docs/plans/r1-g01-release-governance-contract.md)。
 - Owner：单一 Luna xhigh 工程师负责桌面 workflow、静态审计器及聚焦测试；根 PM 独占共享计划/矩阵/发布记录与 beta 集成；Terra medium Scrum Master、QA/QC 独立验收。
 - 验收：`MACOS-WORKFLOW` 静态 finding PASS 且 `PUBLIC-RELEASE-TRIGGER` 保持 PASS；macOS job 固定 arm64 runner、同 SHA、迁移及包装验证，只读无发布副作用。真实 Actions、平台包装与 UI 留在 RC 验收。
 - 非范围：不创建/推送标签，不上传、签名或公证；不接 macOS x64、AI backfill 生产卡或 Release 2。
+- 独立 QA/QC：同 SHA 默认 checkout、完整标签 guard、arm64 运行断言、迁移与 DMG/ZIP 包装验证链、无发布副作用及 G01a 回归均 PASS；聚焦测试 `11/11`。静态审计 `PASS=11 / REVIEW=1`、严格模式退出 `0`；真实 Actions 与安装验收未执行。
 
-R1-RC 独立 Refinement：[R1-G01 发布治理拆分合同](./docs/plans/r1-g01-release-governance-contract.md)已冻结。`R1-G01a` 3 点已 Done 并合入 beta，`R1-G01b` macOS arm64 候选 CI 5 点进入当前 R1-S3F，`R1-G01c` 1 点 PO 决定已 Done。Release 1 只支持 Windows x64 与 macOS arm64，不支持 macOS x64。当前静态门为 `PASS=10 / BLOCKED=1 / REVIEW=1`，未通过完整 Release gate。
+R1-RC 独立 Refinement：[R1-G01 发布治理拆分合同](./docs/plans/r1-g01-release-governance-contract.md)已冻结。`R1-G01a` 3 点已 Done 并合入 beta，`R1-G01b` macOS arm64 候选 CI 5 点处于当前 R1-S3F In Review，`R1-G01c` 1 点 PO 决定已 Done。Release 1 只支持 Windows x64 与 macOS arm64，不支持 macOS x64。当前静态门为 `PASS=11 / REVIEW=1`，不代表真实平台候选或 Release 1 已通过。
 
 ## 强制敏捷门
 
@@ -338,5 +339,5 @@ R1-RC 独立 Refinement：[R1-G01 发布治理拆分合同](./docs/plans/r1-g01-
 - 已识别发布阻断：当前分支与 v0.4.25 存在重叠的视觉资产迁移历史；空库全迁移和新增部分迁移 fixture 均失败，须在 R1-03 验证矩阵和后续明确 Story 中处理。
 - R1-01 已强制服务端、Vite 和桌面入口只使用回环地址；LAN、wildcard、私网主机和非回环 CORS 配置会在迁移及后台恢复前失败。
 - R1-02 的确定性长链在隔离临时 SQLite 中完成十章，验证一次人工恢复、前五章正文哈希不变、第八章质量债继续、显式世界/人物编辑和 TXT 顺序完整；公共 idea→导演交接、真实模型和 UI 仍不在该证据范围内。
-- R1-S0 当时的静态审计为 `PASS=8 / BLOCKED=3 / REVIEW=1`；当时硬阻断是重叠 SQLite 迁移、非标准 tag/手动触发可公开发布、公开工作流无 macOS job，且 macOS x64 支持范围尚未冻结。后续 R1-MIG01 已解除迁移阻断，PO 已冻结 Release 1 为 macOS arm64-only；当前门见 R1-S3E 的 `PASS=10 / BLOCKED=1 / REVIEW=1`。
+- R1-S0 当时的静态审计为 `PASS=8 / BLOCKED=3 / REVIEW=1`；当时硬阻断是重叠 SQLite 迁移、非标准 tag/手动触发可公开发布、公开工作流无 macOS job，且 macOS x64 支持范围尚未冻结。后续 R1-MIG01 已解除迁移阻断，PO 已冻结 Release 1 为 macOS arm64-only；当前门见 R1-S3F 的 `PASS=11 / REVIEW=1`。
 - R1-04 已冻结 15 点 R1-S1；新增 R1-MIG01 独立承接迁移阻断，四张既有 Ready 卡进入明确波次，未满足依赖的诊断生产卡未被提前承诺。

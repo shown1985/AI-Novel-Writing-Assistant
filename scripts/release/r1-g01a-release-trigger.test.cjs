@@ -147,7 +147,7 @@ test("the static audit rejects a second write-enabled job with publish side effe
   assert.match(violations.join("; "), /contents: write must belong only/);
 });
 
-test("the static audit rejects any third job, including inline write permission and gh release side effects", () => {
+test("the static audit rejects any unauthorized fourth job, including inline write permission and gh release side effects", () => {
   const rogueJob = `
   rogue-release:
     permissions: { contents: write }
@@ -156,5 +156,5 @@ test("the static audit rejects any third job, including inline write permission 
       - run: gh release create rogue asset.zip
 `;
   const violations = collectReleaseWorkflowViolations(`${workflow}\n${rogueJob}`, desktopPackage);
-  assert.match(violations.join("; "), /only validate-release and publish-release jobs/);
+  assert.match(violations.join("; "), /only validate-release, publish-release, and macos-candidate jobs/);
 });

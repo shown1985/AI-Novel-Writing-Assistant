@@ -4,9 +4,9 @@
 
 - Release / Epic：Release 1 / R1-RC 桌面发布候选。
 - 父项：`R1-G01` beta 组合验证与公开发布治理；父项不重复计点，也不作为一张混合实现卡进入 Sprint。
-- 当前状态：Refinement 已完成；`R1-G01a` 已在 R1-S3E Done 并合入 beta；`R1-G01b` 满足 DoR、保持 Ready，须经后续 Planning；`R1-G01c` 为 PO 范围决定且已完成。
+- 当前状态：Refinement 已完成；`R1-G01a` 已在 R1-S3E Done 并合入 beta；`R1-G01b` 满足 DoR 并进入 R1-S3F，当前 In Review、待 beta 集成复核；`R1-G01c` 为 PO 范围决定且已完成。
 - PO 支持决定：Release 1 桌面候选只覆盖 **Windows x64 与 macOS arm64**。macOS x64 不属于 Release 1 支持范围，不新增 builder target、原生模块、runtime 或 UI 验收。
-- 当前静态发布门为 `PASS=10 / BLOCKED=1 / REVIEW=1`：`PUBLIC-RELEASE-TRIGGER` 已 PASS；macOS CI 仍 BLOCKED，arm64-only 范围提示仍 REVIEW。静态合同不等于实际 GitHub Actions 运行证据。
+- 当前静态发布门为 `PASS=11 / REVIEW=1`：`PUBLIC-RELEASE-TRIGGER` 与 `MACOS-WORKFLOW` 已 PASS，arm64-only 范围提示仍 REVIEW。静态合同不等于实际 GitHub Actions 运行、包装或安装证据。
 
 选择两种已存在的目标架构，是为了先完成可验证的单机成书候选，而不是同时扩建第三套桌面架构。若未来要求 macOS x64，必须另立 Story、重新估点并独立验证，不能塞入以下卡片。
 
@@ -30,7 +30,7 @@
 
 ## R1-G01b macOS arm64 候选包装 CI 证据（5 点）
 
-- 状态 / Owner / 依赖：Ready；R1-RC02 桌面发布 owner；依赖 R1-03、已完成的 R1-G01c 支持范围决定，并须在 R1-G01a 合并后实施。
+- 状态 / Owner / 依赖：In Review；R1-S3F 的 Luna xhigh 桌面发布 owner；依赖 R1-03、已完成的 R1-G01c 支持范围决定与已合入 beta 的 R1-G01a。独立 QA/QC PASS、聚焦测试 `11/11`，待 beta 同一静态合同复核。
 - 用户价值：macOS arm64 候选拥有不可由 Windows 结果替代的 CI 包装证据，并可与同一候选 SHA 对账。
 - 文件边界：独占 `.github/workflows/desktop-release.yml`、`scripts/release/r1-03-static-gate-audit.cjs`、既有 `scripts/release/r1-g01a-release-trigger.test.cjs` 与新增聚焦测试 `scripts/release/r1-g01b-macos-candidate.test.cjs`，复用既有 macOS arm64 脚本。G01a 旧测试只允许将“两 job”反例修正为“额外未授权第四 job”反例，保留严格标签回归；不得修改 beta workflow 或新增 workflow。R1-03 状态与共享计划由根集成人更新。
 
@@ -61,7 +61,7 @@
 R1-03 已建立验证矩阵
   ├─ R1-G01c 支持范围决定（Done，1 点）
   └─ R1-G01a 严格公开标签门（Done，3 点）
-       └─ R1-G01b macOS arm64 候选 CI（Ready，5 点）
+       └─ R1-G01b macOS arm64 候选 CI（In Review，5 点）
 ```
 
 - R1-S3E 只承诺并完成 G01a 3 点。G01b 已解除 G01a 合入 beta 的依赖，但仍须经下一次 Planning 选择；G01c 的范围决定已完成，不重复计入本 Sprint。
@@ -70,4 +70,4 @@ R1-03 已建立验证矩阵
 
 ## 文档与发布记录判断
 
-G01a 改变的是公开发布的内部触发门，尚未产生用户可用的新安装包或应用行为，因此本阶段不更新 README 或 release notes。实际标签、GitHub Actions 运行与安装包验收仍留在后续候选阶段。当前两 job 审计边界服务于 G01a；G01b 增加只读 macOS 候选 job 时必须同步扩展审计与测试。此处没有新增稳定的产品运行时/架构知识，Wiki 暂不更新。
+G01a 改变的是公开发布的内部触发门，尚未产生用户可用的新安装包或应用行为，因此当时不更新 README 或 release notes。G01b 建立的仍是内部候选 CI 合同，尚无可供用户安装的新包，本阶段同样不更新用户发布记录。实际标签、GitHub Actions 运行与安装包验收仍留在后续候选阶段。三 job 的长期发布/候选边界已写入 [桌面版本号与发布标识规则](../wiki/workflows/desktop-release-versioning.md)，不把当次测试清单复制进 Wiki。

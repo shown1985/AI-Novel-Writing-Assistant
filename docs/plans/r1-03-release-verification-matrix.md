@@ -13,7 +13,7 @@
 ## beta 组合验证状态
 
 - R1-S2G beta 组合验证：PASS。权威合并提交为 `eaa8cce8`，双亲 `32b2e9c7` / `21c7642e`，merge tree 一致；shared/server/client build/typecheck PASS，服务端 8 文件 `45/45`、client `3/3`，合计 `48/48`；验证前后工作树均 clean。Computer Use 证据复用既有 Sprint/Story 合同。
-- Release 1 尚未完成。R1-03 当前静态状态为 `PASS=10 / BLOCKED=1 / REVIEW=1`：G01a 的公开发布严格标签门已通过本地静态与 guard 测试，macOS arm64 候选 workflow 仍待 G01b 实现。PO 已决定 Release 1 只支持 Windows x64 与 macOS arm64、不支持 macOS x64，但审计器须在后续 R1-G01 实现卡中消费该口径后才能关闭 `REVIEW`。真实 GitHub Actions 发布证据尚未执行。
+- Release 1 尚未完成。R1-03 当前静态状态为 `PASS=11 / REVIEW=1`：G01a 严格标签门与 G01b macOS arm64 候选 workflow 合同均已通过本地审计及聚焦测试。PO 已决定 Release 1 只支持 Windows x64 与 macOS arm64、不支持 macOS x64，但审计器仍未消费该口径以关闭 `REVIEW`。真实 GitHub Actions、macOS 包装与安装证据尚未执行。
 
 ## 证据类型与判定
 
@@ -46,7 +46,7 @@
 | R1-W02 | NSIS 静默安装、首次启动、健康检查、快捷方式、卸载保留数据、重装和二次启动 | Windows x64 | 包装自动化 + 用户 UI | Windows 候选机：`pnpm verify:desktop:installer`，随后执行 UI 清单 | R1-RC02 / 用户 | 可执行，未运行 | 任一步失败阻断 Windows 候选；测试目录与用户真实数据分离 |
 | R1-M01 | DMG/ZIP、app bundle、arm64 原生模块、Prisma/迁移布局有效 | macOS arm64 | 包装自动化 | `pnpm verify:desktop-package:mac` | R1-RC02 桌面发布 owner | 可执行，R1-S0 未运行 | 失败保留 dist 与架构检查；不签名、不公证、不上传 |
 | R1-M02 | 从 DMG 复制 app，首次启动创建隔离世界，关闭后重开仍可读取 | macOS arm64 | 包装自动化 + 用户 UI | 在 R1-M01 成功后：`pnpm verify:desktop:runtime:mac`，随后执行 UI 清单 | R1-RC02 / 用户 | 可执行，未运行 | 任一步失败阻断 macOS arm64 候选；保留脚本输出的临时数据路径 |
-| R1-G01 | beta 组合验证覆盖迁移与候选包装；公开发布只由与 `desktop/package.json` 完全匹配的 `vX.Y.Z` tag 触发 | Windows x64 / macOS arm64 | CI/发布治理 | 静态盘点：`node scripts/release/r1-03-static-gate-audit.cjs --strict`；G01a 定向 `node --test scripts/release/r1-g01a-release-trigger.test.cjs` | R1-RC02 / 发布 owner | **部分通过**：`PUBLIC-RELEASE-TRIGGER` PASS，严格 guard 及旁路突变 `8/8`；`MACOS-WORKFLOW` BLOCKED，实际 GitHub Actions 与平台候选未执行 | G01b 独立补 macOS arm64 候选 job 并复核审计；R1-03 不运行 publish，不以静态检查替代候选证据 |
+| R1-G01 | beta 组合验证覆盖迁移与候选包装；公开发布只由与 `desktop/package.json` 完全匹配的 `vX.Y.Z` tag 触发 | Windows x64 / macOS arm64 | CI/发布治理 | 静态盘点：`node scripts/release/r1-03-static-gate-audit.cjs --strict`；G01a/G01b 聚焦 `node --test scripts/release/r1-g01a-release-trigger.test.cjs scripts/release/r1-g01b-macos-candidate.test.cjs` | R1-RC02 / 发布 owner | **静态合同通过、候选未验收**：`PUBLIC-RELEASE-TRIGGER` 与 `MACOS-WORKFLOW` PASS，聚焦 `11/11`；`MACOS-X64-SCOPE` REVIEW；实际 GitHub Actions 与平台候选未执行 | 按同一 SHA 留存 Windows/macOS Actions、包装与安装证据；R1-03 不运行 publish，不以静态检查替代候选证据 |
 | R1-A01 | 候选安装包完成开书、十章、中断恢复、质量债、世界/角色更新、导出和重开 | Windows x64 / macOS arm64 | 用户 UI | 下文 UI 清单；每个平台独立签字 | 用户 / PO / R1-RC03 | 用户验收，未执行 | 任一平台失败回到来源 Story；未验收不得写 Release Done |
 | R1-L01 | 授权的真实供应商按固定模型/参数/预算运行 R1-02 指定样本，保存每次 attempt、失败和人工质量记录 | 明确指定的平台 | 真实模型 | 命令与样本由 R1-02/S8-07 owner 提供；需单独授权、预算与测试作品 | PO / 模型验收 owner | 需授权；本 Story 禁止运行 | 未授权只表示“真实模型未验收”；不得用 mock 或历史生成结果冒充，也不得用单次成功替代确定性回归 |
 
@@ -96,7 +96,7 @@
 | 阻断 | 证据 | 影响 | 解锁条件 |
 | --- | --- | --- | --- |
 | 公共 idea→导演准备交接缺少自动化长链 | R1-02 已固定想法与已验收导演产物，但明确不调用公共交接入口和真实资产生成器 | R1-RC03 的来源页 UI 验收与后续公共入口回归 | 用隔离作品验证来源页真实交接；不得把 R1-02 的固定产物证据扩大解释 |
-| 公开工作流仅 Windows | release/beta workflow 只有 `windows-latest`；macOS 验证仅有本地脚本 | macOS 候选组合证据、R1-G01 | 为 macOS arm64 建受控候选 job 或形成同 SHA 的可审计平台证据；不得用 Windows 包装替代 |
+| macOS 候选缺真实运行证据 | 公开 workflow 已有只读 arm64 候选 job，本地静态合同 PASS；尚无同 SHA Actions 成功日志、产物校验或安装证据 | macOS 候选组合证据、R1-G01/R1-RC02 | 在受控候选阶段留存真实 runner 架构、同 SHA 包装/验证日志与产物；不得用 Windows 或静态结果替代 |
 | 静态审计尚未消费 macOS 支持决定 | PO 已冻结 Release 1 为 macOS arm64-only，但现行审计仍无条件输出 `MACOS-X64-SCOPE REVIEW` | R1-G01 关闭判断与候选说明一致性 | R1-G01 实现卡令审计器核对明确的 arm64-only 发布合同；不得为消除 REVIEW 新增 x64 范围 |
 | TXT 用户打开证据未执行 | R1-02 已断言十章顺序、完整标题/正文和 UTF-8 content type，但未在系统编辑器中打开文件 | R1-E02、R1-A01 | 在每个平台从来源页下载并记录文件名、大小、SHA-256 与首尾章人工核对 |
 | 真实模型无授权/预算 | R1-00 将 S8-07 标为 Not Ready，本 Story 禁止真实调用 | 只能声称 mock 回归，不能声称真实模型验收 | 固定模型/参数/样本/预算、测试作品与人工 rubric 获批后单独执行并保留所有 attempt |
@@ -119,7 +119,7 @@ node scripts/release/r1-03-static-gate-audit.cjs --strict
 
 R1-MIG01 已解除视觉资产双迁移历史的静态阻断；严格模式仍因公开发布触发和 macOS 工作流缺口返回 `2`。静态 PASS 只证明兼容保护与 fixture 存在，R1-D01/D02 的行为结论必须来自实际迁移测试。
 
-R1-G01 已完成 [Backlog 拆分](./r1-g01-release-governance-contract.md)：G01a 只关闭公开标签门，G01b 只建立 macOS arm64 候选 CI，G01c 已冻结平台范围。三者均未修改当前门禁事实；不得把 Ready 或 PO 决定写成 workflow 已通过。
+R1-G01 已完成 [Backlog 拆分](./r1-g01-release-governance-contract.md)：G01a 已关闭严格公开标签静态门，G01b 已建立只读 macOS arm64 候选 workflow 静态合同，G01c 已冻结平台范围。三者均不替代真实 Actions、包装、安装与用户验收；不得把静态 PASS 写成 Release 1 已可发布。
 
 ## 文档与发布判断
 
