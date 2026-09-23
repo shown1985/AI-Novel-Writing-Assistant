@@ -3,7 +3,7 @@
 更新时间：2026-09-23
 集成分支：`beta`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S3E 的 `R1-G01a` 已完成 `3/3` 并合入 beta；R1-S3F 仅承诺 `R1-G01b` 5 点，Story In Review、完成 `0/5`，待 beta 集成复核。AI backfill 生产实施卡仍为 Refinement / Not Ready，Release 1 未完成。
+当前状态：R1-S3E 的 `R1-G01a` 已完成 `3/3`；R1-S3F 的 `R1-G01b` 已完成 `5/5` 并合入 beta。AI backfill 生产实施卡仍为 Refinement / Not Ready；真实平台候选与用户验收未完成，Release 1 未完成。
 
 ## 权威文档
 
@@ -313,16 +313,18 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 5. R1-S7：十章长链、有限撤回和导航收束。
 6. R1-RC：桌面升级、备份恢复、包装与用户验收。
 
-## 当前 Sprint：R1-S3F macOS arm64 候选包装 CI 合同
+## 已完成 Sprint：R1-S3F macOS arm64 候选包装 CI 合同
 
 - Sprint Goal：同一候选 SHA 拥有独立的 macOS arm64 只读包装验证链，不触发公开上传。
-- 承诺：仅 `R1-G01b`，5 点、无 Stretch；当前 `0/5`，Story In Review，待 beta 集成复核。[Sprint 合同](./docs/plans/r1-s3f-sprint-commitment.md)与 [Story 合同](./docs/plans/r1-g01-release-governance-contract.md)。
+- 承诺/完成：仅 `R1-G01b`，`5/5` 点、无 Stretch、无 carryover，Story Done。[Sprint 合同](./docs/plans/r1-s3f-sprint-commitment.md)与 [Story 合同](./docs/plans/r1-g01-release-governance-contract.md)。
 - Owner：单一 Luna xhigh 工程师负责桌面 workflow、静态审计器及聚焦测试；根 PM 独占共享计划/矩阵/发布记录与 beta 集成；Terra medium Scrum Master、QA/QC 独立验收。
 - 验收：`MACOS-WORKFLOW` 静态 finding PASS 且 `PUBLIC-RELEASE-TRIGGER` 保持 PASS；macOS job 固定 arm64 runner、同 SHA、迁移及包装验证，只读无发布副作用。真实 Actions、平台包装与 UI 留在 RC 验收。
 - 非范围：不创建/推送标签，不上传、签名或公证；不接 macOS x64、AI backfill 生产卡或 Release 2。
 - 独立 QA/QC：同 SHA 默认 checkout、完整标签 guard、arm64 运行断言、迁移与 DMG/ZIP 包装验证链、无发布副作用及 G01a 回归均 PASS；聚焦测试 `11/11`。静态审计 `PASS=11 / REVIEW=1`、严格模式退出 `0`；真实 Actions 与安装验收未执行。
+- beta 集成：`32d34dfb` 快进合入；在 beta 复跑语法、两组聚焦 `11/11` 与严格审计，finding 保持 `PASS=11 / REVIEW=1`，工作树干净。UI 验收不适用；未创建标签、运行真实 Actions、打包或上传。
+- Review/Retrospective：Sprint Goal 在静态 workflow 合同范围内达成，`5/5`、无 carryover；独立 QA/QC 未退回。保留下一次候选验收的单一改进：必须按同一 SHA 留存真实 runner 架构、Windows/macOS 包装及安装证据，不能从静态 PASS 推断平台成功。
 
-R1-RC 独立 Refinement：[R1-G01 发布治理拆分合同](./docs/plans/r1-g01-release-governance-contract.md)已冻结。`R1-G01a` 3 点已 Done 并合入 beta，`R1-G01b` macOS arm64 候选 CI 5 点处于当前 R1-S3F In Review，`R1-G01c` 1 点 PO 决定已 Done。Release 1 只支持 Windows x64 与 macOS arm64，不支持 macOS x64。当前静态门为 `PASS=11 / REVIEW=1`，不代表真实平台候选或 Release 1 已通过。
+R1-RC 独立 Refinement：[R1-G01 发布治理拆分合同](./docs/plans/r1-g01-release-governance-contract.md)已冻结。`R1-G01a` 3 点、`R1-G01b` 5 点均 Done 并合入 beta，`R1-G01c` 1 点 PO 决定已 Done。Release 1 只支持 Windows x64 与 macOS arm64，不支持 macOS x64。当前静态门为 `PASS=11 / REVIEW=1`，不代表真实平台候选或 Release 1 已通过。
 
 ## 强制敏捷门
 

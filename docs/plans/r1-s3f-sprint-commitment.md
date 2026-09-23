@@ -6,7 +6,7 @@
 
 - Release / Epic：Release 1 / R1-RC 桌面发布候选。
 - 基线：`beta@ab411deb`；R1-S3E 已完成 `3/3`，G01a 严格标签门在 beta 的本地静态与 guard 测试通过，`MACOS-WORKFLOW` 仍 BLOCKED。
-- 承诺：仅 [R1-G01b macOS arm64 候选包装 CI 证据](./r1-g01-release-governance-contract.md)，5 点；Stretch：无。Story In Review，完成 `0/5`，待 beta 集成复核。
+- 承诺/完成：仅 [R1-G01b macOS arm64 候选包装 CI 证据](./r1-g01-release-governance-contract.md)，`5/5` 点；Stretch：无，Story Done。
 - 容量：5 点。S3-02b3a～e 生产卡仍在 Refinement / Not Ready，不进入本 Sprint。
 
 ## Owner 与文件边界
@@ -32,4 +32,8 @@
 
 ## Review 与 Retrospective 出口
 
-完成时记录 Sprint Goal 结果、承诺/完成点数、carryover、QA/QC 退回原因与最多两项流程改进。G01b Done 只关闭 macOS workflow 静态合同；R1-RC 候选 SHA 的实际 Actions 日志、平台包装和 UI 仍须独立验收。
+Sprint Goal 在静态 workflow 合同范围内达成；承诺/完成 `5/5`，carryover `0`。Terra QA/QC 独立 PASS、无退回；同 SHA 默认 checkout、arm64 runner 断言、迁移与 DMG/ZIP 包装链、只读无发布副作用及 G01a 标签门回归均经聚焦 `11/11` 验证。`32d34dfb` 快进 beta 后复跑语法、聚焦测试与严格审计均 PASS，静态摘要 `PASS=11 / REVIEW=1`。
+
+- UI 验收：不适用；本 Story 没有产品 UI 改动。真实 GitHub Actions、平台包装、DMG 安装、签名、公证和公开上传未执行，不得称为发布候选验收。
+- Retrospective 改进：后续 R1-RC 候选按同一 SHA 留存 runner 架构、两平台包装和安装日志；静态检查只作为进入候选的前置证据。
+- 退出门：G01b Done 只关闭 macOS workflow 静态 finding；平台包装、用户 UI、范围 REVIEW 与 RC 候选仍有各自验收门。

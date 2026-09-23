@@ -4,7 +4,7 @@
 
 - Release / Epic：Release 1 / R1-RC 桌面发布候选。
 - 父项：`R1-G01` beta 组合验证与公开发布治理；父项不重复计点，也不作为一张混合实现卡进入 Sprint。
-- 当前状态：Refinement 已完成；`R1-G01a` 已在 R1-S3E Done 并合入 beta；`R1-G01b` 满足 DoR 并进入 R1-S3F，当前 In Review、待 beta 集成复核；`R1-G01c` 为 PO 范围决定且已完成。
+- 当前状态：Refinement 已完成；`R1-G01a` 已在 R1-S3E Done 并合入 beta；`R1-G01b` 已在 R1-S3F Done 并合入 beta；`R1-G01c` 为 PO 范围决定且已完成。三项均不代表 Release 1 已可发布。
 - PO 支持决定：Release 1 桌面候选只覆盖 **Windows x64 与 macOS arm64**。macOS x64 不属于 Release 1 支持范围，不新增 builder target、原生模块、runtime 或 UI 验收。
 - 当前静态发布门为 `PASS=11 / REVIEW=1`：`PUBLIC-RELEASE-TRIGGER` 与 `MACOS-WORKFLOW` 已 PASS，arm64-only 范围提示仍 REVIEW。静态合同不等于实际 GitHub Actions 运行、包装或安装证据。
 
@@ -30,7 +30,7 @@
 
 ## R1-G01b macOS arm64 候选包装 CI 证据（5 点）
 
-- 状态 / Owner / 依赖：In Review；R1-S3F 的 Luna xhigh 桌面发布 owner；依赖 R1-03、已完成的 R1-G01c 支持范围决定与已合入 beta 的 R1-G01a。独立 QA/QC PASS、聚焦测试 `11/11`，待 beta 同一静态合同复核。
+- 状态 / Owner / 依赖：Done；R1-S3F 的 Luna xhigh 桌面发布 owner；依赖 R1-03、已完成的 R1-G01c 支持范围决定与已合入 beta 的 R1-G01a。独立 QA/QC PASS、聚焦测试 `11/11`，`32d34dfb` 合入 beta 后同一静态合同复核通过；真实 Actions、包装与安装验收仍属后续 RC。
 - 用户价值：macOS arm64 候选拥有不可由 Windows 结果替代的 CI 包装证据，并可与同一候选 SHA 对账。
 - 文件边界：独占 `.github/workflows/desktop-release.yml`、`scripts/release/r1-03-static-gate-audit.cjs`、既有 `scripts/release/r1-g01a-release-trigger.test.cjs` 与新增聚焦测试 `scripts/release/r1-g01b-macos-candidate.test.cjs`，复用既有 macOS arm64 脚本。G01a 旧测试只允许将“两 job”反例修正为“额外未授权第四 job”反例，保留严格标签回归；不得修改 beta workflow 或新增 workflow。R1-03 状态与共享计划由根集成人更新。
 
@@ -61,10 +61,10 @@
 R1-03 已建立验证矩阵
   ├─ R1-G01c 支持范围决定（Done，1 点）
   └─ R1-G01a 严格公开标签门（Done，3 点）
-       └─ R1-G01b macOS arm64 候选 CI（In Review，5 点）
+       └─ R1-G01b macOS arm64 候选 CI（Done，5 点）
 ```
 
-- R1-S3E 只承诺并完成 G01a 3 点。G01b 已解除 G01a 合入 beta 的依赖，但仍须经下一次 Planning 选择；G01c 的范围决定已完成，不重复计入本 Sprint。
+- R1-S3E 只承诺并完成 G01a 3 点；R1-S3F 只承诺并完成 G01b 5 点。G01c 的范围决定已完成，不重复计入两个 Sprint。
 - 一个 Agent 同时只持有一张 Story；两个实现卡都编辑同一 workflow 与静态审计器，必须先完成 G01a 再开始 G01b，不能并发覆盖。
 - 任一卡完成都不能单独宣称 Release 1 可发布。包装运行、平台 UI、备份恢复、整本主链与 beta→main 晋级仍受 R1-RC01～04 和 R1-03 的独立门约束。
 
