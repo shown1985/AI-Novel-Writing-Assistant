@@ -4,7 +4,7 @@
 
 - Release / Epic：Release 1 / R1-RC 桌面发布候选。
 - 父项：`R1-G01` beta 组合验证与公开发布治理；父项不重复计点，也不作为一张混合实现卡进入 Sprint。
-- 当前状态：Refinement 已完成；`R1-G01a` 与 `R1-G01b` 满足 DoR、保持 Ready，尚未进入当前 R1-S3D；`R1-G01c` 为 PO 范围决定且已完成。
+- 当前状态：Refinement 已完成；`R1-G01a` 满足 DoR 并进入 R1-S3E，当前 Ready；`R1-G01b` 满足 DoR、保持 Ready，须等待 G01a 合入 beta 后经后续 Planning；`R1-G01c` 为 PO 范围决定且已完成。
 - PO 支持决定：Release 1 桌面候选只覆盖 **Windows x64 与 macOS arm64**。macOS x64 不属于 Release 1 支持范围，不新增 builder target、原生模块、runtime 或 UI 验收。
 - 当前发布门事实仍为 `PASS=9 / BLOCKED=2 / REVIEW=1`。本合同不修改 workflow 或审计器，不能把范围决定冒充公开触发门或 macOS CI 已通过。
 
@@ -12,9 +12,9 @@
 
 ## R1-G01a 公开 Release 严格标签发布门（3 点）
 
-- 状态 / Owner / 依赖：Ready；发布 workflow owner；依赖 R1-03 与既有桌面版本/标签规则。
+- 状态 / Owner / 依赖：Ready；优先级 P0；当前 R1-S3E 的 Luna xhigh 发布 workflow owner；依赖 R1-03 与既有桌面版本/标签规则。
 - 用户价值：只有与桌面版本完全一致的正式标签才能进入公开发布，手动验证或旧标签不会误上传安装包。
-- 文件边界：独占 `.github/workflows/desktop-release.yml` 与 `scripts/release/r1-03-static-gate-audit.cjs`；不得新增其他 workflow，不得改 `desktop/package.json`、builder、签名逻辑或发布脚本。
+- 文件边界：独占 `.github/workflows/desktop-release.yml`、`scripts/release/r1-03-static-gate-audit.cjs` 与聚焦测试 `scripts/release/r1-g01a-release-trigger.test.cjs`；不得新增其他 workflow，不得改 `desktop/package.json`、builder、签名逻辑或发布脚本。R1-03 与 R1-RC02 的历史 owner 不占用这三个文件，当前 Story 只有这一名实现 owner。
 
 ### 验收条件
 
@@ -25,7 +25,7 @@
 
 ### 最窄验证与非范围
 
-- 验证：`node --check scripts/release/r1-03-static-gate-audit.cjs`；workflow 定向断言；`node scripts/release/r1-03-static-gate-audit.cjs --strict`。若另一项 macOS workflow 阻断仍存在，必须按 finding ID 证明本卡只关闭 `PUBLIC-RELEASE-TRIGGER`，不能要求整条严格命令退出 0。
+- 验证：`node --check scripts/release/r1-03-static-gate-audit.cjs`；`node --test scripts/release/r1-g01a-release-trigger.test.cjs` 定向断言实际 guard 与 workflow 接线，至少覆盖匹配 `v${desktop.package.version}`、版本不符的严格标签、`desktop-v*`、手动触发及 `v1.2.3-rc1`；再运行 `node scripts/release/r1-03-static-gate-audit.cjs --strict`。若另一项 macOS workflow 阻断仍存在，必须按 finding ID 证明本卡只关闭 `PUBLIC-RELEASE-TRIGGER`，不能要求整条严格命令退出 0。
 - 非范围：版本 bump、公开上传实操、签名、公证、beta 发布语义、macOS 候选 job、macOS x64。
 
 ## R1-G01b macOS arm64 候选包装 CI 证据（5 点）
@@ -64,7 +64,7 @@ R1-03 已建立验证矩阵
        └─ R1-G01b macOS arm64 候选 CI（Ready，5 点）
 ```
 
-- 当前 R1-S3D 仍只承诺 `S3-02b3s` 2 点。三张 G01 子卡均不换入当前 Sprint；G01a/G01b 只能经后续 Planning 选择。
+- 当前 R1-S3E 只承诺 G01a 3 点。G01b 必须等 G01a 合入 beta 后再经 Planning 选择；G01c 的范围决定已完成，不重复计入本 Sprint。
 - 一个 Agent 同时只持有一张 Story；两个实现卡都编辑同一 workflow 与静态审计器，必须先完成 G01a 再开始 G01b，不能并发覆盖。
 - 任一卡完成都不能单独宣称 Release 1 可发布。包装运行、平台 UI、备份恢复、整本主链与 beta→main 晋级仍受 R1-RC01～04 和 R1-03 的独立门约束。
 

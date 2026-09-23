@@ -1,9 +1,9 @@
 # 当前项目看板：Release 1 单机成书版
 
-更新时间：2026-09-22
+更新时间：2026-09-23
 集成分支：`beta`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S3D 的 `S3-02b3s` Spike 已完成 `2/2`；后续生产实施卡仍为 Refinement / Not Ready，下一 Sprint 尚未承诺。Release 1 未完成。
+当前状态：R1-S3D 的 `S3-02b3s` Spike 已完成 `2/2`；R1-S3E 仅承诺 `R1-G01a` 3 点，Story Ready、完成 `0/3`。AI backfill 生产实施卡仍为 Refinement / Not Ready，Release 1 未完成。
 
 ## 权威文档
 
@@ -293,6 +293,14 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 - 非范围：不实现生产 backfill、store/schema/migration、来源页新状态；不改单区块生成、手动 PUT、同步、评估、Prompt 内容/模型路由、任务中心或 Release 2。
 - 验收：隔离 SQLite/mock seam proof 的 5 项场景经 Terra QA/QC 独立重跑通过；根 PM 在 2026-09-23 复跑 `5/5`，当前隔离证据位于 `/tmp/ai-novel-s3-02b3s-ln5wNF/`。稳定恢复边界已同步世界维护 Wiki；UI 验收不适用。生产 `/backfill` 仍无该保证。
 
+## 当前 Sprint：R1-S3E 桌面公开发布标签门
+
+- Sprint Goal：只有版本匹配的严格 `vX.Y.Z` push tag 可进入公开桌面上传。
+- 承诺：仅 `R1-G01a`，3 点、无 Stretch；当前 `0/3`，Story Ready。[Sprint 合同](./docs/plans/r1-s3e-sprint-commitment.md)与 [Story 合同](./docs/plans/r1-g01-release-governance-contract.md)。
+- Owner：单一 Luna xhigh 工程师负责 desktop release workflow 与静态审计器；根 PM 独占共享计划/矩阵/发布记录并负责 beta 集成；Terra medium Scrum Master、QA/QC 独立验收。
+- 验收：严格标签与桌面版本相等才可上传；旧标签、手动和非严格标签均不能上传。静态 `PUBLIC-RELEASE-TRIGGER` 必须 PASS；macOS workflow 的剩余阻断属于 G01b，不在本卡。
+- 非范围：不创建/推送标签，不运行包装/上传；不接 G01b、macOS x64、beta 发布语义或 AI backfill 生产卡。
+
 ## Release 1 后续队列
 
 1. R1-S1：配置、诊断、阅读恢复和世界归属安全（已完成，15/15 点）。
@@ -302,7 +310,7 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 5. R1-S7：十章长链、有限撤回和导航收束。
 6. R1-RC：桌面升级、备份恢复、包装与用户验收。
 
-R1-RC 独立 Refinement（未进入已完成的 R1-S3D）：[R1-G01 发布治理拆分合同](./docs/plans/r1-g01-release-governance-contract.md)已冻结。`R1-G01a` 严格公开标签门 3 点与 `R1-G01b` macOS arm64 候选 CI 5 点为 Ready；`R1-G01c` 1 点 PO 决定已 Done，Release 1 只支持 Windows x64 与 macOS arm64，不支持 macOS x64。两张实现卡须经后续 Sprint Planning 才能开始，当前静态门仍为 `PASS=9 / BLOCKED=2 / REVIEW=1`。
+R1-RC 独立 Refinement：[R1-G01 发布治理拆分合同](./docs/plans/r1-g01-release-governance-contract.md)已冻结。`R1-G01a` 3 点进入当前 R1-S3E，`R1-G01b` macOS arm64 候选 CI 5 点仍为 Ready，`R1-G01c` 1 点 PO 决定已 Done。Release 1 只支持 Windows x64 与 macOS arm64，不支持 macOS x64。G01b 须待 G01a 合入 beta 后经后续 Sprint Planning 才能开始；当前静态门仍为 `PASS=9 / BLOCKED=2 / REVIEW=1`。
 
 ## 强制敏捷门
 
