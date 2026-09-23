@@ -86,6 +86,16 @@ R1-S2G 的首批生产接线只覆盖 `WorldService.updateWorld` 的既有 HTTP/
 
 `structure-saved` 快照不属于 CAS 事务：只在首次 committed 后尝试，失败时内容与 receipt 仍成功，来源页说明历史快照未完成；重放既不补建也不声称快照存在。响应中的 `created`、`failed`、`unknown` 只表明这次调用可证明的快照状态，不能据此推断全局快照历史。RAG 失败继续作为资料债处理，不回滚已保存内容。
 
+### AI 结构补全的生成事实与费用边界
+
+手动结构 PUT 的 operation/receipt 只能证明内容提交，不能证明 AI 已调用或找回生成结果。当前 `POST /worlds/:id/structure/backfill` 仍是模型输出后直接更新 `World` 的旧路径，尚未接入以下合同；不能把隔离原型或通用模型 attempt 记录解释为生产幂等保证。后续生产接线须以 [S3-02b3s Spike 决策](../../plans/s3-02b3s-structure-backfill-idempotency-spike.md) 和独立实施卡验收。
+
+一次 AI 补全意图由来源页生成稳定 `operationId`，请求身份绑定世界、基线 `contentRevision`、来源内容 digest、Prompt ID/版本、有效 provider/model 与生成策略版本；相同 operation 搭配不同意图必须在模型调用与世界写入前拒绝。只有持久化 claim 的唯一 owner 能在供应商调用前推进 `model_not_called → model_in_flight`。从进入 `model_in_flight` 起，进程重启、超时和 lease 到期都不能证明供应商未调用；未知结果进入 `model_unknown`，同一 operation 禁止自动再次发起付费调用。这里限制的是本系统对同一 operation 的发起次数，不承诺第三方 exactly-once 计费。
+
+模型成功后的归一化结构必须先以独立 result record 持久化，并绑定原 request hash 与基线 revision；通用 attempt 只记录调用证据，不能当作 result store。提交时以该基线 revision 做 CAS，首次成功在同一事务内写世界内容、兼容投影、新 revision、operation 与 commit receipt。生成期间作者修改了世界时，旧结果保留为未保存候选，世界内容零覆盖；不得自动套用到最新 revision。receipt 证明“已保存”，result record 才能找回“生成了什么”。提交后 HTTP 响应丢失先按 operation 读回两种事实，不重新调用模型或再次提交。
+
+来源页须区分生成中、已生成但未保存、已保存、冲突保留和模型状态待确认；未知调用、冲突或确定失败后的新生成只能由作者显式创建新 operation。运行记录仍只读。快照与 RAG 属提交后的派生结果，失败不应把已保存世界误报为未保存，也不能把索引或快照记录当作生成结果仓库。SQLite/PostgreSQL 的最小 owned store 与迁移由后续实施卡负责，不能因这段设计规则而声称当前 backfill 已完成保护。
+
 本机 SQLite runtime migration 是安全提交可运行的必要条件；PostgreSQL apply 属 Release gate，在发布组合验证时单独执行，不把发布环境尚未 apply 混同为本地提交合同失败。两套 schema 仍须保持可验证的一致性，且任何迁移演练都只使用隔离数据库。
 
 引用校验必须发生在任何会丢弃无效引用的 normalization 之前。分区同步若会破坏跨分区引用，应返回最小依赖分区供作者重新确认，不能自动扩大用户选择，也不能把过滤后的结构当作修复成功。
@@ -136,6 +146,7 @@ UI 不自行判断 proposal 是否仍可提交，也不把本地 pending 当作�
 - 把 `updatedAt`、`syncBaseVersion` 或 Story Slice 构建时间当作内容版本。
 - 在 request handler 中直接跑完整 AI 链，或用 `void Promise` 假装可恢复后台执行。
 - 响应超时后生成新 operationId 再提交，导致同一 patch 重复应用。
+- AI 结构补全把模型 attempt 或提交 receipt 当作可恢复生成结果，或在 `model_in_flight` lease 到期后自动再次调用模型。
 - 先 normalization 过滤悬空关系，再把结果保存为“修复成功”。
 - AI 复核失败时回滚已提交内容，或把局部世界风险升级成整本导演失败。
 - 在运行记录加入继续、采用、拒绝、撤销等任务写操作。

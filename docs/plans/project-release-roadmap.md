@@ -79,13 +79,13 @@ R1-S2H 承诺并完成 [S2-04c1 实况模型来源只读显示](./s2-04c1-live-m
 
 本窗口仅承诺并完成 [S3-02b2 世界手册手动结构保存 CAS](./s3-02b2-world-structure-cas-contract.md) `5/5` 点、无 Stretch；[限时 Spike](./s3-02b2s-structure-save-feasibility-spike.md)、独立 DoR、代码级 QA/QC、`beta@d7df4af2` 组合验证与隔离 Chrome 来源页验收均通过。实际 UI 覆盖两视图成功保存、刷新持久化、409/未知结果草稿保留、显式重读和快照失败提示。实施仅限手动 `PUT /structure` 及两个既有编辑视图，AI backfill、其他世界旧入口和同步均不在本窗口。Review/Retrospective 见 [R1-S3C Sprint 承诺](./r1-s3c-sprint-commitment.md)；本窗口完成不代表 Release 1 完成。
 
-### R1-S3D 当前窗口
+### R1-S3D 已完成窗口
 
-本窗口仅承诺 [S3-02b3s AI 结构补全幂等与费用边界 Spike](./s3-02b3s-structure-backfill-idempotency-spike.md) `2` 点、无 Stretch，基线为 `beta@88e0e00d`。目标只冻结模型调用前 durable claim、生成结果与世界 revision/CAS 的绑定、响应丢失恢复和最小持久状态决定，并用 mock 模型与隔离 SQLite seam proof 验证；不实现生产 backfill、schema/migration 或来源页新状态。S3-02b3 及 S3-03b～06 继续保持 Refinement / Not Ready。退出门、角色和文件边界见 [R1-S3D Sprint 承诺](./r1-s3d-sprint-commitment.md)。
+本窗口仅承诺并完成 [S3-02b3s AI 结构补全幂等与费用边界 Spike](./s3-02b3s-structure-backfill-idempotency-spike.md) `2/2` 点、无 Stretch，基线为 `beta@88e0e00d`。模型调用前 durable claim、生成结果与世界 revision/CAS 的绑定、响应丢失及未知调用恢复合同已冻结；mock 模型与隔离 SQLite seam proof 经 Terra QA/QC 独立通过。没有实现生产 backfill、schema/migration 或来源页新状态。S3-02b3a～e 及 S3-03b～06 继续保持 Refinement / Not Ready；Review/Retrospective 见 [R1-S3D Sprint 承诺](./r1-s3d-sprint-commitment.md)。
 
 ### R1-G01 发布治理 Backlog Refinement
 
-[R1-G01 拆分合同](./r1-g01-release-governance-contract.md)已把混合父项拆成 `R1-G01a` 严格公开标签门 3 点、`R1-G01b` macOS arm64 候选 CI 5 点和 `R1-G01c` 支持范围决定 1 点。PO 已完成 G01c：Release 1 只支持 Windows x64 与 macOS arm64，不支持 macOS x64。G01a/G01b Ready 但未进入当前 R1-S3D；当前静态门仍为 `PASS=9 / BLOCKED=2 / REVIEW=1`，拆卡不代表 workflow、包装或发布缺口已经关闭。
+[R1-G01 拆分合同](./r1-g01-release-governance-contract.md)已把混合父项拆成 `R1-G01a` 严格公开标签门 3 点、`R1-G01b` macOS arm64 候选 CI 5 点和 `R1-G01c` 支持范围决定 1 点。PO 已完成 G01c：Release 1 只支持 Windows x64 与 macOS arm64，不支持 macOS x64。G01a/G01b Ready，但未进入已完成的 R1-S3D，仍待后续 Planning；当前静态门仍为 `PASS=9 / BLOCKED=2 / REVIEW=1`，拆卡不代表 workflow、包装或发布缺口已经关闭。
 
 ### R1-S0 新增 Story
 

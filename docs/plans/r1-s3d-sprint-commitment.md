@@ -6,7 +6,7 @@
 
 - Release / Epic：Release 1 / S3 可信世界。
 - 基线：`beta@88e0e00d`；R1-S3C 已完成 `5/5`，S3-02a、S3-02b1、S3-02b2 均 Done。
-- 承诺：仅 [S3-02b3s AI 结构补全幂等与费用边界 Spike](./s3-02b3s-structure-backfill-idempotency-spike.md)，2 点；Stretch：无。当前状态：Active，Story Ready；完成 `0/2`。
+- 承诺：仅 [S3-02b3s AI 结构补全幂等与费用边界 Spike](./s3-02b3s-structure-backfill-idempotency-spike.md)，2 点；Stretch：无。当前状态：Story Done；完成 `2/2`。
 - 容量：2 点。Spike 产出决策与证据，不冒充生产能力；S3-02b3 实施卡保持 Refinement / Not Ready。
 
 ## 角色、Owner 与文件边界
@@ -36,4 +36,9 @@
 
 ## Review 与 Retrospective 出口
 
-完成时记录：Sprint Goal 是否达成、承诺/完成点数、carryover 原因、Spike 对后续 Story 数量和点数的结论、发现的错误假设，以及最多两项流程改进。未通过独立 QA/QC 或缺少隔离 seam proof 时不得标 Done。
+Sprint Goal 达成：真实 backfill 的模型调用、内存结果、直接世界写入、快照/RAG 与响应时序已对账；拟议 durable claim/result、基线 revision CAS、未知调用和响应丢失恢复状态已冻结。隔离 SQLite/mock seam proof 的五个场景由 Terra QA/QC 独立重跑 `5/5` PASS；其 2026-09-22 临时目录已被系统清理。根 PM 于 2026-09-23 用同一固定命令复跑 `5/5` PASS，当前证据根为 `/tmp/ai-novel-s3-02b3s-ln5wNF/`；`git diff --check` 与 docs manifest PASS。当前生产 `/backfill` 不具备上述保证，不将原型误报为上线能力；UI 验收不适用。稳定运行合同已写入世界维护恢复 Wiki。
+
+- 承诺/完成：`2/2` 点；carryover `0`；无 Stretch、无生产代码、schema/migration、API/UI 或真实模型调用。
+- 后续结论：S3-02b3 生产父项拆为 a～e 五张候选（`5/5/3/3/3` 点），均保持 Refinement / Not Ready；须逐张补齐独立 DoR 并经后续 Sprint Planning，不自动换入。
+- 错误假设：通用模型 attempt 不能找回归一化输出，手动提交 receipt 不能证明模型调用；`version` 自增不是 `contentRevision` CAS，lease 到期也不能证明供应商未调用。
+- 返工与改进：QA 退回缺失的 Wiki 长期合同，QC 退回同连接“恢复”假阳性；两项均在 Done 前关闭。后续 Spike 在 DoR 先列清持久事实和状态转移，并要求重启/恢复类 proof 使用新连接及保留隔离证据，避免只看同进程返回值。
