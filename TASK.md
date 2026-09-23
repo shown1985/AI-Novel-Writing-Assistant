@@ -3,7 +3,7 @@
 更新时间：2026-09-23
 集成分支：`beta`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S3E 的 `R1-G01a` 已完成 `3/3` 并合入 beta；`R1-G01b` 仍为 Ready，AI backfill 生产实施卡仍为 Refinement / Not Ready。Release 1 未完成。
+当前状态：R1-S3E 的 `R1-G01a` 已完成 `3/3` 并合入 beta；R1-S3F 仅承诺 Ready 的 `R1-G01b` 5 点，尚未开始实现。AI backfill 生产实施卡仍为 Refinement / Not Ready，Release 1 未完成。
 
 ## 权威文档
 
@@ -313,7 +313,15 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 5. R1-S7：十章长链、有限撤回和导航收束。
 6. R1-RC：桌面升级、备份恢复、包装与用户验收。
 
-R1-RC 独立 Refinement：[R1-G01 发布治理拆分合同](./docs/plans/r1-g01-release-governance-contract.md)已冻结。`R1-G01a` 3 点进入当前 R1-S3E，`R1-G01b` macOS arm64 候选 CI 5 点仍为 Ready，`R1-G01c` 1 点 PO 决定已 Done。Release 1 只支持 Windows x64 与 macOS arm64，不支持 macOS x64。G01b 须待 G01a 合入 beta 后经后续 Sprint Planning 才能开始；当前静态门为 `PASS=10 / BLOCKED=1 / REVIEW=1`，未通过完整 Release gate。
+## 当前 Sprint：R1-S3F macOS arm64 候选包装 CI 合同
+
+- Sprint Goal：同一候选 SHA 拥有独立的 macOS arm64 只读包装验证链，不触发公开上传。
+- 承诺：仅 `R1-G01b`，5 点、无 Stretch；当前 `0/5`，Story Ready。[Sprint 合同](./docs/plans/r1-s3f-sprint-commitment.md)与 [Story 合同](./docs/plans/r1-g01-release-governance-contract.md)。
+- Owner：单一 Luna xhigh 工程师负责桌面 workflow、静态审计器及聚焦测试；根 PM 独占共享计划/矩阵/发布记录与 beta 集成；Terra medium Scrum Master、QA/QC 独立验收。
+- 验收：`MACOS-WORKFLOW` 静态 finding PASS 且 `PUBLIC-RELEASE-TRIGGER` 保持 PASS；macOS job 固定 arm64 runner、同 SHA、迁移及包装验证，只读无发布副作用。真实 Actions、平台包装与 UI 留在 RC 验收。
+- 非范围：不创建/推送标签，不上传、签名或公证；不接 macOS x64、AI backfill 生产卡或 Release 2。
+
+R1-RC 独立 Refinement：[R1-G01 发布治理拆分合同](./docs/plans/r1-g01-release-governance-contract.md)已冻结。`R1-G01a` 3 点已 Done 并合入 beta，`R1-G01b` macOS arm64 候选 CI 5 点进入当前 R1-S3F，`R1-G01c` 1 点 PO 决定已 Done。Release 1 只支持 Windows x64 与 macOS arm64，不支持 macOS x64。当前静态门为 `PASS=10 / BLOCKED=1 / REVIEW=1`，未通过完整 Release gate。
 
 ## 强制敏捷门
 

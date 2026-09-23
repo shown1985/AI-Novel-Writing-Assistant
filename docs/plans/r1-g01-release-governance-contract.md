@@ -32,19 +32,19 @@
 
 - 状态 / Owner / 依赖：Ready；R1-RC02 桌面发布 owner；依赖 R1-03、已完成的 R1-G01c 支持范围决定，并须在 R1-G01a 合并后实施。
 - 用户价值：macOS arm64 候选拥有不可由 Windows 结果替代的 CI 包装证据，并可与同一候选 SHA 对账。
-- 文件边界：独占 `.github/workflows/desktop-release.yml` 与 `scripts/release/r1-03-static-gate-audit.cjs`，复用既有 macOS arm64 脚本；不得修改 beta workflow 或新增 workflow。R1-03 状态与共享计划由根集成人更新。
+- 文件边界：独占 `.github/workflows/desktop-release.yml`、`scripts/release/r1-03-static-gate-audit.cjs`、既有 `scripts/release/r1-g01a-release-trigger.test.cjs` 与新增聚焦测试 `scripts/release/r1-g01b-macos-candidate.test.cjs`，复用既有 macOS arm64 脚本。G01a 旧测试只允许将“两 job”反例修正为“额外未授权第四 job”反例，保留严格标签回归；不得修改 beta workflow 或新增 workflow。R1-03 状态与共享计划由根集成人更新。
 
 ### 验收条件
 
-1. 增加受控的 macOS arm64 候选 job，固定 `macos-*` runner，对与 Windows 候选相同的 SHA 执行迁移检查及 `verify:desktop-package:mac` 所需链路。
+1. 增加受控的 macOS arm64 候选 job，固定 `macos-15` runner、默认同 SHA checkout（不覆盖 `ref`/`repository`），`needs: validate-release` 且完整 `if` 要求合法标签输出、push 与 tag；增加 `uname -m = arm64` 运行断言。对与 Windows 候选相同的事件 SHA 执行迁移检查及 `dist:desktop:mac:reuse-stage`、`verify:desktop-package:mac:reuse-stage`。`macos-15` arm64 标签以 [GitHub 官方 runner 参考](https://docs.github.com/en/actions/reference/runners/github-hosted-runners) 为准，实际架构仍须从后续运行日志核对。
 2. job 明确使用 arm64 产物和原生模块检查，不以 Windows 产物替代，也不声称覆盖 macOS x64。
 3. macOS 候选 job 不调用任何 `publish:desktop:*`、GitHub Release 更新、签名或公证步骤；产物只作为候选验证证据。
-4. 静态审计验证 runner、arm64 包装命令、同 SHA 候选边界和无 publish 合同；严格模式不再因 `MACOS-WORKFLOW` 返回 `BLOCKED`。
+4. 静态审计验证 runner、完整 guard、默认同 SHA checkout、运行时 arm64 断言、迁移/arm64 包装命令和无 publish 合同；G01a 的 job 白名单扩为精确三 job，第四 job 仍拒绝，Windows 发布仍是唯一写权限与唯一发布副作用 owner。严格模式不再因 `MACOS-WORKFLOW` 返回 `BLOCKED`。
 5. 静态检查只证明 workflow 合同。实际 macOS workflow 成功记录必须在 R1-RC 候选阶段按该 SHA 留证，不能由本卡的文本检查替代。
 
 ### 最窄验证与非范围
 
-- 验证：`node --check scripts/release/r1-03-static-gate-audit.cjs`；workflow 定向断言；`node scripts/release/r1-03-static-gate-audit.cjs --strict`。若 G01a 尚未完成，按 finding ID 证明本卡只关闭 `MACOS-WORKFLOW`。
+- 验证：`node --check scripts/release/r1-03-static-gate-audit.cjs`；`node --test scripts/release/r1-g01a-release-trigger.test.cjs scripts/release/r1-g01b-macos-candidate.test.cjs`，对真实 workflow 和缺 runner/迁移/arm64/guard、checkout 改 ref、第四 job、写权限/发布副作用突变定向断言；`node scripts/release/r1-03-static-gate-audit.cjs --strict`。按 finding ID 证明本卡关闭 `MACOS-WORKFLOW` 且保持 `PUBLIC-RELEASE-TRIGGER` PASS。
 - 非范围：DMG/ZIP 公开上传、签名、公证、macOS x64、真实用户安装验收、业务 runtime/UI 修改。
 
 ## R1-G01c Release 1 macOS 支持范围冻结（1 点）
