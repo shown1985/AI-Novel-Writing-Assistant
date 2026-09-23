@@ -3,7 +3,7 @@
 更新时间：2026-09-23
 集成分支：`beta`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S3D 的 `S3-02b3s` Spike 已完成 `2/2`；R1-S3E 仅承诺 `R1-G01a` 3 点，Story In Review、完成 `0/3`，等待 beta 集成复核。AI backfill 生产实施卡仍为 Refinement / Not Ready，Release 1 未完成。
+当前状态：R1-S3E 的 `R1-G01a` 已完成 `3/3` 并合入 beta；`R1-G01b` 仍为 Ready，AI backfill 生产实施卡仍为 Refinement / Not Ready。Release 1 未完成。
 
 ## 权威文档
 
@@ -293,14 +293,16 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 - 非范围：不实现生产 backfill、store/schema/migration、来源页新状态；不改单区块生成、手动 PUT、同步、评估、Prompt 内容/模型路由、任务中心或 Release 2。
 - 验收：隔离 SQLite/mock seam proof 的 5 项场景经 Terra QA/QC 独立重跑通过；根 PM 在 2026-09-23 复跑 `5/5`，当前隔离证据位于 `/tmp/ai-novel-s3-02b3s-ln5wNF/`。稳定恢复边界已同步世界维护 Wiki；UI 验收不适用。生产 `/backfill` 仍无该保证。
 
-## 当前 Sprint：R1-S3E 桌面公开发布标签门
+## 已完成 Sprint：R1-S3E 桌面公开发布标签门
 
 - Sprint Goal：只有版本匹配的严格 `vX.Y.Z` push tag 可进入公开桌面上传。
-- 承诺：仅 `R1-G01a`，3 点、无 Stretch；当前 `0/3`，Story In Review，等待 beta 集成复核。[Sprint 合同](./docs/plans/r1-s3e-sprint-commitment.md)与 [Story 合同](./docs/plans/r1-g01-release-governance-contract.md)。
+- 承诺/完成：仅 `R1-G01a`，`3/3` 点、无 Stretch、无 carryover，Story Done。[Sprint 合同](./docs/plans/r1-s3e-sprint-commitment.md)与 [Story 合同](./docs/plans/r1-g01-release-governance-contract.md)。
 - Owner：单一 Luna xhigh 工程师负责 desktop release workflow 与静态审计器；根 PM 独占共享计划/矩阵/发布记录并负责 beta 集成；Terra medium Scrum Master、QA/QC 独立验收。
 - 验收：严格标签与桌面版本相等才可上传；旧标签、手动和非严格标签均不能上传。静态 `PUBLIC-RELEASE-TRIGGER` 必须 PASS；macOS workflow 的剩余阻断属于 G01b，不在本卡。
 - 非范围：不创建/推送标签，不运行包装/上传；不接 G01b、macOS x64、beta 发布语义或 AI backfill 生产卡。
 - 独立 QA/QC：严格版本、旧标签、手动、预发行与版本不符拒绝；三种发布旁路突变被静态审计拒绝，聚焦测试 `8/8`。`PUBLIC-RELEASE-TRIGGER` 已 PASS；`MACOS-WORKFLOW` 仍 BLOCKED，不能将 Release 1 标为完成。
+- beta 集成：`fe055cec` 快进合入；在 beta 复跑语法、聚焦 `8/8` 与严格审计，finding 保持 `PASS=10 / BLOCKED=1 / REVIEW=1`，工作树干净。UI 验收不适用；真实 GitHub Actions、标签、包装与上传均未执行。
+- Review/Retrospective：Sprint Goal 在静态与本地 guard 范围内达成。QC 两次退回暴露了审计器对 OR 旁路、额外上传 job 的误判；修复后独立 QA/QC PASS。下次发布 workflow Story 在 Ready 阶段固定副作用 job 集合及反例，再交付实现，避免验收时补洞。
 
 ## Release 1 后续队列
 

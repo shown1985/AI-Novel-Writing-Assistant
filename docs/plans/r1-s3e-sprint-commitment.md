@@ -6,7 +6,7 @@
 
 - Release / Epic：Release 1 / R1-RC 桌面发布候选。
 - 基线：`beta@7023b3ed`；R1-S3D 已完成 `2/2`，R1-03 验证矩阵已 Done。
-- 承诺：仅 [R1-G01a 公开 Release 严格标签发布门](./r1-g01-release-governance-contract.md)，3 点；Stretch：无。Story In Review，完成 `0/3`，待 beta 集成复核。
+- 承诺/完成：仅 [R1-G01a 公开 Release 严格标签发布门](./r1-g01-release-governance-contract.md)，`3/3` 点；Stretch：无，Story Done。
 - 容量：3 点。R1-G01b 虽为 Ready，但与本卡共享 workflow/审计脚本且依赖本卡合并，未进入本 Sprint。S3-02b3a～e 均保持 Refinement / Not Ready。
 
 ## Owner 与文件边界
@@ -32,4 +32,8 @@
 
 ## Review 与 Retrospective 出口
 
-完成时记录 Sprint Goal 结果、承诺/完成点数、carryover、发现的误判与最多两项流程改进。G01a Done 只关闭公开标签触发 finding；R1-G01b、平台包装、两平台 UI 与 RC 候选仍有各自退出门。
+Sprint Goal 在静态与本地 guard 范围内达成。承诺/完成 `3/3`，carryover `0`。工程师实施后 Terra QA 与 QC 独立验收；QC 两次退回分别发现 OR 条件旁路、额外上传 job 的审计假 PASS，最终三类突变均被拒绝。`node --check`、聚焦测试 `8/8`、`git diff --check` 均 PASS。`fe055cec` 快进 beta 后复跑同一检查，`PUBLIC-RELEASE-TRIGGER` PASS，`MACOS-WORKFLOW` 仍 BLOCKED，严格审计预期退出 `2`。
+
+- UI 验收：不适用；本 Story 没有产品 UI 改动。真实 GitHub Actions、标签、包装、签名、公证与公开上传未执行，不得称为平台发布验收。
+- Retrospective 改进：下一张 workflow Story 的 Ready 合同先固定可产生发布副作用的 job 集合及负例；不把本卡扩成通用 YAML 安全框架。
+- 退出门：G01a Done 只关闭公开标签触发 finding；R1-G01b、平台包装、两平台 UI 与 RC 候选仍有各自退出门。
