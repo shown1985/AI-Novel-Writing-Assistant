@@ -3,7 +3,7 @@
 更新时间：2026-09-23
 集成分支：`beta`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S3D 的 `S3-02b3s` Spike 已完成 `2/2`；R1-S3E 仅承诺 `R1-G01a` 3 点，Story Ready、完成 `0/3`。AI backfill 生产实施卡仍为 Refinement / Not Ready，Release 1 未完成。
+当前状态：R1-S3D 的 `S3-02b3s` Spike 已完成 `2/2`；R1-S3E 仅承诺 `R1-G01a` 3 点，Story In Review、完成 `0/3`，等待 beta 集成复核。AI backfill 生产实施卡仍为 Refinement / Not Ready，Release 1 未完成。
 
 ## 权威文档
 
@@ -67,7 +67,7 @@ Release 2只允许做不抢占R1产能的只读Spike/Refinement。账号、LAN�
 
 承诺容量：15 点。Stretch：无。权威合同见 [R1-S1 Sprint 承诺](./docs/plans/r1-s1-sprint-commitment.md)。
 
-当前 Release 静态门：`PASS=9 / BLOCKED=2 / REVIEW=1`；迁移历史共存已由行为测试保护，剩余静态阻断为公开发布触发和 macOS 工作流。
+R1-S1 当时的 Release 静态门：`PASS=9 / BLOCKED=2 / REVIEW=1`；迁移历史共存已由行为测试保护，当时的静态阻断为公开发布触发和 macOS 工作流。当前状态见 R1-S3E。
 
 S1-05 聚焦证据：server build 通过，世界问题归属行为测试 6/6；S1-06 依赖已解除。
 
@@ -237,7 +237,7 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 - beta 合并提交：`eaa8cce8`，双亲为 `32b2e9c7` / `21c7642e`，merge tree 一致。
 - Terra 权威验证：shared/server/client build/typecheck PASS；服务端 8 文件 `45/45`、client `3/3`，合计 `48/48`；验证前后工作树均 clean。Computer Use 证据复用既有 Sprint/Story 合同，不重复执行。
 - R1-S2G beta 集成结论：PASS。该结论只关闭本 Sprint 的 beta 组合门，不代表 Release 1 完成，也不启动下一 Story。
-- R1-03 当前发布静态门仍为 `PASS=9 / BLOCKED=2 / REVIEW=1`；待处理项为公开发布 workflow 触发规则、macOS arm64 候选 workflow，以及让审计器消费已冻结的 arm64-only 支持决定。
+- R1-S2G 当时的 R1-03 发布静态门为 `PASS=9 / BLOCKED=2 / REVIEW=1`；当时的待处理项为公开发布 workflow 触发规则、macOS arm64 候选 workflow，以及让审计器消费已冻结的 arm64-only 支持决定。当前状态见 R1-S3E。
 
 ## 已完成 Sprint：R1-S2H 实况模型来源可见
 
@@ -296,10 +296,11 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 ## 当前 Sprint：R1-S3E 桌面公开发布标签门
 
 - Sprint Goal：只有版本匹配的严格 `vX.Y.Z` push tag 可进入公开桌面上传。
-- 承诺：仅 `R1-G01a`，3 点、无 Stretch；当前 `0/3`，Story Ready。[Sprint 合同](./docs/plans/r1-s3e-sprint-commitment.md)与 [Story 合同](./docs/plans/r1-g01-release-governance-contract.md)。
+- 承诺：仅 `R1-G01a`，3 点、无 Stretch；当前 `0/3`，Story In Review，等待 beta 集成复核。[Sprint 合同](./docs/plans/r1-s3e-sprint-commitment.md)与 [Story 合同](./docs/plans/r1-g01-release-governance-contract.md)。
 - Owner：单一 Luna xhigh 工程师负责 desktop release workflow 与静态审计器；根 PM 独占共享计划/矩阵/发布记录并负责 beta 集成；Terra medium Scrum Master、QA/QC 独立验收。
 - 验收：严格标签与桌面版本相等才可上传；旧标签、手动和非严格标签均不能上传。静态 `PUBLIC-RELEASE-TRIGGER` 必须 PASS；macOS workflow 的剩余阻断属于 G01b，不在本卡。
 - 非范围：不创建/推送标签，不运行包装/上传；不接 G01b、macOS x64、beta 发布语义或 AI backfill 生产卡。
+- 独立 QA/QC：严格版本、旧标签、手动、预发行与版本不符拒绝；三种发布旁路突变被静态审计拒绝，聚焦测试 `8/8`。`PUBLIC-RELEASE-TRIGGER` 已 PASS；`MACOS-WORKFLOW` 仍 BLOCKED，不能将 Release 1 标为完成。
 
 ## Release 1 后续队列
 
@@ -310,7 +311,7 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 5. R1-S7：十章长链、有限撤回和导航收束。
 6. R1-RC：桌面升级、备份恢复、包装与用户验收。
 
-R1-RC 独立 Refinement：[R1-G01 发布治理拆分合同](./docs/plans/r1-g01-release-governance-contract.md)已冻结。`R1-G01a` 3 点进入当前 R1-S3E，`R1-G01b` macOS arm64 候选 CI 5 点仍为 Ready，`R1-G01c` 1 点 PO 决定已 Done。Release 1 只支持 Windows x64 与 macOS arm64，不支持 macOS x64。G01b 须待 G01a 合入 beta 后经后续 Sprint Planning 才能开始；当前静态门仍为 `PASS=9 / BLOCKED=2 / REVIEW=1`。
+R1-RC 独立 Refinement：[R1-G01 发布治理拆分合同](./docs/plans/r1-g01-release-governance-contract.md)已冻结。`R1-G01a` 3 点进入当前 R1-S3E，`R1-G01b` macOS arm64 候选 CI 5 点仍为 Ready，`R1-G01c` 1 点 PO 决定已 Done。Release 1 只支持 Windows x64 与 macOS arm64，不支持 macOS x64。G01b 须待 G01a 合入 beta 后经后续 Sprint Planning 才能开始；当前静态门为 `PASS=10 / BLOCKED=1 / REVIEW=1`，未通过完整 Release gate。
 
 ## 强制敏捷门
 
@@ -327,5 +328,5 @@ R1-RC 独立 Refinement：[R1-G01 发布治理拆分合同](./docs/plans/r1-g01-
 - 已识别发布阻断：当前分支与 v0.4.25 存在重叠的视觉资产迁移历史；空库全迁移和新增部分迁移 fixture 均失败，须在 R1-03 验证矩阵和后续明确 Story 中处理。
 - R1-01 已强制服务端、Vite 和桌面入口只使用回环地址；LAN、wildcard、私网主机和非回环 CORS 配置会在迁移及后台恢复前失败。
 - R1-02 的确定性长链在隔离临时 SQLite 中完成十章，验证一次人工恢复、前五章正文哈希不变、第八章质量债继续、显式世界/人物编辑和 TXT 顺序完整；公共 idea→导演交接、真实模型和 UI 仍不在该证据范围内。
-- R1-S0 当时的静态审计为 `PASS=8 / BLOCKED=3 / REVIEW=1`；当时硬阻断是重叠 SQLite 迁移、非标准 tag/手动触发可公开发布、公开工作流无 macOS job，且 macOS x64 支持范围尚未冻结。后续 R1-MIG01 已解除迁移阻断，PO 已冻结 Release 1 为 macOS arm64-only；当前门以本页前述 `PASS=9 / BLOCKED=2 / REVIEW=1` 为准。
+- R1-S0 当时的静态审计为 `PASS=8 / BLOCKED=3 / REVIEW=1`；当时硬阻断是重叠 SQLite 迁移、非标准 tag/手动触发可公开发布、公开工作流无 macOS job，且 macOS x64 支持范围尚未冻结。后续 R1-MIG01 已解除迁移阻断，PO 已冻结 Release 1 为 macOS arm64-only；当前门见 R1-S3E 的 `PASS=10 / BLOCKED=1 / REVIEW=1`。
 - R1-04 已冻结 15 点 R1-S1；新增 R1-MIG01 独立承接迁移阻断，四张既有 Ready 卡进入明确波次，未满足依赖的诊断生产卡未被提前承诺。

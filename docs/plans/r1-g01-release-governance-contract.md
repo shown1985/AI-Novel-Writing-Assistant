@@ -4,15 +4,15 @@
 
 - Release / Epic：Release 1 / R1-RC 桌面发布候选。
 - 父项：`R1-G01` beta 组合验证与公开发布治理；父项不重复计点，也不作为一张混合实现卡进入 Sprint。
-- 当前状态：Refinement 已完成；`R1-G01a` 满足 DoR 并进入 R1-S3E，当前 Ready；`R1-G01b` 满足 DoR、保持 Ready，须等待 G01a 合入 beta 后经后续 Planning；`R1-G01c` 为 PO 范围决定且已完成。
+- 当前状态：Refinement 已完成；`R1-G01a` 满足 DoR 并进入 R1-S3E，当前 In Review、待 beta 集成复核；`R1-G01b` 满足 DoR、保持 Ready，须等待 G01a 合入 beta 后经后续 Planning；`R1-G01c` 为 PO 范围决定且已完成。
 - PO 支持决定：Release 1 桌面候选只覆盖 **Windows x64 与 macOS arm64**。macOS x64 不属于 Release 1 支持范围，不新增 builder target、原生模块、runtime 或 UI 验收。
-- 当前发布门事实仍为 `PASS=9 / BLOCKED=2 / REVIEW=1`。本合同不修改 workflow 或审计器，不能把范围决定冒充公开触发门或 macOS CI 已通过。
+- 当前静态发布门为 `PASS=10 / BLOCKED=1 / REVIEW=1`：`PUBLIC-RELEASE-TRIGGER` 已 PASS；macOS CI 仍 BLOCKED，arm64-only 范围提示仍 REVIEW。静态合同不等于实际 GitHub Actions 运行证据。
 
 选择两种已存在的目标架构，是为了先完成可验证的单机成书候选，而不是同时扩建第三套桌面架构。若未来要求 macOS x64，必须另立 Story、重新估点并独立验证，不能塞入以下卡片。
 
 ## R1-G01a 公开 Release 严格标签发布门（3 点）
 
-- 状态 / Owner / 依赖：Ready；优先级 P0；当前 R1-S3E 的 Luna xhigh 发布 workflow owner；依赖 R1-03 与既有桌面版本/标签规则。
+- 状态 / Owner / 依赖：In Review；优先级 P0；当前 R1-S3E 的 Luna xhigh 发布 workflow owner；依赖 R1-03 与既有桌面版本/标签规则。
 - 用户价值：只有与桌面版本完全一致的正式标签才能进入公开发布，手动验证或旧标签不会误上传安装包。
 - 文件边界：独占 `.github/workflows/desktop-release.yml`、`scripts/release/r1-03-static-gate-audit.cjs` 与聚焦测试 `scripts/release/r1-g01a-release-trigger.test.cjs`；不得新增其他 workflow，不得改 `desktop/package.json`、builder、签名逻辑或发布脚本。R1-03 与 R1-RC02 的历史 owner 不占用这三个文件，当前 Story 只有这一名实现 owner。
 
@@ -60,7 +60,7 @@
 ```text
 R1-03 已建立验证矩阵
   ├─ R1-G01c 支持范围决定（Done，1 点）
-  └─ R1-G01a 严格公开标签门（Ready，3 点）
+  └─ R1-G01a 严格公开标签门（In Review，3 点）
        └─ R1-G01b macOS arm64 候选 CI（Ready，5 点）
 ```
 
@@ -70,4 +70,4 @@ R1-03 已建立验证矩阵
 
 ## 文档与发布记录判断
 
-本阶段只冻结 Backlog、支持口径和未来验收边界，没有改变用户可用产品、workflow 或安装包，因此不更新 README 或 release notes。该范围决定属于发布计划，不新增长期运行时或架构规则，暂不更新 Wiki。
+G01a 改变的是公开发布的内部触发门，尚未产生用户可用的新安装包或应用行为，因此本阶段不更新 README 或 release notes。实际标签、GitHub Actions 运行与安装包验收仍留在后续候选阶段。当前两 job 审计边界服务于 G01a；G01b 增加只读 macOS 候选 job 时必须同步扩展审计与测试。此处没有新增稳定的产品运行时/架构知识，Wiki 暂不更新。

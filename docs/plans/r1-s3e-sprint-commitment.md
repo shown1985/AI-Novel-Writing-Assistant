@@ -6,7 +6,7 @@
 
 - Release / Epic：Release 1 / R1-RC 桌面发布候选。
 - 基线：`beta@7023b3ed`；R1-S3D 已完成 `2/2`，R1-03 验证矩阵已 Done。
-- 承诺：仅 [R1-G01a 公开 Release 严格标签发布门](./r1-g01-release-governance-contract.md)，3 点；Stretch：无。Story Ready，完成 `0/3`。
+- 承诺：仅 [R1-G01a 公开 Release 严格标签发布门](./r1-g01-release-governance-contract.md)，3 点；Stretch：无。Story In Review，完成 `0/3`，待 beta 集成复核。
 - 容量：3 点。R1-G01b 虽为 Ready，但与本卡共享 workflow/审计脚本且依赖本卡合并，未进入本 Sprint。S3-02b3a～e 均保持 Refinement / Not Ready。
 
 ## Owner 与文件边界
