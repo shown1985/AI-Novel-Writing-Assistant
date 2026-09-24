@@ -94,7 +94,11 @@ R1-S2G 的首批生产接线只覆盖 `WorldService.updateWorld` 的既有 HTTP/
 
 模型成功后的归一化结构必须先以独立 result record 持久化，并绑定原 request hash 与基线 revision；通用 attempt 只记录调用证据，不能当作 result store。提交时以该基线 revision 做 CAS，首次成功在同一事务内写世界内容、兼容投影、新 revision、operation 与 commit receipt。生成期间作者修改了世界时，旧结果保留为未保存候选，世界内容零覆盖；不得自动套用到最新 revision。receipt 证明“已保存”，result record 才能找回“生成了什么”。提交后 HTTP 响应丢失先按 operation 读回两种事实，不重新调用模型或再次提交。
 
-来源页须区分生成中、已生成但未保存、已保存、冲突保留和模型状态待确认；未知调用、冲突或确定失败后的新生成只能由作者显式创建新 operation。运行记录仍只读。快照与 RAG 属提交后的派生结果，失败不应把已保存世界误报为未保存，也不能把索引或快照记录当作生成结果仓库。SQLite/PostgreSQL 的最小 owned store 与迁移由后续实施卡负责，不能因这段设计规则而声称当前 backfill 已完成保护。
+来源页须区分生成中、已生成但未保存、已保存、冲突保留和模型状态待确认；未知调用、冲突或确定失败后的新生成只能由作者显式创建新 operation。运行记录仍只读。快照与 RAG 属提交后的派生结果，失败不应把已保存世界误报为未保存，也不能把索引或快照记录当作生成结果仓库。设计规则与独立存储层都不能替代生产 `/backfill` 的运行时接线验收。
+
+S3-02b3a 的 owned store 已提供上述调用前 claim 与生成后 result 的持久事实，但仍未接入现有 `/backfill`。store 按固定字段顺序把世界、基线 revision、Prompt、provider/model、策略版本与来源 digest 计算为请求 hash；相同世界与 operation 的不同冻结输入拒绝重用。`startModel` 是从 `model_not_called` 进入 `model_in_flight` 的唯一条件更新门，lease 仅用于识别结果是否待确认，不授予第二次调用权。`markUnknown` 必须区分已知“结果不明”与 lease 到期：前者可立即进入 `model_unknown`，后者须到期；两者都不能自动重开模型调用。
+
+result 仅保存规范化结构与 binding support，和基线 revision、请求 hash、策略版本、模型观察引用及 digest 绑定；写 result 与 `model_succeeded_pending_commit` 状态属于同一事务。模型 request/attempt 身份只是可空的观察引用，不依赖 attempt 先落库，也不把 attempt 或手动提交 receipt 当成生成结果。store 不写 World 内容、快照或 RAG；CAS、commit receipt、来源页恢复和真实 PostgreSQL apply 仍属后续独立验收。因此“持久事实仓库已存在”不能被投影为“生产补全已受保护”。
 
 本机 SQLite runtime migration 是安全提交可运行的必要条件；PostgreSQL apply 属 Release gate，在发布组合验证时单独执行，不把发布环境尚未 apply 混同为本地提交合同失败。两套 schema 仍须保持可验证的一致性，且任何迁移演练都只使用隔离数据库。
 

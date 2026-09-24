@@ -1516,6 +1516,7 @@ model World {
   libraryItems       WorldPropertyLibrary[]
   novelWorlds        NovelWorld[]
   assets             WorldAsset[]
+  structureBackfillOperations WorldStructureBackfillOperation[]
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
 }
@@ -1646,6 +1647,46 @@ model WorldMaintenanceCommitReceipt {
   afterDigest          String
   committedAt          DateTime @default(now())
   operationRecord      WorldMaintenanceOperation @relation(fields: [operationRecordId], references: [id], onDelete: Cascade)
+}
+
+model WorldStructureBackfillOperation {
+  id                     String   @id @default(cuid())
+  worldId                String
+  operationId            String
+  requestHash            String
+  baseContentRevision    Int
+  promptId               String
+  promptVersion          String
+  provider               String?
+  model                  String?
+  generationPolicyVersion String
+  sourceDigest           String
+  status                 String   @default("model_not_called")
+  leaseExpiresAt         DateTime?
+  modelRequestId         String?
+  modelAttemptId         String?
+  world                  World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  result                 WorldStructureBackfillResult?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@unique([worldId, operationId])
+  @@index([worldId, updatedAt])
+}
+
+model WorldStructureBackfillResult {
+  id                       String   @id @default(cuid())
+  operationRecordId        String   @unique
+  normalizedStructureJson  String
+  bindingSupportJson       String
+  baseContentRevision      Int
+  requestHash              String
+  generationPolicyVersion  String
+  digest                   String
+  modelRequestId           String?
+  modelAttemptId           String?
+  operationRecord          WorldStructureBackfillOperation @relation(fields: [operationRecordId], references: [id], onDelete: Cascade)
+  createdAt                DateTime @default(now())
 }
 
 model WorldGenerationRun {

@@ -328,8 +328,8 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 
 - Sprint Goal：一次结构补全拥有可跨连接和重启辨认的 claim、模型调用所有权及规范化结果事实，为后续恢复/提交接线奠基；本 Sprint 不改现有 `/backfill`。
 - 承诺：仅 `S3-02b3a`，5 点、无 Stretch。[Sprint 合同](./docs/plans/r1-s3g-sprint-commitment.md)与 [Story 合同](./docs/plans/s3-02b3a-backfill-store-contract.md)；独立 Terra QA 与 Scrum Master DoR PASS。
-- 状态：Ready，待功能分支启动；未获得 QA/QC 实现验收前不得标 Done。
-- Owner：单一 Luna xhigh 工程师独占双 schema、双新增 migration 与 owned store/聚焦测试；根 PM/PO 独占共享计划/Wiki/发布记录和 beta 集成；Terra medium Scrum Master、QA/QC 独立验收。
+- 状态：In Review；实现和独立 GPT-6 QA/QC 已 PASS，待阶段提交与 beta 复核后才能标 Done。首次 QA/QC 发现“结果已知不明仍须等 lease 到期”的 P1，已修正并独立复验通过。
+- Owner：单一 GPT-6 Luna Max 工程师独占双 schema、双新增 migration 与 owned store/聚焦测试；根 PM/PO 独占共享计划/Wiki/发布记录和 beta 集成；独立 Scrum Master 复核规划，GPT-6 Luna Medium QA/QC 验收实现。
 - 验收：双连接竞争只有一方获得模型调用权、lease 到期为 unknown 且不重开调用；request hash 与结果 digest 稳定拒绝不一致重放；隔离 SQLite 结果可重启读回且零世界内容写入；双 schema validate、双 migration 静态对称、server build、聚焦迁移测试、独立 QA/QC 与 beta 复核。
 - 非范围：不接模型、HTTP、Prompt、世界 CAS、现有 `/backfill`、UI、PostgreSQL 真实 apply、Release 2 或其他世界维护入口；不得破坏用户数据库。UI 验收不适用。
 

@@ -2,14 +2,14 @@
 
 ## 身份、价值与状态
 
-- Release / Epic：Release 1 / S3 可信世界；Story ID：`S3-02b3a`；5 点；优先级 P1；独立 Terra QA 与 Scrum Master DoR PASS，进入 R1-S3G 承诺。
+- Release / Epic：Release 1 / S3 可信世界；Story ID：`S3-02b3a`；5 点；优先级 P1；独立 QA 与 Scrum Master DoR PASS，进入 R1-S3G 承诺；实现的独立 GPT-6 QA/QC 已 PASS，待阶段提交与 beta 复核。
 - 用户价值：作者发起一次“AI 补全世界结构”后，服务端能持久辨认同一次操作、是否已经打开模型调用以及是否已有可恢复结果，为后续不重复付费、不覆盖较新世界内容提供可信事实。
 - 依赖：[S3-02b3s 幂等与费用边界 Spike](./s3-02b3s-structure-backfill-idempotency-spike.md)、S3-02b1 世界 CAS、S3-02b2 手动结构保存均 Done。当前生产 `/backfill` 仍是旧路径；本 Story 不把新 store 接入 HTTP/模型/CAS，后续 b/c/d/e 分卡承担。
 - 入口/数据来源：现有 `World` 的 `id/contentRevision`；同一作者意图冻结的 `worldId`、`operationId`、`baseContentRevision`、Prompt ID/version、provider/model、`generationPolicyVersion`、source digest。owned domain 函数由这些字段计算稳定 request hash；模型输出尚不存在时不能将其纳入 hash。模型观察事实的身份来自 `ModelAttemptEvidence.requestId` 与主键 `attemptId`，不能把二者混用。
 
 ## 唯一 Owner 与文件边界
 
-- 一名 Luna xhigh 全栈工程师独占 `server/src/services/world/backfill/{domain,infrastructure}/` 与该模块的 `index.ts`、`README.md`；两份 Prisma schema `server/src/prisma/schema.prisma`、`schema.sqlite.prisma`；同名增量 migration `server/src/prisma/migrations/20260923120000_world_structure_backfill_store/migration.sql` 与 `server/src/prisma/migrations.sqlite/20260923120000_world_structure_backfill_store/migration.sql`；新增 `server/tests/worldStructureBackfillStore.test.js`。
+- 一名 GPT-6 Luna Max 全栈工程师独占 `server/src/services/world/backfill/{domain,infrastructure}/` 与该模块的 `index.ts`、`README.md`；两份 Prisma schema `server/src/prisma/schema.prisma`、`schema.sqlite.prisma`；同名增量 migration `server/src/prisma/migrations/20260923120000_world_structure_backfill_store/migration.sql` 与 `server/src/prisma/migrations.sqlite/20260923120000_world_structure_backfill_store/migration.sql`；新增 `server/tests/worldStructureBackfillStore.test.js`。
 - 根 PM/PO 独占 `TASK.md`、Roadmap、Sprint/Story 合同、Wiki/发布记录、阶段提交与 beta 集成。共享 schema/migration 由同一工程师作为唯一数据 owner；其他 Agent 只读验收。
 - 现有 `WorldMaintenanceOperation/CommitReceipt` 属手动 `commit_world_sample`，不保存模型生成结果；不得挪作 backfill 结果仓库。模型 attempt 表也不是结果仓库。
 
@@ -26,7 +26,7 @@
 - SQLite：测试只对 `:memory:` 或 `/tmp/ai-novel-s3-02b3a-*` 隔离库运行；从既有 migration 历史增量升级后，既有 `World` 的内容/revision/关键行数不变，新增表/索引/外键完整；双连接并发 claim、不同 hash、结果跨连接恢复、重复 digest、lease 过期未知及零世界写入均有行为断言。
 - PostgreSQL：用不连接数据库的 Prisma schema validate 与新增测试静态核对双 schema/同名增量 SQL 的 operation/result 字段、唯一索引、World 外键及无 attempt 外键决定。真实 PostgreSQL apply 与跨库组合回归留给 `S3-02b3e`。
 - 固定检查：`DATABASE_URL='file:/tmp/ai-novel-s3-02b3a-validate.db' pnpm --filter @ai-novel/server exec prisma validate --schema src/prisma/schema.sqlite.prisma`；`DATABASE_URL='postgresql://validate:validate@127.0.0.1:1/isolated' pnpm --filter @ai-novel/server exec prisma validate --schema src/prisma/schema.prisma`（均只校验 schema，不连接目标库）；`pnpm --filter @ai-novel/server prisma:generate`；`pnpm --filter @ai-novel/server build`；`node --test server/tests/worldStructureBackfillStore.test.js server/tests/prismaMigrationCompleteness.test.js server/tests/runtimeMigrations.test.js`；`git diff --check`。如现有通用迁移测试不覆盖本卡关键表，在新增测试中补合同断言，避免扩改通用测试文件。
-- 独立 Terra medium QA/QC 需检查数据库并发、重启、失败/未知恢复与双 schema/migration 对称。无产品 UI 改动，UI 验收不适用。完成前需检查 Wiki 是否新增稳定存储/状态知识、用户发布记录是否有可见能力；阶段提交后在 beta 复核最窄合同。
+- 独立 GPT-6 QA/QC 需检查数据库并发、重启、失败/未知恢复与双 schema/migration 对称。无产品 UI 改动，UI 验收不适用。完成前需检查 Wiki 是否新增稳定存储/状态知识、用户发布记录是否有可见能力；阶段提交后在 beta 复核最窄合同。
 
 ## 非范围与数据保护
 
