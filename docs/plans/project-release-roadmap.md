@@ -91,9 +91,9 @@ R1-S2H 承诺并完成 [S2-04c1 实况模型来源只读显示](./s2-04c1-live-m
 
 本窗口只承诺并完成 [R1-G01b macOS arm64 候选包装 CI 证据](./r1-g01-release-governance-contract.md) `5/5` 点、无 Stretch。新增同 SHA、只读、无上传的 macOS arm64 候选 job 并扩展静态审计；真实 Actions、公开上传或平台 UI 验收尚未执行。Review/Retrospective 见 [R1-S3F Sprint 承诺](./r1-s3f-sprint-commitment.md)。
 
-### R1-S3G 当前窗口
+### R1-S3G 已完成窗口
 
-本窗口只承诺 [S3-02b3a AI 世界结构补全持久 claim/result store](./s3-02b3a-backfill-store-contract.md) 5 点、无 Stretch。双库增量 schema/migration 与 owned store 的隔离行为验收，是后续 b3b～e 的基础，不接现有 `/backfill`、模型或世界 CAS。退出门与文件边界见 [R1-S3G Sprint 承诺](./r1-s3g-sprint-commitment.md)。
+本窗口只承诺并完成 [S3-02b3a AI 世界结构补全持久 claim/result store](./s3-02b3a-backfill-store-contract.md) `5/5` 点、无 Stretch。双库增量 schema/migration 与 owned store 的隔离行为、独立 QA/QC 及 beta 复核均通过；现有 `/backfill`、模型、世界 CAS 和真实 PostgreSQL apply 尚未接入或执行。Review/Retrospective 见 [R1-S3G Sprint 承诺](./r1-s3g-sprint-commitment.md)。
 
 ### R1-G01 发布治理 Backlog Refinement
 

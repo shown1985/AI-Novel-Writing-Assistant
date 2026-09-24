@@ -2,7 +2,7 @@
 
 ## 身份、价值与状态
 
-- Release / Epic：Release 1 / S3 可信世界；Story ID：`S3-02b3a`；5 点；优先级 P1；独立 QA 与 Scrum Master DoR PASS，进入 R1-S3G 承诺；实现的独立 GPT-6 QA/QC 已 PASS，待阶段提交与 beta 复核。
+- Release / Epic：Release 1 / S3 可信世界；Story ID：`S3-02b3a`；5 点；优先级 P1；Done。独立 QA 与 Scrum Master DoR PASS，实现的独立 GPT-6 QA/QC PASS，`16dc4a50` 已合入 beta 并完成最窄复核。
 - 用户价值：作者发起一次“AI 补全世界结构”后，服务端能持久辨认同一次操作、是否已经打开模型调用以及是否已有可恢复结果，为后续不重复付费、不覆盖较新世界内容提供可信事实。
 - 依赖：[S3-02b3s 幂等与费用边界 Spike](./s3-02b3s-structure-backfill-idempotency-spike.md)、S3-02b1 世界 CAS、S3-02b2 手动结构保存均 Done。当前生产 `/backfill` 仍是旧路径；本 Story 不把新 store 接入 HTTP/模型/CAS，后续 b/c/d/e 分卡承担。
 - 入口/数据来源：现有 `World` 的 `id/contentRevision`；同一作者意图冻结的 `worldId`、`operationId`、`baseContentRevision`、Prompt ID/version、provider/model、`generationPolicyVersion`、source digest。owned domain 函数由这些字段计算稳定 request hash；模型输出尚不存在时不能将其纳入 hash。模型观察事实的身份来自 `ModelAttemptEvidence.requestId` 与主键 `attemptId`，不能把二者混用。

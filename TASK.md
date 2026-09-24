@@ -3,7 +3,7 @@
 更新时间：2026-09-23
 集成分支：`beta`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S3E 的 `R1-G01a` 与 R1-S3F 的 `R1-G01b` 已完成并合入 beta；R1-S3G 仅承诺 `S3-02b3a` 持久 claim/result store 5 点，尚未完成。后续 AI backfill 接线卡仍为 Refinement / Not Ready；真实平台候选与用户验收未完成，Release 1 未完成。
+当前状态：R1-S3E 的 `R1-G01a`、R1-S3F 的 `R1-G01b` 与 R1-S3G 的 `S3-02b3a` 均已完成并合入 beta。后续 AI backfill 接线卡仍为 Refinement / Not Ready；真实平台候选与用户验收未完成，Release 1 未完成。
 
 ## 权威文档
 
@@ -308,7 +308,7 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 
 1. R1-S1：配置、诊断、阅读恢复和世界归属安全（已完成，15/15 点）。
 2. R1-S2：R1-S2A～S2H 已完成（S2H `3/3`）；S2-04c1 实况切片已 Done，父 S2-04c 的任务/历史展示范围仍在 Refinement。
-3. R1-S3～4：可信世界、提案采用和失败复核；S3-01、S3-02a、S3-02b1、S3-02b2、S3-02b3s、S3-03a1、S3-03a2 已完成。S3-02b3a 已进入 R1-S3G；原 S3-02b 其他旧入口、S3-02b3b～e 和 S3-03b～06 保持 Refinement/依赖状态，须经后续 Planning 才能开始。
+3. R1-S3～4：可信世界、提案采用和失败复核；S3-01、S3-02a、S3-02b1、S3-02b2、S3-02b3s、S3-02b3a、S3-03a1、S3-03a2 已完成。原 S3-02b 其他旧入口、S3-02b3b～e 和 S3-03b～06 保持 Refinement/依赖状态，须经后续 Planning 才能开始。
 4. R1-S5～6：本机Agent委托、预算、记忆和资产。
 5. R1-S7：十章长链、有限撤回和导航收束。
 6. R1-RC：桌面升级、备份恢复、包装与用户验收。
@@ -324,14 +324,16 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 - beta 集成：`32d34dfb` 快进合入；在 beta 复跑语法、两组聚焦 `11/11` 与严格审计，finding 保持 `PASS=11 / REVIEW=1`，工作树干净。UI 验收不适用；未创建标签、运行真实 Actions、打包或上传。
 - Review/Retrospective：Sprint Goal 在静态 workflow 合同范围内达成，`5/5`、无 carryover；独立 QA/QC 未退回。保留下一次候选验收的单一改进：必须按同一 SHA 留存真实 runner 架构、Windows/macOS 包装及安装证据，不能从静态 PASS 推断平台成功。
 
-## 当前 Sprint：R1-S3G AI 世界结构补全持久事实仓库
+## 已完成 Sprint：R1-S3G AI 世界结构补全持久事实仓库
 
 - Sprint Goal：一次结构补全拥有可跨连接和重启辨认的 claim、模型调用所有权及规范化结果事实，为后续恢复/提交接线奠基；本 Sprint 不改现有 `/backfill`。
 - 承诺：仅 `S3-02b3a`，5 点、无 Stretch。[Sprint 合同](./docs/plans/r1-s3g-sprint-commitment.md)与 [Story 合同](./docs/plans/s3-02b3a-backfill-store-contract.md)；独立 Terra QA 与 Scrum Master DoR PASS。
-- 状态：In Review；实现和独立 GPT-6 QA/QC 已 PASS，待阶段提交与 beta 复核后才能标 Done。首次 QA/QC 发现“结果已知不明仍须等 lease 到期”的 P1，已修正并独立复验通过。
+- 承诺/完成：仅 `S3-02b3a`，`5/5` 点、无 Stretch、无 carryover，Story Done。首次 QA/QC 发现“结果已知不明仍须等 lease 到期”的 P1，已修正并独立复验通过。
 - Owner：单一 GPT-6 Luna Max 工程师独占双 schema、双新增 migration 与 owned store/聚焦测试；根 PM/PO 独占共享计划/Wiki/发布记录和 beta 集成；独立 Scrum Master 复核规划，GPT-6 Luna Medium QA/QC 验收实现。
 - 验收：双连接竞争只有一方获得模型调用权、lease 到期为 unknown 且不重开调用；request hash 与结果 digest 稳定拒绝不一致重放；隔离 SQLite 结果可重启读回且零世界内容写入；双 schema validate、双 migration 静态对称、server build、聚焦迁移测试、独立 QA/QC 与 beta 复核。
 - 非范围：不接模型、HTTP、Prompt、世界 CAS、现有 `/backfill`、UI、PostgreSQL 真实 apply、Release 2 或其他世界维护入口；不得破坏用户数据库。UI 验收不适用。
+- 独立 QA/QC：GPT-6 QA/QC 均 PASS；双 schema validate、隔离 SQLite 双连接与迁移行为、server build、三组聚焦 `21/21` 均通过。`16dc4a50` 快进 beta 后，beta 独立工作树重跑 Prisma generate、server build 与 `21/21` 均 PASS，工作树干净。真实 PostgreSQL apply 与现有 `/backfill` 接线未做。
+- Review/Retrospective：Sprint Goal 在 store-only 范围达成，`5/5`、carryover `0`；P1 在本 Sprint 内发现并关闭，未流出。下一张 backfill runtime 卡必须明确区分“即时结果不明”和“lease 到期”两种来源，且不得把任一来源视为可再次付费调用的许可。
 
 R1-RC 独立 Refinement：[R1-G01 发布治理拆分合同](./docs/plans/r1-g01-release-governance-contract.md)已冻结。`R1-G01a` 3 点、`R1-G01b` 5 点均 Done 并合入 beta，`R1-G01c` 1 点 PO 决定已 Done。Release 1 只支持 Windows x64 与 macOS arm64，不支持 macOS x64。当前静态门为 `PASS=11 / REVIEW=1`，不代表真实平台候选或 Release 1 已通过。
 

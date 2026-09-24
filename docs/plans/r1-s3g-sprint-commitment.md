@@ -23,4 +23,7 @@
 
 ## Review 与 Retrospective 出口
 
-关闭 Sprint 时记录 Sprint Goal 是否达成、承诺/完成点数、carryover 与原因、退回/漏检问题，以及至多两项具体改进。未完成事项重新 Refinement，不以原估算自动顺延。
+Sprint Goal 在 store-only 范围达成；承诺/完成 `5/5`，carryover `0`。GPT-6 QA/QC 独立 PASS，双 schema validate、隔离 SQLite 双连接竞争/恢复/增量迁移、server build 与 `21/21` 聚焦测试通过。`16dc4a50` 快进 beta 后，beta 独立工作树的 Prisma generate、server build 和 `21/21` 复核通过，工作树干净。无产品 UI 改动，UI 验收不适用；真实 PostgreSQL apply、当前 `/backfill`、模型/CAS/HTTP 和来源页仍属后续卡，不能将本 Sprint 视为生产补全闭环。
+
+- 退回/漏检：首轮 QA/QC 发现即时结果不明无法转 `model_unknown` 的 P1；同 Sprint 修正并独立复验，未流出。
+- 改进：下一张 runtime 卡在 Ready 时分别写出“结果立即未知”和“lease 到期未知”的状态/恢复用例，两者均不得自动重开模型调用。
