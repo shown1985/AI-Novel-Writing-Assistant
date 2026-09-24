@@ -23,6 +23,7 @@
 - [Prompt Governance Audit 2026-05-08](./checkpoints/prompt-governance-audit-2026-05-08.md)
 - [LLM Schema Refactor Checkpoint](./checkpoints/llm-schema-refactor-checkpoint.md)
 - [Windows Desktop Installer Manual Checklist](./checkpoints/windows-desktop-installer-manual-checklist.md)
+- [开发进度审查与纠偏指引 2026-09-24](./checkpoints/codex-progress-audit-2026-09-24.md)
 
 ### `docs/plans`
 
