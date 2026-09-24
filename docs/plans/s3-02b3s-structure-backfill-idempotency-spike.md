@@ -138,6 +138,8 @@ SQLite 与 PostgreSQL schema/migration 必须同一字段和唯一约束；migra
 
 拆成五张卡是因为 store/schema、runtime/CAS、HTTP、来源页投影和组合验收拥有不同 owner；把它们压成一张 5 点卡会掩盖 migration 与未知调用恢复风险。
 
+PO 于 2026-09-24 在 b3a 完成后进一步拆分上表的 **S3-02b3b 历史建议项**：`S3-02b3b1` 只负责已持久结果→世界 CAS/专属回执，独立 5 点合同见 [b3b1](./s3-02b3b1-backfill-result-commit-contract.md)；`S3-02b3b2` 才负责模型→持久结果及调用恢复，仍待 Refinement、未估点和未承诺。原 `S3-02b3b` 的 5 点仅为 Spike 当时的估算，不再作为独立 Story 或 Sprint 容量重复计入。拆分原因是现有手动维护回执使用专属 operation 类型，若把模型接线、backfill 专属原子回执和并发恢复绑在一张卡内，无法在 5 点内清晰验收。
+
 ### Spike 出口记录
 
 - Sprint Goal：决策和隔离证据冻结了调用前 claim、生成结果与基线 revision 绑定、CAS 冲突保留以及响应丢失/未知状态恢复合同；不宣称生产能力。
