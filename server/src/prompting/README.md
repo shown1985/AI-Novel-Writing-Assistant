@@ -61,6 +61,17 @@
   - `world.structure.generate@v1`
   - `style.recommendation@v1`
 
+## Family Layout
+
+- 单个 prompt 文件超过项目 1300 行上限时，按生成阶段或用途拆到 family 下有明确归属的子目录，原文件保留为 facade 重新导出，保证 service 和 `registry/promptAssetLoaderEntries.ts` 的 import 路径不变。
+- `world` family：
+  - `world/world.prompts.ts`：facade，只做重新导出；外部模块继续从这里 import。
+  - `world/stages/inspiration.prompts.ts`：参考作品灵感、概念卡生成与本地化、世界属性选项。
+  - `world/stages/layers.prompts.ts`：深化追问、一致性检查、分层生成与本地化、世界公理建议。
+  - `world/stages/structure.prompts.ts`：结构化世界数据（导入抽取、结构回填、按小说主题生成世界、结构分段生成）与世界可视化。
+  - `world/worldDraft.prompts.ts`：世界骨架生成与展示、世界草稿生成与润色（含候选改写）。
+  - `world/world.promptSchemas.ts`、`world/world.promptTypes.ts`：各阶段共用的输出 schema 与输入类型，阶段文件单向依赖它们，不反向依赖 facade。
+
 ## Runner Usage
 
 - 结构化输出使用 `runStructuredPrompt`
