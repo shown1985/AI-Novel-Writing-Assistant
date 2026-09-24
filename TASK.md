@@ -3,7 +3,7 @@
 更新时间：2026-09-24
 集成分支：`beta`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S3E 的 `R1-G01a`、R1-S3F 的 `R1-G01b` 与 R1-S3G 的 `S3-02b3a` 均已完成并合入 beta；R1-S3H 仅承诺 `S3-02b3b1` 已生成结果的 CAS/回执 5 点，尚未完成。后续模型、HTTP、UI 接线卡仍为 Refinement / Not Ready；Release 1 未完成。
+当前状态：R1-S3E 的 `R1-G01a`、R1-S3F 的 `R1-G01b`、R1-S3G 的 `S3-02b3a` 与 R1-S3H 的 `S3-02b3b1` 均已完成并合入 beta。后续模型、HTTP、UI 接线卡仍为 Refinement / Not Ready；Release 1 未完成。
 
 ## 权威文档
 
@@ -308,7 +308,7 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 
 1. R1-S1：配置、诊断、阅读恢复和世界归属安全（已完成，15/15 点）。
 2. R1-S2：R1-S2A～S2H 已完成（S2H `3/3`）；S2-04c1 实况切片已 Done，父 S2-04c 的任务/历史展示范围仍在 Refinement。
-3. R1-S3～4：可信世界、提案采用和失败复核；S3-01、S3-02a、S3-02b1、S3-02b2、S3-02b3s、S3-02b3a、S3-03a1、S3-03a2 已完成。S3-02b3b1 进入 R1-S3H；原 S3-02b 其他旧入口、S3-02b3b2/c/d/e 和 S3-03b～06 保持 Refinement/依赖状态，须经后续 Planning 才能开始。
+3. R1-S3～4：可信世界、提案采用和失败复核；S3-01、S3-02a、S3-02b1、S3-02b2、S3-02b3s、S3-02b3a、S3-02b3b1、S3-03a1、S3-03a2 已完成。原 S3-02b 其他旧入口、S3-02b3b2/c/d/e 和 S3-03b～06 保持 Refinement/依赖状态，须经后续 Planning 才能开始。
 4. R1-S5～6：本机Agent委托、预算、记忆和资产。
 5. R1-S7：十章长链、有限撤回和导航收束。
 6. R1-RC：桌面升级、备份恢复、包装与用户验收。
@@ -335,14 +335,16 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 - 独立 QA/QC：GPT-6 QA/QC 均 PASS；双 schema validate、隔离 SQLite 双连接与迁移行为、server build、三组聚焦 `21/21` 均通过。`16dc4a50` 快进 beta 后，beta 独立工作树重跑 Prisma generate、server build 与 `21/21` 均 PASS，工作树干净。真实 PostgreSQL apply 与现有 `/backfill` 接线未做。
 - Review/Retrospective：Sprint Goal 在 store-only 范围达成，`5/5`、carryover `0`；P1 在本 Sprint 内发现并关闭，未流出。下一张 backfill runtime 卡必须明确区分“即时结果不明”和“lease 到期”两种来源，且不得把任一来源视为可再次付费调用的许可。
 
-## 当前 Sprint：R1-S3H AI 世界结构补全结果的 CAS 提交
+## 已完成 Sprint：R1-S3H AI 世界结构补全结果的 CAS 提交
 
 - Sprint Goal：已生成结果只在原世界内容版本匹配时保存一次；内容冲突保留结果，响应丢失能读回同一回执。
 - 承诺：仅 `S3-02b3b1`，5 点、无 Stretch。[Sprint 合同](./docs/plans/r1-s3h-sprint-commitment.md)与 [Story 合同](./docs/plans/s3-02b3b1-backfill-result-commit-contract.md)；独立 GPT-6 Scrum 与技术 QA DoR PASS。
-- 状态：In Review；实现和独立 GPT-6 QA/QC 已 PASS，待阶段提交与 beta 复核后才能标 Done。
+- 承诺/完成：仅 `S3-02b3b1`，`5/5` 点、无 Stretch、无 carryover，Story Done。
 - Owner：单一 GPT-6 Luna Max 工程师独占 backfill owned 模块、双 schema/双新增 migration 与聚焦测试；根 PM/PO 独占共享计划/Wiki/提交与 beta 集成；GPT-6 Luna Medium QA/QC 独立验收。
 - 验收：原始 result/binding support 在归一化前校验引用；同 operation 双连接争提交只递增一次 revision、仅一份 backfill receipt；响应丢失/重启重放同 receipt/result；作者并发改世界零覆盖且保留结果；双 schema/migration 对称、隔离 SQLite 迁移与 server build。
 - 非范围：不接现有 `/backfill`、模型/Prompt/attempt、HTTP 查询、UI、snapshot/RAG、手动 PUT、真实 PostgreSQL apply 或 Release 2。UI 验收不适用。
+- 独立 QA/QC：GPT-6 QA/QC 均 PASS，原始悬空引用先校验、两个独立 SQLite 连接只提交一次、响应丢失同回执、作者改世界保留 result、无回执不假报成功及双 schema/migration 对称均有证据。`6ed64e31` 快进 beta 后，在 beta 独立工作树重跑 Prisma generate、server build 与合同四测 `31/31` PASS，工作树干净；真实 PostgreSQL apply 未执行。
+- Review/Retrospective：Sprint Goal 在已持久 result→CAS/receipt 的内部范围达成，`5/5`、carryover `0`；没有漏到 beta 的 P0/P1。自测时双连接锁等待曾让落败方过早报未知，改成只读确认同 operation 持久回执并补无回执负例，独立 QA/QC 复验通过。下次模型接线卡保持“回执证明已保存、result 证明生成内容”两事实分离，不把内部门面误报为现有 `/backfill` 已受保护。
 
 R1-RC 独立 Refinement：[R1-G01 发布治理拆分合同](./docs/plans/r1-g01-release-governance-contract.md)已冻结。`R1-G01a` 3 点、`R1-G01b` 5 点均 Done 并合入 beta，`R1-G01c` 1 点 PO 决定已 Done。Release 1 只支持 Windows x64 与 macOS arm64，不支持 macOS x64。当前静态门为 `PASS=11 / REVIEW=1`，不代表真实平台候选或 Release 1 已通过。
 

@@ -22,4 +22,7 @@
 
 ## Review 与 Retrospective 出口
 
-关闭时记录 Sprint Goal、承诺/完成点数、carryover/退回原因、漏检与至多两项具体改进。未完成事项重新估点，不自动顺延。
+Sprint Goal 在已持久 result→World CAS/receipt 的内部范围达成；承诺/完成 `5/5`，carryover `0`。GPT-6 QA/QC 独立 PASS，原始结构/使用建议先校验、双连接一次提交、响应丢失同回执、内容冲突保留结果和无回执未知保护均有隔离行为证据。`6ed64e31` 快进 beta 后，beta 独立工作树的 Prisma generate、server build 与合同四测 `31/31` PASS、工作树干净。无产品 UI 改动，UI 验收不适用；真实 PostgreSQL apply、模型、旧 `/backfill`、HTTP/来源页与 snapshot/RAG 未接入，不能称为生产补全闭环。
+
+- 退回/漏检：未有流出 Sprint 的 P0/P1；工程师首轮双连接测试出现锁等待落败方误报未知，修正后独立 QA/QC 通过，并补无 durable receipt 时不假报成功的反例。
+- 改进：下张模型→result 卡继续把“生成结果”和“世界已保存回执”分开验证，避免运行时接线把内部提交成功误投影为整个来源页已恢复。

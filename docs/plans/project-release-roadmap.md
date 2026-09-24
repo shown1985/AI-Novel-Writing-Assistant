@@ -95,9 +95,9 @@ R1-S2H 承诺并完成 [S2-04c1 实况模型来源只读显示](./s2-04c1-live-m
 
 本窗口只承诺并完成 [S3-02b3a AI 世界结构补全持久 claim/result store](./s3-02b3a-backfill-store-contract.md) `5/5` 点、无 Stretch。双库增量 schema/migration 与 owned store 的隔离行为、独立 QA/QC 及 beta 复核均通过；现有 `/backfill`、模型、世界 CAS 和真实 PostgreSQL apply 尚未接入或执行。Review/Retrospective 见 [R1-S3G Sprint 承诺](./r1-s3g-sprint-commitment.md)。
 
-### R1-S3H 当前窗口
+### R1-S3H 已完成窗口
 
-本窗口只承诺 [S3-02b3b1 已持久化补全结果的 CAS 提交与回执](./s3-02b3b1-backfill-result-commit-contract.md) 5 点、无 Stretch。先完成 result→World 的原子提交、冲突保留和回执重放；模型→result 编排另由 b3b2 承担，HTTP/UI 与真实 PostgreSQL apply 仍在后续卡。退出门与文件边界见 [R1-S3H Sprint 承诺](./r1-s3h-sprint-commitment.md)。
+本窗口只承诺并完成 [S3-02b3b1 已持久化补全结果的 CAS 提交与回执](./s3-02b3b1-backfill-result-commit-contract.md) `5/5` 点、无 Stretch。result→World 原子提交、冲突保留、回执重放和无回执未知保护经独立 QA/QC 与 beta 隔离复核通过；模型→result 编排另由 b3b2 承担，HTTP/UI 与真实 PostgreSQL apply 仍在后续卡。Review/Retrospective 见 [R1-S3H Sprint 承诺](./r1-s3h-sprint-commitment.md)。
 
 ### R1-G01 发布治理 Backlog Refinement
 
