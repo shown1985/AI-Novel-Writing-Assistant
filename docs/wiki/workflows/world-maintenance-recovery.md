@@ -92,6 +92,8 @@ R1-S2G 的首批生产接线只覆盖 `WorldService.updateWorld` 的既有 HTTP/
 
 一次 AI 补全意图由来源页生成稳定 `operationId`，请求身份绑定世界、基线 `contentRevision`、来源内容 digest、Prompt ID/版本、有效 provider/model 与生成策略版本；相同 operation 搭配不同意图必须在模型调用与世界写入前拒绝。只有持久化 claim 的唯一 owner 能在供应商调用前推进 `model_not_called → model_in_flight`。从进入 `model_in_flight` 起，进程重启、超时和 lease 到期都不能证明供应商未调用；未知结果进入 `model_unknown`，同一 operation 禁止自动再次发起付费调用。这里限制的是本系统对同一 operation 的发起次数，不承诺第三方 exactly-once 计费。
 
+一次 `runStructuredPrompt` 逻辑调用不等于一次物理供应商调用：结构化策略切换、传输重试、备用模型、JSON 修复和语义重试都可能再次打开 transport。若某操作承诺“最多一次供应商调用”，必须在 Prompt/LLM 执行边界显式限制**物理**调用并以底层 provider 调用次数验收；仅靠 operation claim 限制顶层调用次数不够。该严格模式须由调用方 opt-in，普通 Prompt 仍保留既有恢复策略。`S3-02b3b2a` 先建立该门，`S3-02b3b2b` 才将它与持久 claim/result 编排结合；在两者及后续 HTTP/UI 接线完成前，生产 `/backfill` 仍没有此保证。
+
 模型成功后的归一化结构必须先以独立 result record 持久化，并绑定原 request hash 与基线 revision；通用 attempt 只记录调用证据，不能当作 result store。提交时以该基线 revision 做 CAS，首次成功在同一事务内写世界内容、兼容投影、新 revision、operation 与 commit receipt。生成期间作者修改了世界时，旧结果保留为未保存候选，世界内容零覆盖；不得自动套用到最新 revision。receipt 证明“已保存”，result record 才能找回“生成了什么”。提交后 HTTP 响应丢失先按 operation 读回两种事实，不重新调用模型或再次提交。
 
 来源页须区分生成中、已生成但未保存、已保存、冲突保留和模型状态待确认；未知调用、冲突或确定失败后的新生成只能由作者显式创建新 operation。运行记录仍只读。快照与 RAG 属提交后的派生结果，失败不应把已保存世界误报为未保存，也不能把索引或快照记录当作生成结果仓库。设计规则与独立存储层都不能替代生产 `/backfill` 的运行时接线验收。

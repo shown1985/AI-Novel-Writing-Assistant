@@ -140,6 +140,8 @@ SQLite 与 PostgreSQL schema/migration 必须同一字段和唯一约束；migra
 
 PO 于 2026-09-24 在 b3a 完成后进一步拆分上表的 **S3-02b3b 历史建议项**：`S3-02b3b1` 只负责已持久结果→世界 CAS/专属回执，独立 5 点合同见 [b3b1](./s3-02b3b1-backfill-result-commit-contract.md)；`S3-02b3b2` 才负责模型→持久结果及调用恢复，仍待 Refinement、未估点和未承诺。原 `S3-02b3b` 的 5 点仅为 Spike 当时的估算，不再作为独立 Story 或 Sprint 容量重复计入。拆分原因是现有手动维护回执使用专属 operation 类型，若把模型接线、backfill 专属原子回执和并发恢复绑在一张卡内，无法在 5 点内清晰验收。
 
+PO 后续只读审计发现：现有 `runStructuredPrompt` 的一次逻辑调用可因传输、策略、备用模型、JSON 修复或语义恢复发起多次**物理**供应商调用，不能直接兑现本 Spike 的每 operation 最多一次保证。因此原未估点的 `S3-02b3b2` 再拆为 [b3b2a 单次物理调用门](./s3-02b3b2a-backfill-single-attempt-prompt-contract.md) 3 点（R1-S3I Ready）与 `S3-02b3b2b` 模型→持久结果运行时编排（继续 Refinement，待 b3b2a 完成后冻结合同）；原 b3b2 不再作为独立 Story 计点。一次逻辑请求和一次物理供应商调用不能互相替代，已有 attempt 观察事实也不能代替 operation claim。
+
 ### Spike 出口记录
 
 - Sprint Goal：决策和隔离证据冻结了调用前 claim、生成结果与基线 revision 绑定、CAS 冲突保留以及响应丢失/未知状态恢复合同；不宣称生产能力。
