@@ -487,6 +487,24 @@ pnpm dev
 2. 打开 `http://localhost:5173/settings/model-routes`，检查各任务实际使用的模型路由
 3. 如果要启用知识库，打开 `http://localhost:5173/knowledge?tab=settings`，保存 Embedding / Collection 设置
 
+#### 3.1 用容器热更开发（可选）
+
+本机已安装 Docker Desktop（或 Docker Engine + Compose v2）时，可以不在本机安装 Node 依赖，直接用容器启动开发环境：
+
+```bash
+pnpm docker:dev        # 首次会构建开发镜像并在容器内安装依赖
+pnpm docker:dev:logs   # 查看 shared / api / web 日志
+pnpm docker:dev:down   # 停止容器，保留依赖与数据卷
+```
+
+没有安装 pnpm 时，可以直接运行 `docker compose -f infra/docker-compose.dev.yml up --build`。
+
+- 源码挂载到容器内，修改 `client/`、`server/`、`shared/` 后自动热更，地址与 `pnpm dev` 相同：前端 `http://localhost:5173`，后端 `http://localhost:3000`。
+- 容器使用独立的开发数据库，与本机 `server/dev.db` 互不影响；模型 API Key 可以在页面里配置，也可以继续写在 `server/.env`。
+- 执行 `docker compose -f infra/docker-compose.dev.yml down -v` 会同时删除容器里的小说数据，执行前请先备份。
+- Windows 上修改文件后没有触发热更时，先设置 `AI_NOVEL_DEV_POLLING=true` 和 `AI_NOVEL_DEV_TSC_WATCHFILE=DynamicPriorityPolling` 再启动。
+- 需要知识库向量检索时，使用 `docker compose -f infra/docker-compose.dev.yml --profile rag up --build` 同时启动 Qdrant。
+
 ### 4. 如果你使用 Qdrant Cloud
 
 如果你只是先体验主流程，其实可以先跳过 Qdrant，直接在 `server/.env` 里设：
