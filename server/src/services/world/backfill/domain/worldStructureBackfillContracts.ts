@@ -5,6 +5,8 @@ export const WORLD_STRUCTURE_BACKFILL_STATUSES = [
   "model_in_flight",
   "model_succeeded_pending_commit",
   "model_unknown",
+  "committed",
+  "conflict_result_retained",
 ] as const;
 
 export type WorldStructureBackfillStatus = (typeof WORLD_STRUCTURE_BACKFILL_STATUSES)[number];
@@ -73,6 +75,35 @@ export interface WorldStructureBackfillReadResult {
   result: WorldStructureBackfillResultRecord | null;
 }
 
+export interface WorldStructureBackfillCommitReceiptRecord {
+  id: string;
+  operationRecordId: string;
+  worldId: string;
+  operationId: string;
+  resultDigest: string;
+  baseContentRevision: number;
+  committedRevision: number;
+  beforeDigest: string;
+  afterDigest: string;
+  committedAt: Date;
+}
+
+export interface WorldStructureBackfillCommitReadOutcome {
+  operation: WorldStructureBackfillOperationRecord;
+  result: WorldStructureBackfillResultRecord | null;
+  receipt: WorldStructureBackfillCommitReceiptRecord | null;
+}
+
+export type WorldStructureBackfillCommitOutcome =
+  | { kind: "committed" | "replayed"; outcome: WorldStructureBackfillCommitReadOutcome & {
+    result: WorldStructureBackfillResultRecord;
+    receipt: WorldStructureBackfillCommitReceiptRecord;
+  } }
+  | { kind: "conflict_result_retained"; outcome: WorldStructureBackfillCommitReadOutcome & {
+    result: WorldStructureBackfillResultRecord;
+    receipt: null;
+  } };
+
 export type WorldStructureBackfillStoreErrorCode =
   | "INVALID_INPUT"
   | "OPERATION_ID_REUSED"
@@ -80,7 +111,11 @@ export type WorldStructureBackfillStoreErrorCode =
   | "OPERATION_NOT_FOUND"
   | "INVALID_STATE"
   | "MODEL_REFERENCE_MISMATCH"
-  | "RESULT_DIGEST_CONFLICT";
+  | "RESULT_DIGEST_CONFLICT"
+  | "RESULT_NOT_FOUND"
+  | "RESULT_INTEGRITY_MISMATCH"
+  | "COMMIT_RECEIPT_INTEGRITY"
+  | "COMMIT_RESULT_UNKNOWN";
 
 export class WorldStructureBackfillStoreError extends Error {
   constructor(

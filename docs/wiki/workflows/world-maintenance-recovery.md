@@ -98,7 +98,11 @@ R1-S2G 的首批生产接线只覆盖 `WorldService.updateWorld` 的既有 HTTP/
 
 S3-02b3a 的 owned store 已提供上述调用前 claim 与生成后 result 的持久事实，但仍未接入现有 `/backfill`。store 按固定字段顺序把世界、基线 revision、Prompt、provider/model、策略版本与来源 digest 计算为请求 hash；相同世界与 operation 的不同冻结输入拒绝重用。`startModel` 是从 `model_not_called` 进入 `model_in_flight` 的唯一条件更新门，lease 仅用于识别结果是否待确认，不授予第二次调用权。`markUnknown` 必须区分已知“结果不明”与 lease 到期：前者可立即进入 `model_unknown`，后者须到期；两者都不能自动重开模型调用。
 
-result 仅保存规范化结构与 binding support，和基线 revision、请求 hash、策略版本、模型观察引用及 digest 绑定；写 result 与 `model_succeeded_pending_commit` 状态属于同一事务。模型 request/attempt 身份只是可空的观察引用，不依赖 attempt 先落库，也不把 attempt 或手动提交 receipt 当成生成结果。store 不写 World 内容、快照或 RAG；CAS、commit receipt、来源页恢复和真实 PostgreSQL apply 仍属后续独立验收。因此“持久事实仓库已存在”不能被投影为“生产补全已受保护”。
+result 仅保存规范化结构与 binding support，和基线 revision、请求 hash、策略版本、模型观察引用及 digest 绑定；写 result 与 `model_succeeded_pending_commit` 状态属于同一事务。模型 request/attempt 身份只是可空的观察引用，不依赖 attempt 先落库，也不把 attempt 或手动提交 receipt 当成生成结果。
+
+S3-02b3b1 的 backfill-owned 提交门面只消费已持久化 result，不调用模型或旧 `/backfill`。它在事务内校验 operation/result 的冻结身份与 digest，并把原始结构及 binding support 与当前 World 组成完整候选：先用维护候选校验拒绝悬空引用，再归一化并生成兼容投影，不能让 normalization 静默删掉无效关系。随后用原基线 `contentRevision` 做 CAS；首次成功时，World 结构与兼容投影、revision 加一、backfill 专属 commit receipt 和 operation `committed` 状态必须同事务落库。手动维护 receipt 不是 backfill receipt，也不能替代生成 result。
+
+同一 operation 的并发落败方先读取赢家的 backfill receipt，重放只返回原 result/receipt，不再次递增 revision；响应或事务结果未知时，没有可验证 receipt 不能宣称已保存。作者在生成期间修改世界则只保留 result 并标 `conflict_result_retained`，不覆盖 World、不创建 receipt，也不自动按较新 revision 套用。快照/RAG、生产 HTTP 接线、来源页恢复和真实 PostgreSQL apply 尚未完成，因此“提交门面已存在”仍不能被投影为“生产补全已受保护”。
 
 本机 SQLite runtime migration 是安全提交可运行的必要条件；PostgreSQL apply 属 Release gate，在发布组合验证时单独执行，不把发布环境尚未 apply 混同为本地提交合同失败。两套 schema 仍须保持可验证的一致性，且任何迁移演练都只使用隔离数据库。
 

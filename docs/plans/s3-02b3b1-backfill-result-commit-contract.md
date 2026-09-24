@@ -2,7 +2,7 @@
 
 ## 身份与状态
 
-- Release / Epic：Release 1 / S3 可信世界；Story ID：`S3-02b3b1`；5 点；优先级 P1；独立 GPT-6 Scrum 与技术 QA DoR PASS，进入 R1-S3H 承诺。
+- Release / Epic：Release 1 / S3 可信世界；Story ID：`S3-02b3b1`；5 点；优先级 P1；独立 GPT-6 Scrum 与技术 QA DoR PASS，进入 R1-S3H 承诺；实现的独立 GPT-6 QA/QC 已 PASS，待阶段提交与 beta 复核。
 - 用户价值：一次 AI 结构补全已生成的结果能在作者世界内容未变化时只保存一次；如果生成期间作者改了世界，旧结果留存而不覆盖新内容。提交响应丢失时，可按原 operation 读回保存回执和生成结果。
 - 已完成依赖：S3-02b3s 冻结的身份/恢复决策、S3-02b3a durable claim/result store、S3-02b1 世界内容 revision CAS 与 S3-02b2 手动结构保存。当前生产 `/backfill` 仍走旧路径。
 - 本 Story 的输入是 `model_succeeded_pending_commit` 且已有规范化 result 的 `(worldId, operationId)`；不调用模型、不创建 result、不接 HTTP。`S3-02b3b2` 才负责模型到 result 的运行时编排。

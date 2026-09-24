@@ -339,7 +339,7 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 
 - Sprint Goal：已生成结果只在原世界内容版本匹配时保存一次；内容冲突保留结果，响应丢失能读回同一回执。
 - 承诺：仅 `S3-02b3b1`，5 点、无 Stretch。[Sprint 合同](./docs/plans/r1-s3h-sprint-commitment.md)与 [Story 合同](./docs/plans/s3-02b3b1-backfill-result-commit-contract.md)；独立 GPT-6 Scrum 与技术 QA DoR PASS。
-- 状态：Ready，待独立功能分支启动；未通过行为验收、阶段提交与 beta 复核不得标 Done。
+- 状态：In Review；实现和独立 GPT-6 QA/QC 已 PASS，待阶段提交与 beta 复核后才能标 Done。
 - Owner：单一 GPT-6 Luna Max 工程师独占 backfill owned 模块、双 schema/双新增 migration 与聚焦测试；根 PM/PO 独占共享计划/Wiki/提交与 beta 集成；GPT-6 Luna Medium QA/QC 独立验收。
 - 验收：原始 result/binding support 在归一化前校验引用；同 operation 双连接争提交只递增一次 revision、仅一份 backfill receipt；响应丢失/重启重放同 receipt/result；作者并发改世界零覆盖且保留结果；双 schema/migration 对称、隔离 SQLite 迁移与 server build。
 - 非范围：不接现有 `/backfill`、模型/Prompt/attempt、HTTP 查询、UI、snapshot/RAG、手动 PUT、真实 PostgreSQL apply 或 Release 2。UI 验收不适用。
