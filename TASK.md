@@ -3,7 +3,7 @@
 更新时间：2026-09-24
 集成分支：`beta`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S3I 仅承诺 `S3-02b3b2a` 单次物理模型调用门 3 点；独立 Scrum/QA DoR PASS，准备开发。此前 R1-S3E～S3H 均已完成并合入 beta。模型→result 运行时、HTTP 与 UI 接线继续 Refinement；Release 1 未完成。
+当前状态：R1-S3I 已完成 `S3-02b3b2a` 单次物理模型调用门 `3/3` 点，独立 QA/QC PASS，待根集成人快进 beta。此前 R1-S3E～S3H 均已完成并合入 beta。下一 Story 尚未 Ready。模型→result 运行时、HTTP 与 UI 接线继续 Refinement；Release 1 未完成。
 
 ## 权威文档
 
@@ -308,7 +308,7 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 
 1. R1-S1：配置、诊断、阅读恢复和世界归属安全（已完成，15/15 点）。
 2. R1-S2：R1-S2A～S2H 已完成（S2H `3/3`）；S2-04c1 实况切片已 Done，父 S2-04c 的任务/历史展示范围仍在 Refinement。
-3. R1-S3～4：可信世界、提案采用和失败复核；S3-01、S3-02a、S3-02b1、S3-02b2、S3-02b3s、S3-02b3a、S3-02b3b1、S3-03a1、S3-03a2 已完成。R1-S3I 仅承诺 S3-02b3b2a；原 S3-02b 其他旧入口、S3-02b3b2b/c/d/e 和 S3-03b～06 保持 Refinement/依赖状态。
+3. R1-S3～4：可信世界、提案采用和失败复核；S3-01、S3-02a、S3-02b1、S3-02b2、S3-02b3s、S3-02b3a、S3-02b3b1、S3-03a1、S3-03a2 已完成。S3-02b3b2a 已于 R1-S3I 完成；原 S3-02b 其他旧入口、S3-02b3b2b/c/d/e 和 S3-03b～06 保持 Refinement/依赖状态。
 4. R1-S5～6：本机Agent委托、预算、记忆和资产。
 5. R1-S7：十章长链、有限撤回和导航收束。
 6. R1-RC：桌面升级、备份恢复、包装与用户验收。
@@ -348,13 +348,15 @@ DoR 已满足，R1-S2G 已完成 `8/8`：S2-04b4 完成 5 点，S3-02b1 完成 3
 
 R1-RC 独立 Refinement：[R1-G01 发布治理拆分合同](./docs/plans/r1-g01-release-governance-contract.md)已冻结。`R1-G01a` 3 点、`R1-G01b` 5 点均 Done 并合入 beta，`R1-G01c` 1 点 PO 决定已 Done。Release 1 只支持 Windows x64 与 macOS arm64，不支持 macOS x64。当前静态门为 `PASS=11 / REVIEW=1`，不代表真实平台候选或 Release 1 已通过。
 
-## 当前 Sprint：R1-S3I 结构补全单次模型调用门
+## 已完成 Sprint：R1-S3I 结构补全单次模型调用门
 
 - Sprint Goal：为后续 AI 结构补全运行时提供显式的“最多一次物理供应商调用”模式，普通结构化 Prompt 保持既有行为。合同：[R1-S3I](./docs/plans/r1-s3i-sprint-commitment.md)。
-- 承诺：仅 [S3-02b3b2a](./docs/plans/s3-02b3b2a-backfill-single-attempt-prompt-contract.md) 3 点，无 Stretch；独立 GPT-6 Scrum/QA DoR PASS，状态 Ready，待单一 GPT-6 Luna Max 工程师实施。
+- 承诺/完成：仅 [S3-02b3b2a](./docs/plans/s3-02b3b2a-backfill-single-attempt-prompt-contract.md)，`3/3` 点、无 Stretch、无 carryover，Story Done；独立 GPT-6 Scrum/QA DoR PASS，由单一 GPT-6 Luna Max 工程师实施。
 - Owner：工程师独占 PromptRunner、structured execution/invoke、Prompt 执行选项和聚焦测试；根 PM/PO 独占共享计划/Wiki/发布记录与 beta 集成；GPT-6 Luna Medium QA/QC 独立验收。
 - 退出门：真实 mock provider `stream()`/transport 物理调用计数覆盖成功、重试/修复/fallback 失败、stream 拒绝与普通 Prompt 回归；server build、定向测试、独立 QA/QC、阶段提交和 beta 复核。无新 UI，UI 验收不适用。
 - 非范围：不接旧 `/backfill`、World/store/CAS/HTTP/UI、真实模型或数据库、Release 2。`S3-02b3b2b` 和 b3c/d/e 不顺手带入。
+- 独立 QA/QC：PASS，无阻断；逐一移除传输重试、fallback、策略上限、修复、语义重试与流式拒绝任一守卫均被测试捕获，文件边界与默认行为未变。server build 与合同定向测试 `35/35` PASS，`git diff --check`、server `tsc --noEmit` 通过；beta 快进复核由根集成人执行。
+- Review/Retrospective：Sprint Goal 在运行器内部范围达成，`3/3`、carryover `0`、返工/逸出缺陷 `0`。零修复下非 JSON 被归为 `schema_mismatch` 的分类问题并入 `S3-02b3b2b`，文本 Prompt 忽略单次选项记为同卡注记；请求级统一调用预算登记为 `R1-PROMPT02` Refinement（Not Ready，未承诺）。下一 Story 未标 Ready。
 
 ## 强制敏捷门
 

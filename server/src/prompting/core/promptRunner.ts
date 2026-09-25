@@ -436,8 +436,11 @@ async function runStructuredPromptInContext<I, O, R = O>(input: {
       taskType: input.asset.taskType,
       messages,
       schema: outputSchema,
+      singleProviderTransportAttempt: input.options?.singleProviderTransportAttempt === true,
       deferModelAttemptAdoption: true,
-      maxRepairAttempts: resolveStructuredRepairAttempts(input.asset as PromptAsset<unknown, unknown, unknown>),
+      maxRepairAttempts: input.options?.singleProviderTransportAttempt === true
+        ? 0
+        : resolveStructuredRepairAttempts(input.asset as PromptAsset<unknown, unknown, unknown>),
       promptMeta: prepared.invocation,
     });
     logMemoryUsage({
@@ -567,6 +570,9 @@ async function streamStructuredPromptInContext<I, O, R = O>(input: {
   contextBlocks?: Parameters<typeof selectContextBlocks>[0];
   options?: PromptExecutionOptions;
 }): Promise<PromptStreamRunResult<O>> {
+  if (input.options?.singleProviderTransportAttempt === true) {
+    throw new Error("singleProviderTransportAttempt is only supported by non-stream runStructuredPrompt.");
+  }
   if (input.asset.mode !== "structured" || !input.asset.outputSchema) {
     throw new Error(`Prompt asset ${input.asset.id}@${input.asset.version} is not a structured prompt.`);
   }

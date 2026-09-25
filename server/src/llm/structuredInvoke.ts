@@ -76,6 +76,8 @@ export interface StructuredInvokeInput<T> {
   reasoningEnabled?: boolean;
   reasoningEffort?: ReasoningEffort;
   disableFallbackModel?: boolean;
+  /** Internal PromptRunner constraint covering all provider calls in this request. */
+  singleProviderTransportAttempt?: boolean;
   /** Internal production-wiring controls; not part of the public prompt API. */
   deferModelAttemptAdoption?: boolean;
   modelAttemptRole?: Exclude<ModelAttemptRole, "legacy_unknown">;
@@ -383,7 +385,9 @@ async function invokeStructuredAttempt<T>(input: {
       taskType: input.baseInput.taskType,
       requestProtocol: resolved.requestProtocol,
       label: input.baseInput.label,
-      maxRepairAttempts: input.baseInput.maxRepairAttempts,
+      maxRepairAttempts: input.baseInput.singleProviderTransportAttempt
+        ? 0
+        : input.baseInput.maxRepairAttempts,
       promptMeta: input.baseInput.promptMeta,
       onRepairOutputDelta: (content) => {
         if (!repairStarted) {
@@ -468,7 +472,8 @@ async function tryStructuredStrategies<T>(input: {
     ]
     : sequence;
   let lastError: StructuredOutputError | null = null;
-  for (let index = 0; index < preferredSequence.length; index += 1) {
+  const strategyLimit = input.baseInput.singleProviderTransportAttempt ? 1 : preferredSequence.length;
+  for (let index = 0; index < strategyLimit; index += 1) {
     const strategy = preferredSequence[index]!;
     try {
       return await invokeStructuredAttempt({
@@ -587,10 +592,10 @@ async function invokeStructuredLlmDetailedInContext<T>(input: StructuredInvokeIn
       target: primaryTarget,
       fallbackAvailable: fallbackEnabled,
       fallbackUsed: false,
-      retryCount: transportRetryCount,
+      retryCount: input.singleProviderTransportAttempt ? 0 : transportRetryCount,
     });
   } catch (primaryError) {
-    if (!fallbackEnabled || !fallbackSettings) {
+    if (input.singleProviderTransportAttempt || !fallbackEnabled || !fallbackSettings) {
       throw primaryError;
     }
 

@@ -142,6 +142,11 @@ PO 于 2026-09-24 在 b3a 完成后进一步拆分上表的 **S3-02b3b 历史建
 
 PO 后续只读审计发现：现有 `runStructuredPrompt` 的一次逻辑调用可因传输、策略、备用模型、JSON 修复或语义恢复发起多次**物理**供应商调用，不能直接兑现本 Spike 的每 operation 最多一次保证。因此原未估点的 `S3-02b3b2` 再拆为 [b3b2a 单次物理调用门](./s3-02b3b2a-backfill-single-attempt-prompt-contract.md) 3 点（R1-S3I Ready）与 `S3-02b3b2b` 模型→持久结果运行时编排（继续 Refinement，待 b3b2a 完成后冻结合同）；原 b3b2 不再作为独立 Story 计点。一次逻辑请求和一次物理供应商调用不能互相替代，已有 attempt 观察事实也不能代替 operation claim。
 
+b3b2a 已于 R1-S3I Done。`S3-02b3b2b` 仍为 Refinement / Not Ready，冻结合同时须纳入以下 QA 发现：
+
+- 范围/AC（必须）：单次模式下 JSON 修复次数为 0 时，`structuredInvokeParser.ts` 对无法解析的输出须立即抛出 `malformed_json`（空正文为 `empty_content`），不得继续落入 schema 校验而被归为 `schema_mismatch`；以分类测试验收。原因是 b2b 的恢复决策可能按失败类别分支。重复的 not_adopted finalize 为幂等，无需处理。
+- 注记：`runTextPrompt`/`streamTextPrompt` 当前静默忽略 `singleProviderTransportAttempt`；b2b 只能经非流式 `runStructuredPrompt` 使用单次门，若需要文本或流式入口须另行拆卡，不能假设其受保护。
+
 ### Spike 出口记录
 
 - Sprint Goal：决策和隔离证据冻结了调用前 claim、生成结果与基线 revision 绑定、CAS 冲突保留以及响应丢失/未知状态恢复合同；不宣称生产能力。

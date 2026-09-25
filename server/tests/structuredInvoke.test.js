@@ -1,4 +1,5 @@
 const test = require("node:test");
+const { beforeEach, afterEach } = require("node:test");
 const assert = require("node:assert/strict");
 const { z } = require("zod");
 
@@ -6,8 +7,50 @@ const factory = require("../dist/llm/factory.js");
 const structuredFallbackSettings = require("../dist/llm/structuredFallbackSettings.js");
 const { buildStructuredResponseFormat, resolveStructuredOutputProfile } = require("../dist/llm/structuredOutput.js");
 const structuredInvoke = require("../dist/llm/structuredInvoke.js");
+const attempts = require("../dist/platform/llm/provenance/index.js");
 const { plannerOutputSchema } = require("../dist/services/planner/plannerSchemas.js");
 const { normalizePlannerOutput } = require("../dist/services/planner/PlannerService.js");
+
+class TestModelAttemptRepository {
+  constructor() {
+    this.rows = [];
+  }
+
+  async startAttempt(input) {
+    this.rows.push({ ...input, status: "started", finalAdoption: "pending" });
+  }
+
+  async finalizeAttempt(input) {
+    const row = this.rows.find((candidate) => candidate.attemptId === input.attemptId);
+    assert.ok(row, "attempt should have been recorded before finalization");
+    Object.assign(row, input);
+  }
+
+  async findAttempt(attemptId) {
+    return this.rows.find((row) => row.attemptId === attemptId) ?? null;
+  }
+
+  async reconstructRequest(requestId) {
+    const rows = this.rows.filter((row) => row.requestId === requestId);
+    return rows.length ? {
+      requestId,
+      attempts: rows,
+      adoptedAttemptId: rows.find((row) => row.finalAdoption === "adopted")?.attemptId ?? null,
+    } : null;
+  }
+
+  async findByNovelId() {
+    return [];
+  }
+}
+
+beforeEach(() => {
+  attempts.setModelAttemptRepositoryForTests(new TestModelAttemptRepository());
+});
+
+afterEach(() => {
+  attempts.setModelAttemptRepositoryForTests();
+});
 
 test("parseStructuredLlmRawContentDetailed recovers when repair output is truncated but completable", async () => {
   const originalGetLLM = factory.getLLM;

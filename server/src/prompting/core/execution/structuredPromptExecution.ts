@@ -224,7 +224,9 @@ export async function resolveStructuredOutput<I, O, R = O>(input: {
   let totalRepairAttempts = currentResult.repairAttempts;
   let repairUsed = currentResult.repairUsed;
   let semanticRetryAttempts = 0;
-  const maxSemanticRetryAttempts = resolveStructuredSemanticRetryAttempts(asset);
+  const maxSemanticRetryAttempts = input.options?.singleProviderTransportAttempt === true
+    ? 0
+    : resolveStructuredSemanticRetryAttempts(asset);
 
   const finalizeCandidate = async (
     adoption: "adopted" | "not_adopted",
@@ -359,10 +361,13 @@ export async function resolveStructuredOutput<I, O, R = O>(input: {
         taskType: input.asset.taskType,
         messages: currentMessages,
         schema: input.outputSchema,
+        singleProviderTransportAttempt: input.options?.singleProviderTransportAttempt === true,
         deferModelAttemptAdoption: true,
         modelAttemptRole: "semantic_retry",
         modelAttemptParentId: currentResult.modelAttemptCandidate?.attemptId ?? null,
-        maxRepairAttempts: resolveStructuredRepairAttempts(asset),
+        maxRepairAttempts: input.options?.singleProviderTransportAttempt === true
+          ? 0
+          : resolveStructuredRepairAttempts(asset),
         promptMeta: buildPromptInvocationMeta(
           asset,
           input.context,

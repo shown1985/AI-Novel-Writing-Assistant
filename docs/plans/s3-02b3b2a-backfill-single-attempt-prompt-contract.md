@@ -2,7 +2,7 @@
 
 ## 身份、价值与状态
 
-- Release / Epic：Release 1 / S3 可信世界；Story ID：`S3-02b3b2a`；估算 3 点；优先级 P1；状态 Ready，已承诺 R1-S3I。独立 GPT-6 Scrum 与 QA DoR PASS。
+- Release / Epic：Release 1 / S3 可信世界；Story ID：`S3-02b3b2a`；估算 3 点；优先级 P1；状态 Done（R1-S3I）。独立 GPT-6 Scrum 与 QA DoR PASS；实现经独立 QA/QC PASS（逐一移除各守卫的变异测试均被捕获），beta 快进复核由根集成人执行。
 - 用户价值：作为发起 AI 世界结构补全的作者，我希望同一次操作在模型结果不明时不会因内部重试再次产生供应商调用，从而能按明确的操作身份恢复或重新决定是否生成。
 - 前置：`S3-02b3s` 的调用前 claim/结果恢复决策、`S3-02b3a` 持久 store 已 Done。本卡只提供运行器的可选执行约束；`S3-02b3b2b` 才将它接到 backfill，现有 `/backfill` 在本卡后仍不受保护。
 - PO 决策：历史 Spike 的“每 operation 最多一次供应商调用”不能由一次 `runStructuredPrompt` 推出。当前结构化运行器可执行传输、策略、备用模型、JSON 修复和语义重试。本卡先使该强保证可执行，不削弱普通 Prompt 的既有重试能力，也不把模型 attempt 观察表当作费用 claim。
@@ -19,7 +19,7 @@
 ## 验收条件
 
 1. 在传输重试数大于零、备用模型启用且结构化策略存在备选的隔离设置下，通过 preflight 并成功返回的显式单次模式恰好发生一次底层 provider `stream()`/transport 调用，输出仍经 Prompt Schema 校验；同一逻辑 request 的 attempt 证据最多一条物理尝试。
-2. 首次调用出现可重试传输错误、策略不兼容、空/非法 JSON、schema 或后校验失败时，每个场景都至多一次底层 provider `stream()`/transport 调用，不触发修复、策略/模型 fallback 或语义重调。调用前的确定性失败可以是零次；不能用顶层 PromptRunner mock 调用计数代替 transport 计数。
+2. 首次调用出现可重试传输错误、策略不兼容、空/非法 JSON、schema 或后校验失败，以及调用开始后的取消时，每个场景都至多一次底层 provider `stream()`/transport 调用，不触发修复、策略/模型 fallback 或语义重调。JSON 修复的另一条 `getLLM().stream()` 路径也计入同一总数。调用前的确定性失败可以是零次；不能用顶层 PromptRunner mock 调用计数代替 transport 计数。
 3. 未开启单次模式的现有结构化调用仍保留传输重试与至少一种原有修复/备选策略行为；既有测试不得通过改变全局配置而“假通过”。并发独立请求不共用调用额度。
 4. 本卡没有 World、operation、result 或 receipt 写入。现有 `/backfill`、其他世界入口、HTTP、UI、schema/migration、snapshot/RAG 均不改；UI 验收不适用。
 5. 对 `streamStructuredPrompt` 传入单次选项的负例在 transport 前拒绝，物理调用数为零；普通流式调用保持既有行为。

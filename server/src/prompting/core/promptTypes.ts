@@ -155,6 +155,8 @@ export interface PromptExecutionOptions {
   roundIndex?: number;
   triggerReason?: string;
   requestBudget?: PromptRequestBudgetOptions;
+  /** Opts a non-stream structured run into at most one provider transport call. */
+  singleProviderTransportAttempt?: boolean;
 }
 
 export interface PromptExecutionMeta {

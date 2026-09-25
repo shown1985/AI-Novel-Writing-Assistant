@@ -99,9 +99,9 @@ R1-S2H 承诺并完成 [S2-04c1 实况模型来源只读显示](./s2-04c1-live-m
 
 本窗口只承诺并完成 [S3-02b3b1 已持久化补全结果的 CAS 提交与回执](./s3-02b3b1-backfill-result-commit-contract.md) `5/5` 点、无 Stretch。result→World 原子提交、冲突保留、回执重放和无回执未知保护经独立 QA/QC 与 beta 隔离复核通过；模型→result 编排由后续 b3b2a/b 拆卡承担，HTTP/UI 与真实 PostgreSQL apply 仍在后续卡。Review/Retrospective 见 [R1-S3H Sprint 承诺](./r1-s3h-sprint-commitment.md)。
 
-### R1-S3I 当前窗口
+### R1-S3I 已完成窗口
 
-仅承诺 [S3-02b3b2a 结构补全单次物理模型调用门](./s3-02b3b2a-backfill-single-attempt-prompt-contract.md) 3 点、无 Stretch。先在 Prompt/LLM 运行器显式限制一次物理调用；后续 `S3-02b3b2b` 才接模型→持久 result，b3c/d/e 才接 HTTP/UI/组合门。独立 Scrum/QA DoR PASS；现有 `/backfill` 尚无本保证。Sprint 合同见 [R1-S3I](./r1-s3i-sprint-commitment.md)。
+本窗口只承诺并完成 [S3-02b3b2a 结构补全单次物理模型调用门](./s3-02b3b2a-backfill-single-attempt-prompt-contract.md) `3/3` 点、无 Stretch。显式单次模式将非流式结构化 Prompt 的物理 provider 调用限制为一次，流式入口拒绝该选项，普通 Prompt 恢复行为不变，经独立 QA/QC 通过；`S3-02b3b2b` 模型→持久 result 与 b3c/d/e 仍在 Refinement，现有 `/backfill` 尚无本保证。Review/Retrospective 见 [R1-S3I Sprint 承诺](./r1-s3i-sprint-commitment.md)。
 
 ### R1-G01 发布治理 Backlog Refinement
 
