@@ -174,6 +174,8 @@ test("buildPayoffLedgerResponse orders items by risk and computes summary counts
       ledgerKey: "overdue",
       title: "黑市账户异常",
       currentStatus: "overdue",
+      targetStartChapterOrder: 3,
+      targetEndChapterOrder: 4,
       updatedAt: "2026-04-05T10:00:04.000Z",
     }),
   ], 5);
@@ -183,6 +185,27 @@ test("buildPayoffLedgerResponse orders items by risk and computes summary counts
   assert.equal(response.summary.overdueCount, 1);
   assert.equal(response.summary.paidOffCount, 1);
   assert.equal(response.updatedAt, "2026-04-05T10:00:04.000Z");
+});
+
+test("buildPayoffLedgerResponse counts an overdue flag inside its payoff window as pending", () => {
+  const response = buildPayoffLedgerResponse([
+    createLedgerItem({
+      ledgerKey: "pending",
+      title: "女二情报钥匙",
+      currentStatus: "pending_payoff",
+    }),
+    createLedgerItem({
+      ledgerKey: "overdue-in-window",
+      title: "黑市账户异常",
+      currentStatus: "overdue",
+      targetStartChapterOrder: 5,
+      targetEndChapterOrder: 6,
+    }),
+  ], 5);
+
+  assert.equal(response.items[0].ledgerKey, "overdue-in-window");
+  assert.equal(response.summary.pendingCount, 2);
+  assert.equal(response.summary.overdueCount, 0);
 });
 
 test("normalizePayoffLedgerIdentity removes spacing and common punctuation", () => {
