@@ -290,7 +290,9 @@ test("director character phase applies an existing draft cast option without reg
   assert.equal(result.status, "applied");
   assert.equal(autoGenerateCalls, 0);
   assert.equal(applyCalls, 1);
+  // Without fast-start `startupPreparation.backgroundEnrichment`, post-apply enhancement runs in sync mode.
   assert.deepEqual(applyArgs[0]?.[2], {
+    postApplyMode: "sync",
     visibleProfileGeneration: {
       provider: "deepseek",
       model: "deepseek-chat",

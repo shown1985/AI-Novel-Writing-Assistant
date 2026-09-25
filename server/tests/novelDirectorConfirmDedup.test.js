@@ -4,6 +4,9 @@ require("../dist/app.js");
 const { NovelDirectorService } = require("../dist/services/novel/director/NovelDirectorService.js");
 const { NovelDirectorConfirmRuntime } = require("../dist/services/novel/director/runtime/novelDirectorConfirmRuntime.js");
 const { prisma } = require("../dist/db/prisma.js");
+const {
+  novelCreateResourceRecommendationService,
+} = require("../dist/services/novel/NovelCreateResourceRecommendationService.js");
 
 function buildDirectorInput(overrides = {}) {
   return {
@@ -190,6 +193,7 @@ test("confirm runtime creates the novel through the standard runtime node", asyn
     competingFeel: "稳定推进",
     first30ChapterPromise: "前 30 章持续兑现成长",
     commercialTags: ["AI 写作", "长篇完成"],
+    writingPlatformPreference: "fanqie_free",
   });
   const runtime = new NovelDirectorConfirmRuntime({
     workflowService: {
@@ -219,7 +223,7 @@ test("confirm runtime creates the novel through the standard runtime node", asyn
     },
     novelContextService: {
       createNovel: async (payload) => {
-        calls.push(["createNovel", payload.title]);
+        calls.push(["createNovel", payload.title, payload.genreId, payload.primaryStoryModeId]);
         return buildNovel("novel_created_demo");
       },
       getNovelById: async (id) => buildNovel(id),
@@ -272,11 +276,32 @@ test("confirm runtime creates the novel through the standard runtime node", asyn
     calls.push(["updateNovel", where.id, data.creationExperience]);
     return buildNovel(where.id);
   };
+  // Missing genre / story modes are completed by the structured AI resource recommendation.
+  // Stub that boundary so the confirm-runtime contract is tested without a real model call.
+  const originalResolveRequired = novelCreateResourceRecommendationService.resolveRequired;
+  novelCreateResourceRecommendationService.resolveRequired = async (foundationInput) => {
+    calls.push(["resolveFoundation", foundationInput.genreId ?? null, foundationInput.primaryStoryModeId ?? null]);
+    return {
+      genreId: "genre_demo",
+      primaryStoryModeId: "story_mode_demo",
+      secondaryStoryModeId: undefined,
+      recommendation: {
+        summary: "demo foundation",
+        genre: { id: "genre_demo", name: "Demo", path: "Demo", source: "ai_recommended", reason: "demo" },
+        primaryStoryMode: { id: "story_mode_demo", name: "Demo", path: "Demo", source: "ai_recommended", reason: "demo" },
+        secondaryStoryMode: null,
+        caution: null,
+        recommendedAt: new Date().toISOString(),
+      },
+      promptBlock: "题材基底：Demo",
+    };
+  };
   let result;
   try {
     result = await runtime.confirmCandidate(input);
   } finally {
     prisma.novel.update = originalNovelUpdate;
+    novelCreateResourceRecommendationService.resolveRequired = originalResolveRequired;
   }
 
   assert.equal(result.novel.id, "novel_created_demo");
@@ -298,6 +323,12 @@ test("confirm runtime creates the novel through the standard runtime node", asyn
     call[0] === "markTaskRunning"
     && call[1] === "auto_director"
     && call[2] === "novel_create"
+  )));
+  assert.ok(calls.some((call) => call[0] === "resolveFoundation" && call[1] === null && call[2] === null));
+  assert.ok(calls.some((call) => (
+    call[0] === "createNovel"
+    && call[2] === "genre_demo"
+    && call[3] === "story_mode_demo"
   )));
   assert.ok(calls.some((call) => call[0] === "analyzeWorkspace" && call[1] === "novel_created_demo"));
   assert.ok(calls.some((call) => call[0] === "attachNovelToTask" && call[1] === "novel_created_demo"));
