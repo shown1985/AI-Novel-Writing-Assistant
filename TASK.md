@@ -77,6 +77,11 @@ Issue #126（模型隐藏与思考深度）已随桌面 0.4.18 发布（提交 `
    - 做法：并入构造函数已有的 `deps` 依赖包，由默认装配函数注入现有实例；不改变确认流程行为。
    - 验收：`novelDirectorConfirmDedup.test.js` 改为通过注入替身而非改写模块单例；确认流程相关测试与全量 fast/integration 测试无新增失败。
    - 顺序：排在上游合并收尾与 `promptRunner.ts` 拆分之后。
+2c. **排期：降级资产同步的补偿同步**（上游设计缺口，2026-09-25 合并审查发现）：
+   - 现状：`adaptive`/`deferred` 同步遇到仍在运行的检查点或局部失败时写入 `outcome=degraded` 边界，章节按已完成继续（符合“局部质量债不阻断全局链”）；但 `docs/wiki/workflows/chapter-artifact-delta-reliability.md` 所说的“后续补偿同步接管”在代码中没有对应任务，`isCurrentChapterProductionCompleted` 把 degraded 边界视为完成，之后不会再补抽取。
+   - 影响：该章角色状态、资源变化等资产可能长期缺失，影响后续章节上下文与连续性。
+   - 待设计：补偿触发时机（后台低优先级队列 / 下一章准备前 / 用户手动）、幂等键（内容哈希）、与质量债投影的关系；设计确定前不改动完成判定。
+   - 另：统一资产抽取 schema 已放宽数量上限（保留超出条目，`ba7cefd5`），与 wiki“确定性裁剪”及提示“最多 8 条”表述不一致，需在该设计中一并澄清是否裁剪。
 3. **用户本机删除 23 个远程分支**：`codex/*` 15 个、`fix/*` 7 个、`mac` 1 个；云端会话无权限执行删除，需用户在本机操作，删除前可用 `git cherry -v origin/main origin/<branch>` 复核。
 4. **用户按验收清单验收**：推荐用 `pnpm docker:dev` 启动（见 `docs/wiki/workflows/docker-dev-environment.md`），对照 `docs/checkpoints/user-acceptance-checklist.md` 逐项验收；升级前先按清单开头的备份步骤备份数据库。
 5. **P2-2 真实 10 章运行**：用户本机执行（云端环境没有任何模型 API Key，无法在云端跑真实模型）。
