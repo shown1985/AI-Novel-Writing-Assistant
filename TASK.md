@@ -58,8 +58,20 @@ Issue #126（模型隐藏与思考深度）已随桌面 0.4.18 发布（提交 `
 
 ## 当前执行顺序
 
-1. **构建 / 类型检查 / 测试验证（进行中）**：在干净的 `main` 上运行 `pnpm install`、`pnpm build`、`pnpm typecheck` 及世界生成、LLM、导演运行时、章节执行相关定向测试；记录结果，不跳过失败项。
-2. **修复两个已知既有测试失败**：`prompting-governance.test.js`（`server/src/services/comic/ComicFactService.ts:39/48` 内联 `SystemMessage`/`HumanMessage` 不在 Prompt 治理批准名单，需迁移到 `server/src/prompting/`）；`worldContextGateway.test.js`（调用参数多出 `openingOnly: undefined`）。同时规划（不必本轮执行）`server/src/prompting/core/promptRunner.ts`（1299 行）的拆分，先写职责清单再动代码。
+1. **构建 / 类型检查 / 测试验证（已完成，2026-09-25）**：`pnpm typecheck`（shared、server、client、desktop）通过。以同等条件（临时 SQLite 库先 `db push`）对照 `main@a580a27`：基线存在 38 个既有失败（服务端 fast 32、integration 2、客户端 4），本分支未引入新失败。
+2. **修复既有测试失败（已完成，2026-09-25）**：38 个既有失败全部按根因处理，不跳过、不删减断言；服务端 fast、integration、客户端测试全部通过。其中确认并修复的真实代码缺陷：
+   - 风格引擎：写法合同在交给正文生成前未隐去原作实体名（`f056815b` 迁移上下文块时丢失），已在 `sanitizeStyleContextForGeneration` 中恢复脱敏。
+   - 拆书额度：并发生成角色档案时 token 用量“读后写”丢失累加，已按实例串行化。
+   - 旧项目迁移：卷工作区补章节链接后丢失 `legacy` 来源标记，导致迁移后的伏笔账本同步不再执行，已恢复。
+   - Prompt 治理：漫画跨话事实提取 Prompt 从服务文件迁入 `prompts/comic/` 并注册。
+   - 目录边界：`NovelDirectorIdeaInspirationService` 移入 `director/idea/`。
+   - 移动端：补齐热门题材雷达与 4 个设置子页的移动端落点，去掉“更多”菜单中重复的“运行记录”，运行记录筛选区改为两行紧凑布局。
+   - 其余为测试未跟上有意的代码变更（`world_setup` 阶段、创作基础 AI 补齐、`full_book_autopilot` 续写模式下线、影响提案被对话层取代等），已按当前入口更新测试；短剧流水线测试的全量运行串扰已通过补全模块缓存清理修复。
+   - 待办：`server/src/prompting/core/promptRunner.ts`（1299 行）贴近上限，拆分前先写职责清单。
+2a. **待产品决定**（修复过程中发现，未擅自改变行为）：
+   - `full_book_autopilot` 携带显式 `chapter_range` 时会原样保留 `autoReview:false`/`autoRepair:false`（`a29c6aa9` 起），全书自动可能在某个范围内关闭审校和修复；是否应强制开启。
+   - 自动导演确认流程通过模块单例直接调用资源推荐、平台推荐，未走注入依赖，与 wiki 的显式依赖要求不一致；建议后续改为注入。
+   - 接管规则 wiki 两条措辞（旧范围“不得提前启动正文”与 `chapter_range` 写入 seed）需要统一。
 3. **用户本机删除 23 个远程分支**：`codex/*` 15 个、`fix/*` 7 个、`mac` 1 个；云端会话无权限执行删除，需用户在本机操作，删除前可用 `git cherry -v origin/main origin/<branch>` 复核。
 4. **用户按验收清单验收**：推荐用 `pnpm docker:dev` 启动（见 `docs/wiki/workflows/docker-dev-environment.md`），对照 `docs/checkpoints/user-acceptance-checklist.md` 逐项验收；升级前先按清单开头的备份步骤备份数据库。
 5. **P2-2 真实 10 章运行**：用户本机执行（云端环境没有任何模型 API Key，无法在云端跑真实模型）。
