@@ -131,6 +131,7 @@
 - 意图识别漏判：修 PromptAsset、输入上下文、schema 或工具目录，不加关键词路由。
 - 角色阵容看起来没有承接身份、题材或隐藏真相：先查角色准备 PromptAsset、上下文块和结构化输出，不加本地正则抽取身份，不用关键词判断候选能否自动应用。
 - 单个 PromptAsset 的 repair 或 semantic retry 频率异常升高：先查看 prompt quality telemetry 中的 promptId/version、上下文块、输出空率和失败分类，再判断是 schema 合同、上下文污染、模型路由还是 prompt 文案问题。
+- `getRegisteredPromptAsset(id, version)` 或 `hasRegisteredPromptAsset` 在资产明显存在时仍返回“missing prompt asset”：这通常不是资产丢失，而是 `server/src/prompting/registry/promptAssetLoaderEntries.ts` 里手写的 `key: "<id>@v<N>"` 字符串没有跟着 `PromptAsset.version` 的最新一次修改同步递增——例如给某条 prompt 加新规则时把 `version` 从 `v1` 改成了 `v2`，却忘了同步改 `promptAssetLoaderEntries.ts` 里的 `key`。`registry.ts` 的 loader 在按声明 key 找不到匹配版本时会遍历并水合其余全部条目再放弃，不会抛错，所以这种漂移不会在启动时报错，只会在按旧 key 精确查找、或 catalog/测试按最新 version 断言时才暴露。修复方式是把 `promptAssetLoaderEntries.ts` 里的 `key` 改成与资产文件里 `id`/`version` 字段一致，而不是把资产版本降回去迁就旧 key；同时要搜索仓库里其他硬编码了该旧 `@vN` 字符串的测试、文档（尤其是本 wiki 目录）一并更新。2026-09 从上游合并后一次性发现过 7 处这类漂移（`novel.world.generate_from_theme`、`novel.character.castOptions`、`novel.character.castAuto`、`novel.character.castAuto.members`、`novel.character.supplemental`、`novel.chapterHook.generate`、`style.detection`、`style.rewrite`），根因都是同一类“改资产版本号时漏改注册 key”，值得在改动任意 `version` 字段后，顺手用一次“遍历 `promptAssetLoaderEntries`、对比每条 `entry.key` 与其 `load()` 出的资产实际 `${id}@${version}`”的检查来防止复发。
 
 ## 相关模块
 
