@@ -112,7 +112,7 @@ test("novel workflow auto director route returns null when only historical visib
   }
 });
 
-test("novel workflow continue route accepts range and full-book continuation modes", { concurrency: false }, async () => {
+test("novel workflow continue route accepts range and quality-skip continuation modes and rejects retired full-book mode", { concurrency: false }, async () => {
   const calls = [];
   const originalEnqueue = DirectorCommandService.prototype.enqueueContinueCommand;
   const originalDetail = NovelWorkflowTaskAdapter.prototype.detail;
@@ -155,6 +155,16 @@ test("novel workflow continue route accepts range and full-book continuation mod
     const payload = await response.json();
     assert.equal(payload.success, true);
     assert.equal(payload.data.commandId, "command-1");
+    const skipQualityResponse = await fetch(`http://127.0.0.1:${port}/api/novel-workflows/workflow-auto-exec/continue`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        continuationMode: "skip_quality_repair",
+      }),
+    });
+    assert.equal(skipQualityResponse.status, 202);
+    // Full-book continuation is carried by the task run mode; the continue
+    // command only accepts DirectorContinuationMode values.
     const fullBookResponse = await fetch(`http://127.0.0.1:${port}/api/novel-workflows/workflow-auto-exec/continue`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -162,7 +172,7 @@ test("novel workflow continue route accepts range and full-book continuation mod
         continuationMode: "full_book_autopilot",
       }),
     });
-    assert.equal(fullBookResponse.status, 202);
+    assert.equal(fullBookResponse.status, 400);
     assert.deepEqual(calls, [
       {
         taskId: "workflow-auto-exec",
@@ -173,7 +183,7 @@ test("novel workflow continue route accepts range and full-book continuation mod
       {
         taskId: "workflow-auto-exec",
         input: {
-          continuationMode: "full_book_autopilot",
+          continuationMode: "skip_quality_repair",
         },
       },
     ]);
