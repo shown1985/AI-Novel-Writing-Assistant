@@ -3,9 +3,10 @@
 ## 身份、价值与状态
 
 - Release / Epic：Release 1 / S3 可信世界；父项 `S3-02b3c`。规划基线 `beta@64d128a1`，该基线已包含 S3J 的 `WorldStructureBackfillGenerationService`、`failed_terminal`、`onNotAcquired` 与 attempt 补绑。
-- 状态：Refinement 完成，**待 PO 确认与独立 DoR**。整体诚实估算 9 点，超过 5 点，因此拆为两张卡：
-  - [S3-02b3c1](#s3-02b3c1提交编排与失败原因持久化)：5 点，**拟作为下一张承诺**。
+- 状态：Refinement 完成；PO 已于 2026-09-25 确认拆分与三项决定（见文末“PO 决定”）。整体诚实估算 9 点，超过 5 点，因此拆为两张卡，另新建接线卡：
+  - [S3-02b3c1](#s3-02b3c1提交编排与失败原因持久化)：5 点，**PO 已确认，DoR 待执行**，拟入 [R1-S3L](./r1-s3l-sprint-commitment.md)。
   - [S3-02b3c2](#s3-02b3c2提交后-snapshotrag-一次性派生)：4 点，依赖 c1，保持 Not Ready。
+  - `S3-02b3c3` HTTP 查询与 `/backfill` 接线：排在 c2 之后、b3d 之前，Not Ready，跟踪见 [Spike 拆分表](./s3-02b3s-structure-backfill-idempotency-spike.md)。
 - 用户价值：作为不懂写作流程的新手作者，我点一次“AI 补全世界结构”后，希望生成结果在世界没被我改动时自动保存一次。我中途改了世界时，生成结果要保留下来、不覆盖我的修改。页面断开或服务重启后，我仍能知道结果是“已保存”“生成中”“生成失败（以及为什么）”还是“状态待确认”，而且不会被重复扣费。
 - 前置（均 Done 并在基线中）：
   - [S3-02b3s](./s3-02b3s-structure-backfill-idempotency-spike.md) 状态/恢复矩阵；
@@ -17,7 +18,7 @@
 ## 父项共同非范围
 
 - 不接 HTTP 路由/查询接口、`POST /worlds/:id/structure/backfill`、`WorldService.backfillStructure`、`worldStructureWorkspace.backfillWorldStructure` 或来源页 UI。
-  - 原 Spike 表中 b3c 的“HTTP operation query”在本次重定义后没有归属，见“需 PO 决定的问题”1。
+  - 原 Spike 表中 b3c 的“HTTP operation query”与旧 `/backfill` 切换归新卡 `S3-02b3c3`（PO 决定 1）。
   - 来源页恢复投影属于 S3-02b3d，组合发布门与真实 PostgreSQL apply 属于 S3-02b3e。
 - 不改 Prompt 资产、PromptRunner、`structuredInvoke.ts`、`structuredInvokeParser.ts`，不改手动结构 PUT、运行记录动作、其他世界旧入口，不引入 Release 2。
 - 不调用真实模型，不访问用户数据库，不做真实 PostgreSQL apply、`migrate reset`/`db reset` 或任何破坏性数据操作。只用 `/tmp/ai-novel-s3-02b3c*-*` 隔离库。
@@ -46,7 +47,7 @@
 
 ### 身份
 
-`S3-02b3c1`；5 点；P1；拟作为下一张承诺。单一 GPT-6 Luna Max 全栈工程师负责实施，同时是唯一数据 owner。
+`S3-02b3c1`；5 点；P1；**PO 已确认，DoR 待执行**；拟入 R1-S3L。单一 GPT-6 Luna Max 全栈工程师负责实施，同时是唯一数据 owner。
 
 ### 范围
 
@@ -58,7 +59,7 @@
 
    统一 outcome 为 `committed | conflict_result_retained | result_pending_commit | in_progress | failed_terminal | model_unknown`，携带 operation、result、receipt（仅已提交时）与持久化的 `failureCategory`。
 2. **提交结果不明**：`commitPersistedResult` 抛出 `COMMIT_RESULT_UNKNOWN` 或其他提交异常时，先用 `readCommitOutcome` 查持久事实：有 receipt 就返回 `committed`，否则返回 `result_pending_commit`，不调用模型。重放时可再次提交，因为 b3b1 的 CAS/receipt 已保证只写一次。
-3. **只读查询**：新增 `readRunOutcome(worldId, operationId)`，返回与上面相同形状的 outcome。它零模型调用、零写入；operation 不存在时返回 `null`。它是 b3d 与未来 HTTP 查询的唯一读取入口。
+3. **只读查询**：新增 `readRunOutcome(worldId, operationId)`，返回与上面相同形状的 outcome。它零模型调用、零写入；operation 不存在时返回 `null`。它是 S3-02b3c3 HTTP 查询与 b3d 来源页的唯一读取入口。
 4. **失败类别持久化**：在 `WorldStructureBackfillOperation` 上新增可空列 `failureCategory`，双 schema 与同名新增 migration `20260926120000_world_structure_backfill_failure_category` 保持对称。
    - `markFailed(worldId, operationId, failureCategory?)` 与 `markUnknown({ ..., failureCategory? })` 在**同一条件更新**中写入状态与类别，只有状态真的发生转换时才写入，重放不会覆盖已有类别。
    - lease 到期路径固定写入 `lease_expired`。
@@ -140,7 +141,7 @@
   - `status` 列为无 CHECK 的 TEXT。
   - `markUnknown` 带 `lease_expired`/`unknown_result` 原因。
 - [x] 共享调用方与零修复调用方已列出，确认不触及解析器。
-- [ ] PO 确认下方问题 1～3。
+- [x] PO 已确认拆分与三项决定（2026-09-25）；c1 与 c2 各带自己的只加列 migration。
 - [ ] 独立 GPT-6 Scrum 与 QA DoR PASS。
 
 ### DoD
@@ -168,7 +169,7 @@
 
 ### 身份
 
-`S3-02b3c2`；4 点；P1；依赖 c1 Done；Not Ready（需在 c1 完成后重新走 DoR）。
+`S3-02b3c2`；4 点（按 PO 决定 3 修订后须重估）；P1；依赖 c1 Done；Not Ready（需在 c1 完成后重新走 Refinement 与 DoR）。
 
 ### 范围草案
 
@@ -178,11 +179,15 @@
    - 同一事务内先创建 `WorldSnapshot`（label 沿用旧路径的 `structure-backfill`，数据用 `serializeWorldSnapshot`），再执行 `updateMany receipt where postCommitSnapshotId IS NULL`。影响行数为 0 时回滚，保证并发下只有一份。
    - snapshot label 对用户可见（`WorldAssetsTab.tsx` 直接显示 label），因此不得把 operationId 写入 label。
 3. **世界已被改动时**：重放发现 World `contentRevision != receipt.committedRevision` 时，不补 snapshot（它已不能代表那次提交），返回 `snapshotStatus: "skipped_world_changed"`。
-4. **RAG 入队**：在首次提交与“补齐缺失 snapshot”的重放中 best-effort 入队 world upsert。入队失败只返回 `ragRefreshPending: true`，不回滚已保存内容，与维护 facade 的规则一致。其他重放不重复入队。
+4. **RAG 刷新（PO 决定 3）**：snapshot 在 `committed` 路径上同步、best-effort 执行。RAG **不得同步执行**，只复用项目既有的索引任务自动入队机制，由 `RagWorker` 在后台消费。
+   - 候选入口（Refinement 时核实并写死）：`server/src/services/rag/RagIndexService.ts` 的 `RagIndexService.enqueueOwnerJob`，经 `enqueueUpsert("world", worldId)` 调用。它对同一 owner 已 `queued`/`running` 的任务去重，与上游 `79aca85c`“重建索引自动入队”所用的 `KnowledgeService.queueKnowledgeRebuild` → `enqueueOwnerJob` 是同一机制。维护 facade 的 `WorldRagRefreshAdapter` 与 `WorldService.queueRagUpsert` 也经 `enqueueUpsert` 进入这里。
+   - 本卡只创建任务行，不在请求内执行索引。入队失败只返回 `ragRefreshPending: true`，不回滚已保存内容。去重由 `enqueueOwnerJob` 保证，重放不另建去重状态。
+   - 运行记录保持只读，不增加“重建索引”“重试”等动作。
+   - Refinement 须写明最终入口文件与函数，并决定 RAG 关闭时的行为（见“待决问题”）。
 5. **端口注入与适配器**：
    - snapshot 与 RAG 都经注入端口访问。RAG 端口复用维护 facade 已导出的 `WorldRagRefreshPort` 类型。
    - 生产适配器放在 backfill `infrastructure/`：snapshot 适配器只读导入 `worldTransfer.serializeWorldSnapshot`；RAG 适配器调用 `ragIndexService.enqueueUpsert`。维护 facade 的 `WorldRagRefreshAdapter` 未导出，本卡不改维护模块。
-   - 生产装配由 `/backfill` 接线卡负责。
+   - 生产装配由 `S3-02b3c3` 接线卡负责。
 
 ### 文件边界草案
 
@@ -192,7 +197,7 @@
 
 ### 验收草案
 
-1. 首次提交恰好创建一份 `structure-backfill` snapshot，receipt 记录其 id，RAG 入队一次。
+1. 首次提交恰好创建一份 `structure-backfill` snapshot，receipt 记录其 id；RAG 只经既有入口创建或复用一条 world upsert 任务，请求内不执行索引。
 2. 提交后、snapshot 前崩溃的重放补齐恰好一份 snapshot；两个 worker 并发重放时仍只有一份。
 3. 世界已改动后的重放不创建 snapshot，返回 `skipped_world_changed`。
 4. snapshot 或 RAG 失败都不回滚 World/receipt，返回 `snapshotStatus: "failed"` 或 `ragRefreshPending`。之后的重放可以补 snapshot，但不会产生第二份。
@@ -202,12 +207,16 @@
 
 ### 估算
 
-4 点：事务性 snapshot 标记与缺口补齐约 1.5 点，适配器与端口约 1 点，migration 约 0.5 点，并发/崩溃夹具约 1 点。
+4 点（暂定）：事务性 snapshot 标记与缺口补齐约 1.5 点，适配器与端口约 1 点，migration 约 0.5 点，并发/崩溃夹具约 1 点。改为复用既有 RAG 入队后可能减少适配器工作，Refinement 时重估。
+
+### 待决问题（c2 Refinement 内解决）
+
+- RAG 关闭时的行为：知识库路径 `queueKnowledgeRebuild` 在 `ragConfig.enabled` 为假时不建任务（Wiki：不得制造没有消费者的永久排队）；世界路径（`WorldService.queueRagUpsert`、维护 `WorldRagRefreshAdapter`）不检查开关。**建议**与世界路径保持一致，由 PO 在 c2 DoR 时确认。无论哪种，都不得像手动重建那样自动开启 RAG，因为补全不是作者明确要求的重建动作。
 
 ---
 
-## 需 PO 决定的问题（附建议默认）
+## PO 决定（2026-09-25）
 
-1. **HTTP 查询与 `/backfill` 接线的归属**：原 Spike 表把“HTTP operation query”放在 b3c，而 b3d 只负责来源页，b3e 只负责组合发布门。本次重定义后，这部分没有归属。**建议**新建 `S3-02b3c3`（HTTP 请求/查询 + 旧 `/backfill` 切换到 `runBackfill`/`readRunOutcome`，含 c2 适配器的生产装配），排在 c2 之后、b3d 之前。
-2. **c1、c2 的迁移是否合并**：**建议**不合并，各自带一个只加列的 migration。这样 c1 不携带尚无用途的列，c2 的 snapshot 标记可以随 c2 设计调整。
-3. **提交后派生的时机**：**建议**由 c2 在 `runBackfill` 的 `committed` 分支同步执行，失败时 best-effort 降级。不引入后台 worker 或任务中心动作，符合“运行记录只读”规则。
+1. **批准**新建 `S3-02b3c3`：负责 HTTP 请求/查询、旧 `/backfill` 切换到 `runBackfill`/`readRunOutcome`，以及 c2 适配器的生产装配。排在 c2 之后、b3d 之前，Not Ready。
+2. **批准** c1 与 c2 各自携带只加列的 migration，不合并。
+3. **改定**：提交后 snapshot 在 `committed` 路径上同步、best-effort 执行；RAG 不同步执行，复用既有索引任务自动入队机制（见 c2 范围 4），c2 Refinement 须写明确切入口。运行记录保持只读。

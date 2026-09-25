@@ -119,6 +119,10 @@ R1-S2H 承诺并完成 [S2-04c1 实况模型来源只读显示](./s2-04c1-live-m
 
 本窗口承诺并完成 [R1-G02a](./r1-g02-fork-desktop-identity-contract.md) 3 点加 R1-G02b 4 点，`7/7`，无 Stretch、无 carryover，经独立 QA/QC 通过。公开发布 guard 要求 major ≥ 1；发布脚本只向 `fork` 推送单个 tag，并拒绝与本地、`fork` 或上游已有 tag 碰撞；四处发布/更新 owner 指向本发行版；beta workflow 只验证不上传。审计 `FORK-VERSION-LINE=REVIEW`（版本仍为 0.x）、`FORK-PUBLISH-TARGET=PASS`，静态门 `PASS=12 / REVIEW=2`。未改身份字段或数据目录，未产生 tag、安装包或 Actions 运行。QA 跟进项登记为 `R1-G02g`（Refinement）。Review/Retrospective 见 [R1-S3K Sprint 承诺](./r1-s3k-sprint-commitment.md)。
 
+### R1-S3L 当前窗口（DoR 待执行）
+
+本窗口拟只承诺 [S3-02b3c1 结构补全提交编排与失败原因持久化](./s3-02b3c-backfill-commit-orchestration-contract.md) 5 点，无 Stretch，尚未开始。PO 已确认范围。生成结果在世界未变时恰好提交一次，冲突时保留结果；失败类别随状态转换持久化，重启后可读。重放、并发与提交结果不明时不重调模型、不重复提交。migration 只加列，双库对称，只在隔离临时库验证。提交后 snapshot/RAG（c2）、HTTP 与 `/backfill` 接线（c3）、UI、真实 PostgreSQL apply 不在本窗口。独立 Scrum/QA DoR 待执行，未 PASS 前不开始。详见 [R1-S3L Sprint 承诺](./r1-s3l-sprint-commitment.md)。
+
 ### R1-S0 新增 Story
 
 #### R1-00 上游实现与计划重对账（3 点）

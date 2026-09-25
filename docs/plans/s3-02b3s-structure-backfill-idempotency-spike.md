@@ -132,7 +132,8 @@ SQLite 与 PostgreSQL schema/migration 必须同一字段和唯一约束；migra
 | --- | ---: | --- |
 | S3-02b3a Durable backfill claim/result store | 5 | 双 schema + 增量 migration；唯一 operation/request hash、lease、状态终态和 result record；隔离双库证明未知不重调、结果可读；不接来源页 |
 | S3-02b3b Backfill runtime 与 CAS recovery | 5 | Prompt/attempt 关联、归一化结果持久化、同 operation CAS、冲突零写入、receipt/result replay；真实 mock/provider seam 与故障回放通过 |
-| S3-02b3c Backfill HTTP operation query | 3（范围扩大后须重估） | 请求接收 operation/base revision/hash 输入，新增按 operation 读状态/receipt/result 的内部接口，响应丢失和错误码契约通过；不扩任务中心。PO 2026-09-25 追加：组合 b3b2b 持久 result→b3b1 `commitPersistedResult` 及提交后 snapshot/RAG；持久化失败类别（必要时带 migration），使来源页重启后仍能说明“为何失败”。**Refinement 完成，待 PO 确认与 DoR**：合同见 [b3c 提交编排与失败原因保存](./s3-02b3c-backfill-commit-orchestration-contract.md)，拆为 c1（提交编排 + 失败类别持久化，5 点，拟作下一承诺）与 c2（提交后 snapshot/RAG，4 点，Not Ready）；HTTP 查询与 `/backfill` 接线的归属待 PO 决定 |
+| S3-02b3c Backfill HTTP operation query | 3（范围扩大后须重估） | 请求接收 operation/base revision/hash 输入，新增按 operation 读状态/receipt/result 的内部接口，响应丢失和错误码契约通过；不扩任务中心。PO 2026-09-25 追加：组合 b3b2b 持久 result→b3b1 `commitPersistedResult` 及提交后 snapshot/RAG；持久化失败类别（必要时带 migration），使来源页重启后仍能说明“为何失败”。Refinement 完成，合同见 [b3c 提交编排与失败原因保存](./s3-02b3c-backfill-commit-orchestration-contract.md)。PO 2026-09-25 确认：拆为 c1（提交编排 + 失败类别持久化，5 点，**PO 已确认，DoR 待执行**，拟入 [R1-S3L](./r1-s3l-sprint-commitment.md)）与 c2（提交后 snapshot 同步 best-effort，RAG 复用既有索引任务自动入队，4 点暂定，Not Ready），各带只加列 migration；HTTP 查询与 `/backfill` 接线移至 S3-02b3c3 |
+| S3-02b3c3 Backfill HTTP 查询与 `/backfill` 接线 | 未估 | PO 2026-09-25 新建，排在 c2 之后、b3d 之前：HTTP 请求接收 operation/base revision，按 operation 查询状态/receipt/result/失败类别（经 `readRunOutcome`），旧 `/backfill` 切换到 `runBackfill`，装配 c2 的 snapshot/RAG 生产适配器；响应丢失与错误码契约；不扩任务中心。Refinement / Not Ready |
 | S3-02b3d 来源页恢复投影 | 3 | 同一世界工作台的两处“AI 整理/提取”入口/视图共用 operation；生成中、已保存、未保存结果可处理、冲突、状态待确认均能回到当前世界工作台；不在运行记录放操作按钮 |
 | S3-02b3e 组合恢复与发布门 | 3 | SQLite/PostgreSQL 迁移检查、并发/重启/lease/响应丢失行为回归、真实来源页验收和 beta 组合验证；不引入真实模型计费验证 |
 
