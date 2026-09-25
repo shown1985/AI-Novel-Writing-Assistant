@@ -418,3 +418,72 @@ test("concurrent single transport requests each receive an independent one-call 
     harness.restore();
   }
 });
+
+test("single transport mode classifies zero-repair parse failures without reaching schema validation", async (t) => {
+  const { StructuredOutputError } = require("../dist/llm/structuredOutput.js");
+  const scenarios = [
+    { name: "non-empty non-JSON is malformed_json", content: "not-json at all", category: "malformed_json" },
+    { name: "whitespace-only is empty_content", content: "   \n\t ", category: "empty_content" },
+    {
+      name: "valid JSON violating the schema stays schema_mismatch",
+      content: JSON.stringify({ summary: "缺少候选", candidates: [] }),
+      category: "schema_mismatch",
+    },
+  ];
+  for (const scenario of scenarios) {
+    await t.test(scenario.name, async () => {
+      const harness = installTransportHarness(async () => jsonStream(scenario.content));
+      try {
+        await assert.rejects(
+          runRecommendation({ singleProviderTransportAttempt: true }),
+          (error) => error instanceof StructuredOutputError && error.category === scenario.category,
+        );
+        assertOnlyPrimaryAttempt(harness);
+        assert.equal(harness.repairs.length, 0, "zero-repair mode must not open a repair call");
+      } finally {
+        harness.restore();
+      }
+    });
+  }
+});
+
+test("ordinary structured mode still sends the same non-JSON output through JSON repair", async () => {
+  const harness = installTransportHarness(async () => jsonStream("not-json at all"));
+  try {
+    const result = await runRecommendation();
+
+    assert.equal(harness.calls.length, 1);
+    assert.equal(harness.repairs.length, 1, "repair budget >= 1 keeps the repair path");
+    assert.equal(result.output.candidates[0].styleProfileId, "allowed-profile");
+  } finally {
+    harness.restore();
+  }
+});
+
+test("zero-repair calls outside single transport mode keep the legacy one-call schema_mismatch classification", async () => {
+  const { StructuredOutputError } = require("../dist/llm/structuredOutput.js");
+  const { invokeStructuredLlmDetailed } = require("../dist/llm/structuredInvoke.js");
+  const harness = installTransportHarness(async () => jsonStream("not-json"));
+  try {
+    await assert.rejects(
+      invokeStructuredLlmDetailed({
+        label: "zero-repair-prompt-json-regression",
+        systemPrompt: "只输出 JSON。",
+        userPrompt: "生成推荐。",
+        schema: styleRecommendationPrompt.outputSchema,
+        provider: PRIMARY_PROVIDER,
+        model: PRIMARY_MODEL,
+        structuredStrategy: "prompt_json",
+        maxRepairAttempts: 0,
+        // Isolate the primary strategy loop; the configured fallback model is a separate, unchanged stage.
+        disableFallbackModel: true,
+      }),
+      (error) => error instanceof StructuredOutputError && error.category === "schema_mismatch",
+    );
+    assert.equal(harness.calls.length, 1, "prompt_json schema_mismatch still stops after one provider call");
+    assert.equal(harness.calls[0].strategy, "prompt_json");
+    assert.equal(harness.repairs.length, 0);
+  } finally {
+    harness.restore();
+  }
+});

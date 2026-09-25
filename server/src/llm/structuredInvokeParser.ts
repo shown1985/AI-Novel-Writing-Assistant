@@ -49,6 +49,8 @@ export interface StructuredInvokeRawParseInput<T> {
   requestProtocol?: ModelRouteRequestProtocol;
   label: string;
   maxRepairAttempts?: number;
+  /** Only single-transport calls classify an unparseable zero-repair response as malformed_json. */
+  classifyZeroRepairParseFailure?: boolean;
   promptMeta?: PromptInvocationMeta;
   onRepairOutputDelta?: (content: string) => void;
   strategy: StructuredOutputStrategy;
@@ -446,6 +448,20 @@ export async function parseStructuredLlmRawContentDetailed<T>(
           });
         }
       }
+    }
+    // Single-transport calls have a zero repair budget: a non-empty response
+    // that cannot be parsed is malformed JSON, not a schema miss. Other
+    // zero-repair callers keep the legacy schema-validation classification.
+    if (input.classifyZeroRepairParseFailure === true) {
+      throw buildStructuredError({
+        message: `[${input.label}] JSON 解析失败，且本次调用不允许 JSON 修复。错误：${parseErrorMessage}`,
+        category: "malformed_json",
+        strategy: input.strategy,
+        profile: input.profile,
+        reasoningForcedOff: input.reasoningForcedOff,
+        fallbackAvailable: input.fallbackAvailable,
+        fallbackUsed: input.fallbackUsed,
+      });
     }
   }
 

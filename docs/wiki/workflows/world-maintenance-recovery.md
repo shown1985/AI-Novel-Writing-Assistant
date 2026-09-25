@@ -108,6 +108,10 @@ S3-02b3b1 的 backfill-owned 提交门面只消费已持久化 result，不调�
 
 同一 operation 的并发落败方先读取赢家的 backfill receipt，重放只返回原 result/receipt，不再次递增 revision；响应或事务结果未知时，没有可验证 receipt 不能宣称已保存。作者在生成期间修改世界则只保留 result 并标 `conflict_result_retained`，不覆盖 World、不创建 receipt，也不自动按较新 revision 套用。快照/RAG、生产 HTTP 接线、来源页恢复和真实 PostgreSQL apply 尚未完成，因此“提交门面已存在”仍不能被投影为“生产补全已受保护”。
 
+S3-02b3b2b 的生成编排固定为：`claim`（`model_not_called`），然后在 provider 调用前由 `startModel` 持久进入 `model_in_flight`，再用单次模式调用。之后只有三种出口：`model_succeeded_pending_commit`；`failed_terminal`（provider 已返回但内容不可用）；`model_unknown`（传输、取消、非结构化异常，或拿到输出后归一化/保存失败）。并发落败方从 `startModel` 取得当前状态直接返回，不比对引用、不调用模型。除唯一胜者推进 `model_not_called` 外，任何重放都不重调模型；`model_not_called` 重放前须确认世界 revision 与来源 digest 未漂移。
+
+零修复解析失败归为 `malformed_json` 只在单次模式生效。其他零修复生产 Prompt 仍按原路径归为 `schema_mismatch`，因为策略循环只在 `prompt_json` 的 `schema_mismatch` 处提前停止；若对它们改判，每次调用会从 1 次升为 3 次。凡是改动共享解析分类，都须先列出全部零修复调用方。
+
 本机 SQLite runtime migration 是安全提交可运行的必要条件；PostgreSQL apply 属 Release gate，在发布组合验证时单独执行，不把发布环境尚未 apply 混同为本地提交合同失败。两套 schema 仍须保持可验证的一致性，且任何迁移演练都只使用隔离数据库。
 
 引用校验必须发生在任何会丢弃无效引用的 normalization 之前。分区同步若会破坏跨分区引用，应返回最小依赖分区供作者重新确认，不能自动扩大用户选择，也不能把过滤后的结构当作修复成功。

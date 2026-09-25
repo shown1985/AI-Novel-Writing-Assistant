@@ -358,12 +358,14 @@ R1-RC 独立 Refinement：[R1-G01 发布治理拆分合同](./docs/plans/r1-g01-
 - 独立 QA/QC：PASS，无阻断；逐一移除传输重试、fallback、策略上限、修复、语义重试与流式拒绝任一守卫均被测试捕获，文件边界与默认行为未变。server build 与合同定向测试 `35/35` PASS，`git diff --check`、server `tsc --noEmit` 通过；beta 快进复核由根集成人执行。
 - Review/Retrospective：Sprint Goal 在运行器内部范围达成，`3/3`、carryover `0`、返工/逸出缺陷 `0`。零修复下非 JSON 被归为 `schema_mismatch` 的分类问题并入 `S3-02b3b2b`，文本 Prompt 忽略单次选项记为同卡注记；请求级统一调用预算登记为 `R1-PROMPT02` Refinement（Not Ready，未承诺）。下一 Story 未标 Ready。
 
-## 当前 Sprint：R1-S3J 结构补全结果持久化编排
+## 已完成 Sprint：R1-S3J 结构补全结果持久化编排
 
-- 状态：PO 已确认范围（2026-09-25），独立 DoR PASS（2026-09-25），实施中。合同：[R1-S3J](./docs/plans/r1-s3j-sprint-commitment.md)、[S3-02b3b2b](./docs/plans/s3-02b3b2b-backfill-generation-orchestration-contract.md)，5 点，无 Stretch。
+- 状态：Done。PO 于 2026-09-25 确认范围，独立 DoR 在同日 PASS。合同：[R1-S3J](./docs/plans/r1-s3j-sprint-commitment.md)、[S3-02b3b2b](./docs/plans/s3-02b3b2b-backfill-generation-orchestration-contract.md)，`5/5` 点，无 Stretch，无 carryover。
 - Sprint Goal：一次结构补全操作先持久 claim，再发出最多一次物理模型调用，然后把结果与基线 revision 绑定保存。并发、重启、响应丢失、lease 到期或结果不明时只读回既有事实，不重新调用模型。单次模式下的解析失败须分别归为 `malformed_json` 或 `empty_content`。
 - PO 决定：result→World 提交、提交后 snapshot/RAG 与失败类别持久化归 S3-02b3c（Not Ready）。进入前置：独立 GPT-6 Scrum/QA DoR PASS。
 - 非范围：不接 `/backfill`、不写 World、不改 HTTP/UI/schema/migration/PromptRunner，不做真实模型或 PostgreSQL apply，不引入 Release 2。
+- 独立 QA/QC：首轮 FAIL，1 项阻断：零修复解析改判波及非单次零修复 Prompt，会使 `prompt_json` 下调用由 1 次升至 3 次。PO 批准在 `structuredInvoke.ts` 增加一行守卫，把新分类限于单次模式；复验 PASS，非单次调用次数与 fallback 路径和改动前一致，根代码评审 PASS。合同固定命令 `76/76` PASS，`git diff --check`、server `tsc --noEmit` 通过。
+- Review/Retrospective：Sprint Goal 在 backfill 内部编排范围达成，`5/5`、carryover `0`。返工为 DoR 1 次（3 项缺口加 mode 用词）和 QA 阻断 1 项（合并前修复），逸出缺陷 `0`。改进：触及共享解析器的合同须列出全部零修复调用方；文件型双连接并发验收默认用 worker 线程。`prompting-governance` 基线失败登记为 `R1-PROMPT03` Refinement（Not Ready）。下一 Story 未标 Ready。
 
 ## 强制敏捷门
 

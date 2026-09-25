@@ -53,6 +53,20 @@ export interface StartWorldStructureBackfillModelInput {
   leaseExpiresAt: Date;
   modelRequestId?: string | null;
   modelAttemptId?: string | null;
+  /**
+   * Opt-in loser behavior for the generation orchestrator. When set to
+   * `return_current`, a caller that does not win the call right receives the
+   * current operation/result instead of a reference comparison error.
+   */
+  onNotAcquired?: "return_current";
+}
+
+export interface StartWorldStructureBackfillModelResult {
+  acquired: boolean;
+  operation: WorldStructureBackfillOperationRecord;
+  result: WorldStructureBackfillResultRecord | null;
+  /** Present only when `onNotAcquired: "return_current"` was set and the call right was not acquired. */
+  current?: WorldStructureBackfillReadResult;
 }
 
 export interface PersistWorldStructureBackfillResultInput extends WorldStructureBackfillRequestInput {
@@ -72,13 +86,13 @@ export interface MarkWorldStructureBackfillUnknownInput {
 export interface WorldStructureBackfillStore {
   claim(input: WorldStructureBackfillRequestInput): Promise<WorldStructureBackfillReadResult>;
   read(worldId: string, operationId: string): Promise<WorldStructureBackfillReadResult | null>;
-  startModel(input: StartWorldStructureBackfillModelInput): Promise<{
-    acquired: boolean;
-    operation: WorldStructureBackfillOperationRecord;
-    result: WorldStructureBackfillResultRecord | null;
-  }>;
+  startModel(input: StartWorldStructureBackfillModelInput): Promise<StartWorldStructureBackfillModelResult>;
   persistResult(input: PersistWorldStructureBackfillResultInput): Promise<WorldStructureBackfillReadResult>;
   markUnknown(input: MarkWorldStructureBackfillUnknownInput): Promise<{
+    changed: boolean;
+    state: WorldStructureBackfillReadResult | null;
+  }>;
+  markFailed(worldId: string, operationId: string): Promise<{
     changed: boolean;
     state: WorldStructureBackfillReadResult | null;
   }>;
@@ -203,6 +217,34 @@ function assertModelReferencesMatch(
   }
 }
 
+/**
+ * Decide whether a persist call may bind the attempt id that only becomes
+ * known after the provider call. Binding is allowed only when the stored
+ * attempt id is still null, the request id matches, and a non-null attempt id
+ * is supplied; every other difference remains an integrity violation.
+ */
+function resolvePersistModelReferences(
+  row: OperationRow,
+  modelRequestId: string | null,
+  modelAttemptId: string | null,
+): { bindAttemptId: boolean } {
+  if (row.modelRequestId === modelRequestId && row.modelAttemptId === modelAttemptId) {
+    return { bindAttemptId: false };
+  }
+  if (
+    row.modelAttemptId === null
+    && modelAttemptId !== null
+    && row.modelRequestId === modelRequestId
+    && !row.result
+  ) {
+    return { bindAttemptId: true };
+  }
+  throw new WorldStructureBackfillStoreError(
+    "MODEL_REFERENCE_MISMATCH",
+    "Model request and attempt references must match the operation claim.",
+  );
+}
+
 function mapOperationWithResult(
   row: OperationRow | null,
   worldId: string,
@@ -276,11 +318,7 @@ export class PrismaWorldStructureBackfillStore implements WorldStructureBackfill
     return mapOperationWithResult(await this.readRow(worldId, operationId), worldId, operationId);
   }
 
-  async startModel(input: StartWorldStructureBackfillModelInput): Promise<{
-    acquired: boolean;
-    operation: WorldStructureBackfillOperationRecord;
-    result: WorldStructureBackfillResultRecord | null;
-  }> {
+  async startModel(input: StartWorldStructureBackfillModelInput): Promise<StartWorldStructureBackfillModelResult> {
     if (typeof input.worldId !== "string" || input.worldId.trim().length === 0) {
       invalidInput("worldId must be a non-empty string.");
     }
@@ -288,6 +326,9 @@ export class PrismaWorldStructureBackfillStore implements WorldStructureBackfill
       invalidInput("operationId must be a non-empty string.");
     }
     validateLeaseDate(input.leaseExpiresAt, "leaseExpiresAt");
+    if (input.onNotAcquired !== undefined && input.onNotAcquired !== "return_current") {
+      invalidInput("onNotAcquired must be return_current when provided.");
+    }
     const modelRequestId = normalizeModelReference(input.modelRequestId, "modelRequestId");
     const modelAttemptId = normalizeModelReference(input.modelAttemptId, "modelAttemptId");
 
@@ -310,6 +351,15 @@ export class PrismaWorldStructureBackfillStore implements WorldStructureBackfill
       throw operationNotFound();
     }
     if (update.count !== 1) {
+      if (input.onNotAcquired === "return_current") {
+        const current = toReadResult(row);
+        return {
+          acquired: false,
+          operation: current.operation,
+          result: current.result,
+          current,
+        };
+      }
       assertModelReferencesMatch(row, modelRequestId, modelAttemptId);
     }
     return {
@@ -345,7 +395,7 @@ export class PrismaWorldStructureBackfillStore implements WorldStructureBackfill
         throw operationNotFound();
       }
       assertRequestMatches(row, input);
-      assertModelReferencesMatch(row, modelRequestId, modelAttemptId);
+      const { bindAttemptId } = resolvePersistModelReferences(row, modelRequestId, modelAttemptId);
 
       if (row.result) {
         if (row.result.digest !== resultPayload.digest) {
@@ -384,8 +434,14 @@ export class PrismaWorldStructureBackfillStore implements WorldStructureBackfill
           requestHash,
           baseContentRevision: normalizedRequest.baseContentRevision,
           status: "model_in_flight",
+          modelRequestId: row.modelRequestId,
+          modelAttemptId: row.modelAttemptId,
         },
-        data: { status: "model_succeeded_pending_commit", leaseExpiresAt: null },
+        data: {
+          status: "model_succeeded_pending_commit",
+          leaseExpiresAt: null,
+          ...(bindAttemptId ? { modelAttemptId } : {}),
+        },
       });
       if (updated.count !== 1) {
         throw new WorldStructureBackfillStoreError(
@@ -432,6 +488,27 @@ export class PrismaWorldStructureBackfillStore implements WorldStructureBackfill
       }
       return toReadResult(existing);
     }
+  }
+
+  async markFailed(worldId: string, operationId: string): Promise<{
+    changed: boolean;
+    state: WorldStructureBackfillReadResult | null;
+  }> {
+    if (typeof worldId !== "string" || worldId.trim().length === 0) {
+      invalidInput("worldId must be a non-empty string.");
+    }
+    if (typeof operationId !== "string" || operationId.trim().length === 0) {
+      invalidInput("operationId must be a non-empty string.");
+    }
+    const update = await this.client.worldStructureBackfillOperation.updateMany({
+      where: { worldId, operationId, status: "model_in_flight" },
+      data: { status: "failed_terminal" },
+    });
+    const row = await this.readRow(worldId, operationId);
+    return {
+      changed: update.count === 1,
+      state: row ? toReadResult(row) : null,
+    };
   }
 
   async markUnknown(input: MarkWorldStructureBackfillUnknownInput): Promise<{

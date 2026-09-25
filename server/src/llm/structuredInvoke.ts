@@ -388,6 +388,7 @@ async function invokeStructuredAttempt<T>(input: {
       maxRepairAttempts: input.baseInput.singleProviderTransportAttempt
         ? 0
         : input.baseInput.maxRepairAttempts,
+      classifyZeroRepairParseFailure: input.baseInput.singleProviderTransportAttempt === true,
       promptMeta: input.baseInput.promptMeta,
       onRepairOutputDelta: (content) => {
         if (!repairStarted) {

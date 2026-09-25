@@ -27,7 +27,7 @@
    - 新增错误码 `BASE_REVISION_MISMATCH`，用于首次请求与 `model_not_called` 重放时的世界漂移（第 1、5 项）。
    - **attempt id 补绑**：`persistResult` 在事务内，若已存 `modelAttemptId` 为 null、`modelRequestId` 与入参一致且入参带非空 `modelAttemptId`，则把该 attempt id 同时写入 operation 与 result。已存 attempt id 非空但不一致、或 `modelRequestId` 不一致，仍抛 `MODEL_REFERENCE_MISMATCH`。
    - **并发落败方**：`startModel` 新增可选输入 `onNotAcquired: "return_current"`。设置时，条件更新未命中（他人已持有 claim 或已推进状态）返回 `{ acquired: false, current }`（当前 operation 与 result），不做引用比对、不抛错。不设置时保持 b3a 既有语义，因为 `worldStructureBackfillStore.test.js` 约 461–468 行断言“不同引用的落败方抛 `MODEL_REFERENCE_MISMATCH`”，本卡不改该测试文件。`MODEL_REFERENCE_MISMATCH` 在 b2b 编排路径上只用于真正的完整性违例。
-4. **单次模式解析分类修正（QA 强制）**：`structuredInvokeParser.ts` 在 JSON 修复预算为 0 时（当前只有单次模式如此）的处理：
+4. **单次模式解析分类修正（QA 强制）**：`structuredInvokeParser.ts` 在单次模式（JSON 修复预算为 0）下的处理（修复预算为 0 并非单次模式独有，见“边界修订”）：
    - 非空但无法解析的输出须立即抛出 `malformed_json`。
    - 空正文保持 `empty_content`。
    - 两者都不得落入 schema 校验被归为 `schema_mismatch`。
@@ -57,6 +57,12 @@
 - 测试：新增 `server/tests/worldStructureBackfillGeneration.test.js`；在 `server/tests/backfillSingleAttemptPrompt.test.js` 增补分类用例。
 
 只读导入、不得修改：`worldStructure.ts`（`normalizeWorldStructuredData`、`buildWorldStructureFromLegacySource`、`buildWorldBindingSupport`）、`worldServiceShared.ts`（`buildWorldStructurePromptSource`）、`prompting/prompts/world` 的 `worldStructureBackfillPrompt`、`prompting/core/promptRunner.ts` 的 `runStructuredPrompt`、`platform/llm/provenance` facade（`runWithModelAttemptRequestContext`、`getModelAttemptRequestState`）、`llm/structuredOutput.ts` 的 `StructuredOutputError`。Prisma schema、migration、PromptRunner/structuredInvoke、World HTTP/UI 都不在边界内。需要越界时先回 PO Refinement。根 PM/PO 独占 `TASK.md`、Roadmap、合同、Wiki、发布记录、提交与 beta 集成；GPT-6 Luna Medium QA/QC 只读验收。
+
+## 边界修订（2026-09-25，PO 批准）
+
+- 更正：修复预算为 0 并非单次模式独有。`worldDraft`、`worldGeneration`、`ideaInspiration`、`ideaConstellation` 等生产 Prompt 也用 `repairPolicy.maxAttempts: 0`。
+- 独立 QA 阻断：未加守卫的解析改动会把这些零修复 Prompt 在 `prompt_json` 下的非 JSON 输出改判为 `malformed_json`。策略循环只在 `prompt_json` 的 `schema_mismatch` 处提前停止，所以物理调用会从 1 次升到 3 次（流式空输出回退硬编码 `prompt_json`，可以触达该路径）。
+- PO 批准唯一越界改动：在 `structuredInvoke.ts` 中增加一行 `classifyZeroRepairParseFailure: singleProviderTransportAttempt === true`。解析器新增同名可选开关，只有开启时才抛 `malformed_json`；其他零修复调用方保持原分类与调用次数，策略停止条件不改。回归测试位于 `backfillSingleAttemptPrompt.test.js`。
 
 ## 验收条件
 

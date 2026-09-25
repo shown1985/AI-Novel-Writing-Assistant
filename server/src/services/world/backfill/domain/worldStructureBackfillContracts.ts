@@ -7,6 +7,7 @@ export const WORLD_STRUCTURE_BACKFILL_STATUSES = [
   "model_unknown",
   "committed",
   "conflict_result_retained",
+  "failed_terminal",
 ] as const;
 
 export type WorldStructureBackfillStatus = (typeof WORLD_STRUCTURE_BACKFILL_STATUSES)[number];
@@ -109,6 +110,7 @@ export type WorldStructureBackfillStoreErrorCode =
   | "OPERATION_ID_REUSED"
   | "WORLD_NOT_FOUND"
   | "OPERATION_NOT_FOUND"
+  | "BASE_REVISION_MISMATCH"
   | "INVALID_STATE"
   | "MODEL_REFERENCE_MISMATCH"
   | "RESULT_DIGEST_CONFLICT"

@@ -2,7 +2,7 @@
 
 ## 模块归属与边界
 
-本模块拥有一次 AI 世界结构补全意图对应的持久 claim、规范化结果，以及从已持久结果到世界 CAS 的提交回执。外部调用只依赖 `index.ts` facade。本模块不调用模型提供方、不接入现有 `/backfill`、不创建 snapshot、不排队 RAG、不暴露 HTTP，也不创建 UI 状态。
+本模块拥有一次 AI 世界结构补全意图对应的持久 claim、单次模型调用编排、规范化结果，以及从已持久结果到世界 CAS 的提交回执。外部调用只依赖 `index.ts` facade。模型调用只经过 `application/WorldStructureBackfillGenerationService` 与已登记的 `world.structure.backfill` Prompt；本模块不接入现有 `/backfill`、不创建 snapshot、不排队 RAG、不暴露 HTTP，也不创建 UI 状态。
 
 operation 属于一个 `World`，由 `(worldId, operationId)` 唯一标识；result 与 backfill commit receipt 分别通过唯一 `operationRecordId` 归属 operation。result 不重复保存 `worldId`，receipt 保存回执所需的 `worldId` 和 `operationId`，并通过 operation 外键保证生命周期一致。模型 attempt 的 `requestId` 与 `attemptId` 是可空观察引用，不添加指向 attempt evidence 的外键。
 
@@ -24,4 +24,14 @@ operation 属于一个 `World`，由 `(worldId, operationId)` 唯一标识；res
 
 已提交的重放只返回原回执和 result；同一 operation 的并发落败方先检查赢家的持久回执，再判断是否为内容冲突。冲突状态只读保留结果，不自动应用到新 revision。手动 PUT 的 `WorldMaintenanceCommitReceipt` 与 backfill 专属回执用途不同，不可互相替代。
 
-本模块目前持久化 `model_not_called`、`model_in_flight`、`model_succeeded_pending_commit`、`model_unknown`、`committed` 和 `conflict_result_retained`。`model_unknown` 不自动重开模型调用；提交服务也不改变旧 `/backfill` 路径的运行行为。现有 attempt 记录和手动维护回执都不能替代本模块的 backfill 结果或提交事实。
+## 从模型调用到持久结果的编排
+
+`generatePersistedResult({ worldId, operationId, baseContentRevision, provider?, model? })` 的输出止于 `model_succeeded_pending_commit` 或失败/未知终态，不调用 `commitPersistedResult`、不写 World。顺序固定为：先 `read`，已有 operation 走重放；否则校验 `World.contentRevision == baseContentRevision`（不符返回 `BASE_REVISION_MISMATCH`，不写 operation），用已登记 Prompt 资产的 id/version、`generationPolicyVersion` 与 `sourceDigest`（`buildWorldStructurePromptSource(world)` 的 SHA-256）组成冻结请求并 `claim`；在外层 `mode: "invoke"`、带已登记 Prompt 身份的请求上下文内取得 `requestId`，以 `onNotAcquired: "return_current"` 调用 `startModel`。只有 `acquired: true` 的一方以 `singleProviderTransportAttempt: true` 调用 `runStructuredPrompt`；落败方按 `current` 返回生成中、已存 result 或终态，不发起调用。成功输出按旧路径规则归一化（`seededFrom: "ai-backfill"`，`lastBackfilledAt` 取自注入时钟），再 `persistResult`。
+
+`startModel` 时 attempt id 尚未产生，因此 `persistResult` 在事务内允许一次补绑：已存 `modelAttemptId` 为 null、`modelRequestId` 一致且入参带非空 attempt id 时，把它同时写入 operation 与 result。已存 attempt id 非空但不同、或 request id 不同，仍是 `MODEL_REFERENCE_MISMATCH`。不设 `onNotAcquired` 的 `startModel` 保持原有引用比对语义。
+
+失败映射是对已结构化错误的确定性后处理，表在 `domain/worldStructureBackfillGeneration.ts`：provider 已返回但内容不可用（`malformed_json`、`empty_content`、`incomplete_json`、`schema_mismatch`、`thinking_pollution`、`output_truncated`、`reasoning_budget_exhausted`）经 `markFailed` 进入 `failed_terminal`；传输错误、取消、未列出的类别、非结构化异常，以及拿到输出后的归一化或 `persistResult` 失败，一律 `markUnknown(unknown_result)` 进入 `model_unknown`。原因是结果不明时重调可能重复扣费，宁可保守。失败类别只随返回值交给调用方，不持久化。
+
+重放一律不新开调用，唯一例外是 `model_not_called`：重新读取 World，revision 与重算的 `sourceDigest` 都等于已存值时，才由 `startModel` 的唯一胜者继续调用；否则返回 `BASE_REVISION_MISMATCH` 且不改行。`model_in_flight` 在 lease 未到期时返回生成中，到期后只能 `markUnknown(lease_expired)`；lease 只用于发现 owner 失联，不能证明 provider 未收到请求。调用方 base revision 或 provider/model 与已存请求不同返回 `OPERATION_ID_REUSED`。
+
+本模块目前持久化 `model_not_called`、`model_in_flight`、`model_succeeded_pending_commit`、`model_unknown`、`failed_terminal`、`committed` 和 `conflict_result_retained`。`failed_terminal` 只能从 `model_in_flight` 进入，与 `model_unknown` 一样不会重新取得调用权。`model_unknown` 不自动重开模型调用；提交服务也不改变旧 `/backfill` 路径的运行行为。现有 attempt 记录和手动维护回执都不能替代本模块的 backfill 结果或提交事实。

@@ -298,6 +298,14 @@
 - 候选范围：在 `invokeStructuredLlmDetailed` 请求范围内建立 provider 与修复调用共用的调用预算，单次模式超额时在打开 transport 前拒绝；以模拟新增重试路径的测试验收。
 - 非范围：不改普通 Prompt 的默认重试/修复/fallback，不做供应商计费账本或通用预算平台，不接 `/backfill`。
 
+### R1-PROMPT03：漫画事实服务内联 Prompt 迁入 Prompt Registry
+
+- 用户价值：Prompt 治理检查在干净基线上恢复为全绿，后续改动引入的未登记 Prompt 能被及时发现，不会被既有失败淹没。
+- 状态：**Refinement / Not Ready**；估算 2 点，未承诺任何 Sprint。来源：R1-S3J 实施期间发现，`prompting-governance.test.js` 在干净基线上即失败。
+- 已知事实：`server/src/services/comic/ComicFactService.ts` 约第 39、48 行有 2 处未登记的内联 `SystemMessage`/`HumanMessage` Prompt，不在治理白名单内。
+- 候选范围：按 `server/src/prompting/README.md` 迁为 `PromptAsset` 并在 registry 登记（id、version、taskType、mode、contextPolicy、结构化时的 outputSchema），服务改走 PromptRunner；`prompting-governance` 与漫画事实相关测试通过。
+- 非范围：不改漫画事实的业务输出语义，不把该路径加入治理白名单来掩盖失败。
+
 ### S2-04b3：真实 transport attempt 接线
 
 - 用户价值：重试、结构策略切换、JSON 修复、语义重试和备用模型的每次真实调用都能分开记录，并明确最终采用者。

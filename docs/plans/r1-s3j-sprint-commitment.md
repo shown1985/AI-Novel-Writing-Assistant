@@ -23,4 +23,9 @@
 
 ## Review 与 Retrospective 出口
 
-（待 Sprint 结束填写）需记录：目标是否达成、承诺/完成点数、carryover 与原因、返工/逸出缺陷、最多两项可执行改进。未完成时不得以 build 通过代替 Done。
+Sprint 结束时记录目标是否达成、承诺/完成点数、carryover 与原因、返工/逸出缺陷、最多两项可执行改进；未完成不得以 build 通过代替 Done。
+
+Sprint Goal 在 backfill 内部编排范围达成；承诺/完成 `5/5`，carryover `0`。编排服务先持久 claim，在 provider 调用前把状态推进为 `model_in_flight`，再以单次模式调用，然后进入 `model_succeeded_pending_commit`、`failed_terminal` 或 `model_unknown`。并发落败方返回当前状态，重放、lease 到期和结果不明都不重调模型。合同固定命令 `76/76` PASS，`git diff --check` 与 server `tsc --noEmit` 通过。独立 QA/QC 复验 PASS，根代码评审 PASS。无产品 UI 改动，UI 验收不适用；现有 `/backfill` 尚未接入，不能称为生产补全已受保护。
+
+- 返工：DoR 返工 1 次，补齐 3 项缺口并修正外层上下文 mode 用词。QA 阻断 1 项，是解析分类改动波及非单次的零修复生产 Prompt；PO 批准在 `structuredInvoke.ts` 增加一行守卫，合并前已修复。逸出缺陷 `0`。
+- 改进：①单次模式之外也有零修复调用方，凡是触及共享解析器的合同，须在 DoR 列出全部零修复调用方及其策略/调用次数影响；②同进程两条 better-sqlite3 连接并发写会因同步 busy 等待而死锁，文件型双连接并发验收应默认使用 worker 线程。
