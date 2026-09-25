@@ -86,7 +86,6 @@ const moreNavGroups: MobileNavGroup[] = [
   {
     title: "世界与系统",
     items: [
-      { key: "tasks", label: "运行记录", to: "/tasks", group: "more" },
       { key: "auto-director-follow-ups", label: "导演跟进", to: "/auto-director/follow-ups", group: "more" },
       { key: "worlds", label: "世界样本库", to: "/worlds", group: "more" },
       { key: "world-generator", label: "创建世界样本", to: "/worlds/generator", group: "more" },
