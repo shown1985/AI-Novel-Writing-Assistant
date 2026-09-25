@@ -103,9 +103,9 @@ R1-S2H 承诺并完成 [S2-04c1 实况模型来源只读显示](./s2-04c1-live-m
 
 本窗口只承诺并完成 [S3-02b3b2a 结构补全单次物理模型调用门](./s3-02b3b2a-backfill-single-attempt-prompt-contract.md) `3/3` 点、无 Stretch。显式单次模式将非流式结构化 Prompt 的物理 provider 调用限制为一次，流式入口拒绝该选项，普通 Prompt 恢复行为不变，经独立 QA/QC 通过；`S3-02b3b2b` 模型→持久 result 与 b3c/d/e 仍在 Refinement，现有 `/backfill` 尚无本保证。Review/Retrospective 见 [R1-S3I Sprint 承诺](./r1-s3i-sprint-commitment.md)。
 
-### R1-S3J 当前窗口（PO 已确认范围，独立 DoR 待执行）
+### R1-S3J 当前窗口（DoR PASS，实施中）
 
-本窗口拟只承诺 [S3-02b3b2b 结构补全从模型调用到持久结果的编排](./s3-02b3b2b-backfill-generation-orchestration-contract.md) 5 点，无 Stretch，尚未开始。执行顺序为：先持久 claim，再发出一次物理模型调用，然后把结果与基线 revision 绑定保存。响应丢失、并发与结果不明时只读回既有事实，不重新调用模型。单次模式下无法解析的输出须归为 `malformed_json`，空正文归为 `empty_content`。不接 `/backfill`、HTTP/UI，不写 World，不做真实 PostgreSQL apply。PO 已确认范围：result→World 提交、提交后 snapshot/RAG 与失败类别持久化归 S3-02b3c；独立 Scrum/QA DoR 待执行，未 PASS 前不开始。详见 [R1-S3J Sprint 承诺](./r1-s3j-sprint-commitment.md)。
+本窗口拟只承诺 [S3-02b3b2b 结构补全从模型调用到持久结果的编排](./s3-02b3b2b-backfill-generation-orchestration-contract.md) 5 点，无 Stretch，已开始实施。执行顺序为：先持久 claim，再发出一次物理模型调用，然后把结果与基线 revision 绑定保存。响应丢失、并发与结果不明时只读回既有事实，不重新调用模型。单次模式下无法解析的输出须归为 `malformed_json`，空正文归为 `empty_content`。不接 `/backfill`、HTTP/UI，不写 World，不做真实 PostgreSQL apply。PO 已确认范围：result→World 提交、提交后 snapshot/RAG 与失败类别持久化归 S3-02b3c；独立 Scrum/QA DoR 已 PASS。详见 [R1-S3J Sprint 承诺](./r1-s3j-sprint-commitment.md)。
 
 ### R1-G01 发布治理 Backlog Refinement
 

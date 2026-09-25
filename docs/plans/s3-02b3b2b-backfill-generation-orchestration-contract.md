@@ -13,7 +13,7 @@
    - 先 `store.read`。已有 operation 时进入重放分支（第 5 项），不重新 claim。
    - 否则读取 World，要求 `contentRevision == baseContentRevision`。
    - 用已登记的 `world.structure.backfill` 资产 id/version、backfill 自有 `generationPolicyVersion` 常量和 `sourceDigest` 组成冻结请求，再 `store.claim`。`sourceDigest` 是 `buildWorldStructurePromptSource(world)` 的 SHA-256。
-   - 在外层 `runWithModelAttemptRequestContext` 内取得 `requestId`。外层上下文须自带 `mode: "structured"` 与 `prompt: { promptId, promptVersion }`（取自已登记资产），因为嵌套的 `runStructuredPrompt` 不会覆盖外层已建立的 prompt 身份。
+   - 在外层 `runWithModelAttemptRequestContext` 内取得 `requestId`。外层上下文须自带 `mode: "invoke"` 与 `prompt: { promptId, promptVersion }`（取自已登记资产），因为嵌套的 `runStructuredPrompt` 不会覆盖外层已建立的 prompt 身份。
    - 调用 `store.startModel`（带 `onNotAcquired: "return_current"`，见第 3 项），写入 `modelRequestId` 与 lease；此时 `modelAttemptId` 为 null。只有 `acquired: true` 的一方可以继续；落败方按 `current` 状态返回生成中、已存 result 或终态，provider 调用为 0。
    - 调用 `runStructuredPrompt`，选项为 `singleProviderTransportAttempt: true`，不能使用流式或文本入口。
    - 成功输出按旧路径同样的规则归一化：`normalizeWorldStructuredData`（以 legacy 结构为基底，`seededFrom: "ai-backfill"`）和 `buildWorldBindingSupport`。`lastBackfilledAt` 取自注入时钟，不调用 `nowISO()`，保证同一输入与时钟下 digest 可复现。
