@@ -85,6 +85,21 @@
 - `repairPolicy` 负责 JSON 解析 / schema 校验失败后的 repair
 - `semanticRetryPolicy` 负责 JSON 已合法但 `postValidate` 未通过时的再生成
 
+## Core Layout
+
+`core/` 是 runner 与上下文治理的运行时，外部模块只从 `core/promptRunner`、`core/promptTypes` 等顶层入口导入，不直接依赖 `core/runner/` 内部文件。
+
+- `core/promptRunner.ts`：公开入口与编排 facade。持有 `runStructuredPrompt`、`runTextPrompt`、`streamTextPrompt`、`streamStructuredPrompt`、`preparePromptExecution` 以及 `setPromptRunner*ForTests`。这些导出必须定义在本文件内：测试会直接替换 `dist/prompting/core/promptRunner.js` 的导出对象属性（例如 `promptRunner.runStructuredPrompt = ...`），服务端调用方也经由该模块对象调用，改成 re-export 会让替换失效。
+- `core/runner/llmBindings.ts`：可替换的 LLM 依赖（`getLLM` 工厂与 `invokeStructuredLlmDetailed`）及调用选项。runner 各模块在调用时通过 getter 读取，保证 `setPromptRunner*ForTests` 对首轮调用、语义重试和空流兜底同时生效。
+- `core/runner/promptPreparation.ts`：注册校验、上下文块选择后的 `PromptRenderContext` 组装、`PromptInvocationMeta` 构建。
+- `core/runner/slotOverlays.ts`：按作品解析 prompt slot overrides，把追加块并入上下文、把内联 slot 交给渲染。
+- `core/runner/requestBudget.ts`：渲染后 prompt 字符估算与请求预算快照日志（`[prompt.budget]`）。预算判定本身在 `llm/requestBudget.ts`，是否拒绝超限请求由编排层按 `options.requestBudget.mode` 决定。
+- `core/runner/outputResolution.ts`：`postValidate` 应用、语义重试消息构建与结构化结果解析循环（含 `postValidateFailureRecovery`）。
+- `core/runner/promptTelemetry.ts`：`[prompt.runner]` 日志、质量遥测事件（completed / failed / 失败分类）以及统一的 `PromptRunResult` 收尾。
+- `core/runner/streamCapture.ts`：流式输出的文本、token usage 与 reasoning 采集。
+
+依赖方向：`promptRunner.ts` → `runner/*` → `core/` 其他模块与 `llm/`；`runner/*` 不反向导入 `promptRunner.ts`。新增运行时职责时放入 `runner/` 下对应文件或新建有明确归属的文件，不要回填到 facade。
+
 ## Migration Default
 
 - 如果一个 prompt 还没有资产化，不要在原 service 里继续加分支。
