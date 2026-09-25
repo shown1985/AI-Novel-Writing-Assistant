@@ -4,25 +4,44 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
+function isDramaStubbedModule(key) {
+  return (
+    key.includes("\\dist\\services\\drama\\")
+    || key.includes("/dist/services/drama/")
+    || key.includes("\\dist\\services\\image\\provider.js")
+    || key.includes("/dist/services/image/provider.js")
+    || key.includes("\\dist\\services\\image\\runtime\\")
+    || key.includes("/dist/services/image/runtime/")
+    || key.includes("\\dist\\db\\prisma.js")
+    || key.includes("/dist/db/prisma.js")
+    || key.includes("\\dist\\prompting\\core\\promptRunner.js")
+    || key.includes("/dist/prompting/core/promptRunner.js")
+    || key.includes("\\dist\\runtime\\appPaths.js")
+    || key.includes("/dist/runtime/appPaths.js")
+  );
+}
+
 function clearDramaModules() {
   for (const key of Object.keys(require.cache)) {
-    if (
-      key.includes("\\dist\\services\\drama\\")
-      || key.includes("/dist/services/drama/")
-      || key.includes("\\dist\\services\\image\\provider.js")
-      || key.includes("/dist/services/image/provider.js")
-      || key.includes("\\dist\\services\\image\\runtime\\")
-      || key.includes("/dist/services/image/runtime/")
-      || key.includes("\\dist\\db\\prisma.js")
-      || key.includes("/dist/db/prisma.js")
-      || key.includes("\\dist\\prompting\\core\\promptRunner.js")
-      || key.includes("/dist/prompting/core/promptRunner.js")
-      || key.includes("\\dist\\runtime\\appPaths.js")
-      || key.includes("/dist/runtime/appPaths.js")
-    ) {
+    if (isDramaStubbedModule(key)) {
       delete require.cache[key];
     }
   }
+}
+
+// The fast suite requires every test file into one process. Stubbed prisma,
+// promptRunner, and appPaths entries must not leak into later test files.
+function snapshotDramaModuleCache() {
+  return Object.fromEntries(
+    Object.keys(require.cache)
+      .filter(isDramaStubbedModule)
+      .map((key) => [key, require.cache[key]]),
+  );
+}
+
+function restoreDramaModuleCache(snapshot) {
+  clearDramaModules();
+  Object.assign(require.cache, snapshot);
 }
 
 function installPipelineStubs() {
@@ -399,7 +418,9 @@ function installPipelineStubs() {
   return state;
 }
 
-test("drama service pipeline keeps repairable quality issues before storyboard and video tasks", async () => {
+test("drama service pipeline keeps repairable quality issues before storyboard and video tasks", async (t) => {
+  const moduleCacheSnapshot = snapshotDramaModuleCache();
+  t.after(() => restoreDramaModuleCache(moduleCacheSnapshot));
   process.env.DRAMA_COST_CURRENCY = "CNY";
   process.env.DRAMA_IMAGE_COST_PER_IMAGE_OPENAI = "1.25";
   process.env.DRAMA_VIDEO_MOCK_COST_PER_SECOND = "0.4";

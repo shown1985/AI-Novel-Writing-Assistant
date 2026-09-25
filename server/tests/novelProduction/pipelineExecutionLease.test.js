@@ -7,6 +7,9 @@ const { loadRuntimeSource } = require("./sourceHarness.cjs");
 const {
   NovelCorePipelineService,
 } = require("../../dist/services/novel/novelCorePipelineService.js");
+// Resolve prisma together with the service so the doubles below patch the same
+// client instance the service holds, even if a later test swaps require.cache.
+const { prisma } = require("../../dist/db/prisma.js");
 
 function createLeaseStore(db) {
   return {
@@ -147,7 +150,6 @@ test("pipeline execution lease: ownership storage failure pauses before executor
   const service = new NovelCorePipelineService();
   const updates = [];
   let executions = 0;
-  const { prisma } = require("../../dist/db/prisma.js");
   const originalUpdateMany = prisma.generationJob.updateMany;
   service.pipelineExecutionLeases = {
     async claim() {
@@ -182,7 +184,6 @@ test("pipeline execution lease: non-schema claim failure does not pause a valid 
   const service = new NovelCorePipelineService();
   const updates = [];
   let executions = 0;
-  const { prisma } = require("../../dist/db/prisma.js");
   const originalUpdateMany = prisma.generationJob.updateMany;
   service.pipelineExecutionLeases = {
     async claim() { throw new Error("temporary connection failure"); },

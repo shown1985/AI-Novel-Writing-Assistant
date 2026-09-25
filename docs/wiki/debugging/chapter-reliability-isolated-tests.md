@@ -28,6 +28,12 @@ node --test --test-reporter=spec server/tests/novelProduction/*.test.js
 
 现有 `server/scripts/run-tests.cjs` 会递归发现该目录中的 `.test.js`；无需新增测试运行器。源码加载辅助文件采用 `.cjs`，不作为独立测试发现。
 
+`pnpm test` 的 fast 模式会在同一进程内 `require` 全部测试文件，先完成注册再按文件顺序执行，`require.cache` 在所有文件之间共享。因此：
+
+- 通过 `require.cache[...] = { exports: stub }` 替换 `dist/db/prisma.js`、`promptRunner`、`appPaths` 等共享模块的测试，必须在测试结束时恢复原缓存项，否则后续文件在测试体内 `require` 到的是残留替身（典型症状：`prisma.generationJob` 为 `undefined`）。
+- 需要打补丁的共享实例（如 `prisma`）应与被测服务在同一时机加载，保证补丁作用于服务实际持有的对象。
+- 单文件 `node --test` 通过而 fast 模式失败时，优先排查缓存替身泄漏，而不是修改被测业务代码。
+
 `artifactCheckpoint.test.js` 保留真实同步协调器、检查点读取、领取、失败标记及成功标记逻辑，仅模拟持久层与资产抽取服务。它覆盖服务实例更换后的重新领取和成功跳过；不等同于真实 Worker 重启或真实消费者事务验证。
 
 章节同步失败测试应验证错误向上传递和直接重入后的同步行为，不规定质量状态一定回退。外层执行器是否跳过待收尾章节，需要独立测试调度与恢复路径，不能由单章函数重入推断。
