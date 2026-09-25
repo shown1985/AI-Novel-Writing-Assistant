@@ -18,6 +18,7 @@
   - Prompt 加载表保留两侧全部资产；同一资产版本冲突时，以该资产源文件中的 `version` 为准，并检查引用该键的测试，禁止出现重复键。
   - wiki 规则取并集，去掉重复表述。
   - 测试文件冲突时保留两侧用例，不删除任一侧断言。
+  - 桌面身份字段（`desktop/package.json` 的 version/productName、builder 的 appId/productName 与发布 owner/repo、更新配置 owner/repo、数据目录名）一律保留本发行版的值，不接受上游值；以 `r1-03-static-gate-audit.cjs --strict` 的 fork 身份 finding 不为 `BLOCKED` 作为合入 `beta` 的前提，见 [R1-G02 合同](../../plans/r1-g02-fork-desktop-identity-contract.md)。
 - 迁移时间戳交错（上游新迁移早于本地已有迁移）时：
   - 桌面运行时迁移器 `server/src/db/runtimeMigrations.ts` 按目录名排序、逐条检查是否已记录，未记录的迁移会被补执行，因此可以接受晚到的旧时间戳迁移。
   - 必须用临时 SQLite 文件验证两条路径：全新库执行完整合并迁移集；先执行本地 `beta` 迁移集、再执行合并迁移集的升级库。两者最终 `sqlite_master` 必须一致，并且相对 `schema.sqlite.prisma` 的差异不能比同步前更多。

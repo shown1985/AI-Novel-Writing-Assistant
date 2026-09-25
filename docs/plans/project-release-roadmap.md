@@ -107,6 +107,10 @@ R1-S2H 承诺并完成 [S2-04c1 实况模型来源只读显示](./s2-04c1-live-m
 
 [R1-G01 拆分合同](./r1-g01-release-governance-contract.md)已把混合父项拆成 `R1-G01a` 严格公开标签门 3 点、`R1-G01b` macOS arm64 候选 CI 5 点和 `R1-G01c` 支持范围决定 1 点。PO 已完成 G01c：Release 1 只支持 Windows x64 与 macOS arm64，不支持 macOS x64。G01a/G01b 已分别在 R1-S3E/F Done 并合入 beta；当前静态门为 `PASS=11 / REVIEW=1`，尚无真实 macOS Actions 或公开上传运行证据。
 
+### R1-G02 独立发行版桌面身份 Backlog Refinement
+
+[R1-G02 合同](./r1-g02-fork-desktop-identity-contract.md)规划了独立发行版的桌面版本线（推荐 Release 1 GA = `1.0.0`，与上游 `0.x` tag 不重叠）以及与上游安装的数据隔离。当前 appId、productName、数据目录、发布/更新 owner 均与上游相同，同时安装会共用同一份 SQLite。拆为 `G02a` 版本线与碰撞门 3 点、`G02b` 发布/更新目标 3 点、`G02c` 身份拆分 5 点、`G02d` 旧数据显式复制引导 5 点、`G02e` 生成图片复制 2 点和 `G02f` PO 品牌决定 1 点。全部为 Refinement / Not Ready，等待 PO 答复品牌名称、appId、数据目录、版本起点与旧数据处理。
+
 ### R1-S0 新增 Story
 
 #### R1-00 上游实现与计划重对账（3 点）
