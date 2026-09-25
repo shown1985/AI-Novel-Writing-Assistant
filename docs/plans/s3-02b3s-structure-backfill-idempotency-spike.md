@@ -146,6 +146,7 @@ b3b2a 已于 R1-S3I Done。`S3-02b3b2b` 仍为 Refinement / Not Ready，冻结�
 
 - 范围/AC（必须）：单次模式下 JSON 修复次数为 0 时，`structuredInvokeParser.ts` 对无法解析的输出须立即抛出 `malformed_json`（空正文为 `empty_content`），不得继续落入 schema 校验而被归为 `schema_mismatch`；以分类测试验收。原因是 b2b 的恢复决策可能按失败类别分支。重复的 not_adopted finalize 为幂等，无需处理。
 - 注记：`runTextPrompt`/`streamTextPrompt` 当前静默忽略 `singleProviderTransportAttempt`；b2b 只能经非流式 `runStructuredPrompt` 使用单次门，若需要文本或流式入口须另行拆卡，不能假设其受保护。
+- 跟踪（2026-09-25）：`S3-02b3b2b` 合同草案见 [b3b2b 模型→持久结果编排](./s3-02b3b2b-backfill-generation-orchestration-contract.md)，5 点，拟入 R1-S3J，**待 PO 确认**与独立 DoR。上述分类 AC 已纳入该合同 AC1。
 
 ### Spike 出口记录
 
