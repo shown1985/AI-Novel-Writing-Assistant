@@ -84,6 +84,28 @@ test("production interface selection keeps the same full-book automation", () =>
   }
 });
 
+test("production interface selection keeps a takeover chapter range as the stop boundary", () => {
+  const seed = directorSeed();
+  const rangedSeed = {
+    ...seed,
+    directorInput: {
+      ...seed.directorInput,
+      autoExecutionPlan: { mode: "chapter_range", startOrder: 3, endOrder: 10, autoReview: true, autoRepair: true },
+    },
+  };
+  const nextSeed = buildProductionExperienceSeed(rangedSeed, "simple");
+  assert.equal(nextSeed.runMode, "full_book_autopilot");
+  assert.deepEqual(nextSeed.autoExecutionPlan, {
+    mode: "chapter_range",
+    startOrder: 3,
+    endOrder: 10,
+    autoReview: true,
+    autoRepair: true,
+  });
+  assert.deepEqual(nextSeed.directorInput.autoExecutionPlan, nextSeed.autoExecutionPlan);
+  assert.equal(nextSeed.autoApproval.enabled, true);
+});
+
 test("complete-workspace selection starts the same chapter execution", async () => {
   const originals = {
     findUnique: prisma.novelWorkflowTask.findUnique,

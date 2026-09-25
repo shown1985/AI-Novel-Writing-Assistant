@@ -542,7 +542,7 @@ test("director command service queues policy updates without directly mutating r
   }
 });
 
-test("director command service applies the full-book autopilot contract before queueing confirmation", async () => {
+test("director command service applies the full-book autopilot contract and keeps explicit quality toggles", async () => {
   const harness = createHarness(createTask({
     novelId: null,
     status: "waiting_approval",
@@ -566,16 +566,16 @@ test("director command service applies the full-book autopilot contract before q
     assert.equal(payload.confirmRequest.runMode, "full_book_autopilot");
     assert.deepEqual(payload.confirmRequest.autoExecutionPlan, {
       mode: "book",
-      autoReview: true,
-      autoRepair: true,
+      autoReview: false,
+      autoRepair: false,
     });
     assert.equal(payload.confirmRequest.autoApproval.enabled, true);
     assert.ok(payload.confirmRequest.autoApproval.approvalPointCodes.includes("chapter_execution_continue"));
     assert.ok(payload.confirmRequest.autoApproval.approvalPointCodes.includes("replan_continue"));
     assert.deepEqual(harness.bootstraps[0].seedPayload.autoExecutionPlan, {
       mode: "book",
-      autoReview: true,
-      autoRepair: true,
+      autoReview: false,
+      autoRepair: false,
     });
     assert.equal(harness.bootstraps[0].seedPayload.autoApproval.enabled, true);
   } finally {
@@ -583,6 +583,28 @@ test("director command service applies the full-book autopilot contract before q
   }
 });
 
+
+test("director command service keeps review and repair on by default under the full-book autopilot contract", async () => {
+  const harness = createHarness(createTask({
+    novelId: null,
+    status: "waiting_approval",
+  }));
+  try {
+    await harness.service.enqueueConfirmCandidateCommand(createConfirmRequest({
+      runMode: "full_book_autopilot",
+      autoExecutionPlan: { mode: "volume", volumeOrder: 1 },
+    }));
+
+    const payload = JSON.parse(harness.commands[0].payloadJson);
+    assert.deepEqual(payload.confirmRequest.autoExecutionPlan, {
+      mode: "book",
+      autoReview: true,
+      autoRepair: true,
+    });
+  } finally {
+    harness.restore();
+  }
+});
 test("director command service preserves an explicit chapter range while applying full-book autopilot approval", async () => {
   const harness = createHarness(createTask({
     novelId: null,

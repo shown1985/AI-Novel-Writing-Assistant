@@ -68,10 +68,15 @@ Issue #126（模型隐藏与思考深度）已随桌面 0.4.18 发布（提交 `
    - 移动端：补齐热门题材雷达与 4 个设置子页的移动端落点，去掉“更多”菜单中重复的“运行记录”，运行记录筛选区改为两行紧凑布局。
    - 其余为测试未跟上有意的代码变更（`world_setup` 阶段、创作基础 AI 补齐、`full_book_autopilot` 续写模式下线、影响提案被对话层取代等），已按当前入口更新测试；短剧流水线测试的全量运行串扰已通过补全模块缓存清理修复。
    - 待办：`server/src/prompting/core/promptRunner.ts`（1299 行）贴近上限，拆分前先写职责清单。
-2a. **待产品决定**（修复过程中发现，未擅自改变行为）：
-   - `full_book_autopilot` 携带显式 `chapter_range` 时会原样保留 `autoReview:false`/`autoRepair:false`（`a29c6aa9` 起），全书自动可能在某个范围内关闭审校和修复；是否应强制开启。
-   - 自动导演确认流程通过模块单例直接调用资源推荐、平台推荐，未走注入依赖，与 wiki 的显式依赖要求不一致；建议后续改为注入。
-   - 接管规则 wiki 两条措辞（旧范围“不得提前启动正文”与 `chapter_range` 写入 seed）需要统一。
+2a. **产品决定（2026-09-25 已确认并落地）**：
+   - 全书自动模式由 AI 主导推进，自动审校与修复默认开启，但计划中显式关闭时保留用户选择、不再强制开启（`applyDirectorRunModeContract`）；关闭审校时修复同时关闭。
+   - 接管规则统一：规划阶段携带的章节范围只写入 Seed、不提前启动正文；选择生产方式开始正文时，已写入的 `chapter_range` 保留为自动生产的停止边界，没有范围才用全书计划（修复了开始正文时范围被全书计划覆盖的问题）。wiki `auto-director-runtime.md` 两条规则已统一措辞。
+   - 自动导演确认流程依赖注入改造已排期，见下方 2b。
+2b. **排期：自动导演确认流程改为显式依赖注入**（与 wiki“StepModule 核心运行时依赖必须通过显式依赖包进入”对齐）：
+   - 范围：`server/src/services/novel/director/runtime/novelDirectorConfirmRuntime.ts` 直接引用的模块单例 `novelCreateResourceRecommendationService`、`writingPlatformProfileService`、`directorIssuePolicyService`、`novelFramingSuggestionService`，以及直接运行的 `writingPlatformRecommendationPrompt`。
+   - 做法：并入构造函数已有的 `deps` 依赖包，由默认装配函数注入现有实例；不改变确认流程行为。
+   - 验收：`novelDirectorConfirmDedup.test.js` 改为通过注入替身而非改写模块单例；确认流程相关测试与全量 fast/integration 测试无新增失败。
+   - 顺序：排在上游合并收尾与 `promptRunner.ts` 拆分之后。
 3. **用户本机删除 23 个远程分支**：`codex/*` 15 个、`fix/*` 7 个、`mac` 1 个；云端会话无权限执行删除，需用户在本机操作，删除前可用 `git cherry -v origin/main origin/<branch>` 复核。
 4. **用户按验收清单验收**：推荐用 `pnpm docker:dev` 启动（见 `docs/wiki/workflows/docker-dev-environment.md`），对照 `docs/checkpoints/user-acceptance-checklist.md` 逐项验收；升级前先按清单开头的备份步骤备份数据库。
 5. **P2-2 真实 10 章运行**：用户本机执行（云端环境没有任何模型 API Key，无法在云端跑真实模型）。
