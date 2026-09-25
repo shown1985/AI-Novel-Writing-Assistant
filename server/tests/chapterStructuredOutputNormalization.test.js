@@ -88,7 +88,7 @@ function makeResourceDelta(index = 1) {
   };
 }
 
-test("character resource extraction schemas cap resource deltas at eight items", () => {
+test("standalone resource extraction caps updates at eight while the unified artifact delta keeps overflow", () => {
   const nineDeltas = Array.from({ length: 9 }, (_, index) => makeResourceDelta(index + 1));
 
   assert.throws(() => {
@@ -96,34 +96,40 @@ test("character resource extraction schemas cap resource deltas at eight items",
       updates: nineDeltas,
       continuityRisks: [],
     });
-  });
+  }, /8/);
 
-  assert.throws(() => {
-    chapterArtifactDeltaOutputSchema.parse({
-      summary: "本章产生过多资源变化。",
-      stateDeltas: {
-        summary: "状态无变化。",
-        characterStates: [],
-        relationStates: [],
-        informationStates: [],
-        foreshadowStates: [],
-      },
-      characterResourceDeltas: nineDeltas,
-      payoffDeltas: [],
-      relationDynamics: [],
-      factionUpdates: [],
-      characterCandidates: [],
-      syncPlan: {
-        stateSnapshot: "skip",
-        characterResources: "write",
-        payoffLedger: "skip",
-        characterDynamics: "skip",
-        reason: "只测试资源上限。",
-      },
-      confidence: 0.9,
-      requiresFullReconcile: false,
-    });
+  // The unified chapter artifact delta must not reject a whole chapter
+  // extraction (and trigger another full-chapter LLM call) just because the
+  // model returned more resource changes than the prompt asked for.
+  const parsed = chapterArtifactDeltaOutputSchema.parse({
+    summary: "本章产生过多资源变化。",
+    stateDeltas: {
+      summary: "状态无变化。",
+      characterStates: [],
+      relationStates: [],
+      informationStates: [],
+      foreshadowStates: [],
+    },
+    characterResourceDeltas: nineDeltas,
+    payoffDeltas: [],
+    relationDynamics: [],
+    factionUpdates: [],
+    characterCandidates: [],
+    syncPlan: {
+      stateSnapshot: "skip",
+      characterResources: "write",
+      payoffLedger: "skip",
+      characterDynamics: "skip",
+      reason: "只测试资源条数超出提示上限。",
+    },
+    confidence: 0.9,
+    requiresFullReconcile: false,
   });
+  assert.equal(parsed.characterResourceDeltas.length, 9);
+  assert.deepEqual(
+    parsed.characterResourceDeltas.map((delta) => delta.resourceName),
+    nineDeltas.map((delta) => delta.resourceName),
+  );
 });
 
 test("chapter acceptance schema normalizes common review category and repair target aliases", () => {
