@@ -17,6 +17,9 @@ const { ragServices } = require("../dist/services/rag/index.js");
 const { providerBalanceService } = require("../dist/services/settings/ProviderBalanceService.js");
 const { STYLE_EXTRACTION_TIMEOUT_MS_KEY } = require("../dist/services/settings/StyleEngineRuntimeSettingsService.js");
 const { prisma } = require("../dist/db/prisma.js");
+const { ensureSystemResourceStarterData } = require("../dist/services/bootstrap/SystemResourceBootstrapService.js");
+const { GenreService } = require("../dist/services/genre/GenreService.js");
+const { StoryModeService } = require("../dist/services/storyMode/StoryModeService.js");
 
 function listen(server) {
   return new Promise((resolve) => {
@@ -25,6 +28,36 @@ function listen(server) {
       resolve(address.port);
     });
   });
+}
+
+function flattenTreeIds(nodes) {
+  const ids = [];
+  for (const node of nodes ?? []) {
+    ids.push(node.id);
+    if (Array.isArray(node.children) && node.children.length > 0) {
+      ids.push(...flattenTreeIds(node.children));
+    }
+  }
+  return ids;
+}
+
+// Resolves real, seeded genre/story-mode ids so novel-creation requests can supply
+// them explicitly. Providing all three ids lets the create route skip its AI-based
+// resource recommendation step (see NovelCreateResourceRecommendationService.resolveRequired),
+// keeping this route test free of real LLM calls.
+async function resolveCreationFoundationIds() {
+  await ensureSystemResourceStarterData();
+  const genreTree = await new GenreService().listGenreTree();
+  const storyModeTree = await new StoryModeService().listStoryModeTree();
+  const genreIds = flattenTreeIds(genreTree);
+  const storyModeIds = flattenTreeIds(storyModeTree);
+  const primaryStoryModeId = storyModeIds[0];
+  const secondaryStoryModeId = storyModeIds.find((id) => id !== primaryStoryModeId);
+  return {
+    genreId: genreIds[0],
+    primaryStoryModeId,
+    secondaryStoryModeId,
+  };
 }
 
 async function safeDeleteCreativeHubThread(threadId) {
@@ -1213,6 +1246,7 @@ test("novel routes preserve book framing fields through create-get-update cycle"
   let novelId = null;
 
   try {
+    const foundationIds = await resolveCreationFoundationIds();
     const createResponse = await fetch(`http://127.0.0.1:${port}/api/novels`, {
       method: "POST",
       headers: {
@@ -1226,6 +1260,7 @@ test("novel routes preserve book framing fields through create-get-update cycle"
         competingFeel: "现实职场压迫感里带强反压。",
         first30ChapterPromise: "前 30 章必须让核心对手浮出水面。",
         commercialTags: ["逆袭", "强冲突", "职场博弈"],
+        ...foundationIds,
       }),
     });
     assert.equal(createResponse.status, 201);
