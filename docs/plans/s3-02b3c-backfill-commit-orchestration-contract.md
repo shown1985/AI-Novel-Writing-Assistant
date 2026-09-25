@@ -4,7 +4,7 @@
 
 - Release / Epic：Release 1 / S3 可信世界；父项 `S3-02b3c`。规划基线 `beta@64d128a1`，该基线已包含 S3J 的 `WorldStructureBackfillGenerationService`、`failed_terminal`、`onNotAcquired` 与 attempt 补绑。
 - 状态：Refinement 完成；PO 已于 2026-09-25 确认拆分与三项决定（见文末“PO 决定”）。整体诚实估算 9 点，超过 5 点，因此拆为两张卡，另新建接线卡：
-  - [S3-02b3c1](#s3-02b3c1提交编排与失败原因持久化)：5 点，**PO 已确认，DoR 待执行**，拟入 [R1-S3L](./r1-s3l-sprint-commitment.md)。
+  - [S3-02b3c1](#s3-02b3c1提交编排与失败原因持久化)：5 点，**Done**（[R1-S3L](./r1-s3l-sprint-commitment.md)，独立 QA/QC PASS）。
   - [S3-02b3c2](#s3-02b3c2提交后-snapshotrag-一次性派生)：4 点，依赖 c1，保持 Not Ready。
   - `S3-02b3c3` HTTP 查询与 `/backfill` 接线：排在 c2 之后、b3d 之前，Not Ready，跟踪见 [Spike 拆分表](./s3-02b3s-structure-backfill-idempotency-spike.md)。
 - 用户价值：作为不懂写作流程的新手作者，我点一次“AI 补全世界结构”后，希望生成结果在世界没被我改动时自动保存一次。我中途改了世界时，生成结果要保留下来、不覆盖我的修改。页面断开或服务重启后，我仍能知道结果是“已保存”“生成中”“生成失败（以及为什么）”还是“状态待确认”，而且不会被重复扣费。
@@ -47,7 +47,7 @@
 
 ### 身份
 
-`S3-02b3c1`；5 点；P1；**PO 已确认，DoR 待执行**；拟入 R1-S3L。单一 GPT-6 Luna Max 全栈工程师负责实施，同时是唯一数据 owner。
+`S3-02b3c1`；5 点；P1；**Done**（R1-S3L）。单一 GPT-6 Luna Max 全栈工程师负责实施，同时是唯一数据 owner。
 
 ### 范围
 
@@ -58,13 +58,22 @@
    - `in_progress`、`failed_terminal`、`model_unknown` 原样返回。
 
    统一 outcome 为 `committed | conflict_result_retained | result_pending_commit | in_progress | failed_terminal | model_unknown`，携带 operation、result、receipt（仅已提交时）与持久化的 `failureCategory`。
-2. **提交结果不明**：`commitPersistedResult` 抛出 `COMMIT_RESULT_UNKNOWN` 或其他提交异常时，先用 `readCommitOutcome` 查持久事实：有 receipt 就返回 `committed`，否则返回 `result_pending_commit`，不调用模型。重放时可再次提交，因为 b3b1 的 CAS/receipt 已保证只写一次。
+   - （DoR 修订 4）`WorldStructureBackfillRunService` 的生成服务与提交服务均为可注入依赖（构造参数），facade 只负责默认装配。测试据此注入抛出 `COMMIT_RESULT_UNKNOWN` 的提交服务，不修改 `PrismaWorldStructureBackfillCommitStore.ts`。
+2. **提交结果不明**：`commitPersistedResult` 抛出 `COMMIT_RESULT_UNKNOWN` 或其他提交异常时，先用 `readCommitOutcome` 查持久事实，不调用模型。重放时可再次提交，因为 b3b1 的 CAS/receipt 已保证只写一次。
+   - （DoR 修订 2）outcome 按 `readCommitOutcome` 读回的 operation `status` 映射，不按“有没有 receipt”推断：
+     - `committed` 且带 receipt → `committed`；
+     - `conflict_result_retained` → `conflict_result_retained`；
+     - `model_succeeded_pending_commit` → `result_pending_commit`；
+     - 读回为 `null` 或其他状态时，原样抛出提交异常，不得猜测为任何 outcome。
+   - 禁止把“没有 receipt”直接映射为 `result_pending_commit`（冲突状态同样没有 receipt）。
 3. **只读查询**：新增 `readRunOutcome(worldId, operationId)`，返回与上面相同形状的 outcome。它零模型调用、零写入；operation 不存在时返回 `null`。它是 S3-02b3c3 HTTP 查询与 b3d 来源页的唯一读取入口。
 4. **失败类别持久化**：在 `WorldStructureBackfillOperation` 上新增可空列 `failureCategory`，双 schema 与同名新增 migration `20260926120000_world_structure_backfill_failure_category` 保持对称。
    - `markFailed(worldId, operationId, failureCategory?)` 与 `markUnknown({ ..., failureCategory? })` 在**同一条件更新**中写入状态与类别，只有状态真的发生转换时才写入，重放不会覆盖已有类别。
    - lease 到期路径固定写入 `lease_expired`。
    - 类别只接受白名单：`StructuredOutputErrorCategory` 各值加上 `WORLD_STRUCTURE_BACKFILL_LOCAL_FAILURE_CATEGORIES` 各值，其他字符串以 `INVALID_INPUT` 拒绝。不保存错误消息、原始输出、provider 响应体或密钥。
+   - （DoR 修订 3）白名单是 contracts 文件中的运行时常量；其中结构化部分须经类型检查与 `StructuredOutputErrorCategory` 双向对齐（例如 `satisfies Record<StructuredOutputErrorCategory, true>` 形式），任一侧增删值都会让 `tsc` 失败，二者不能漂移。
    - `WorldStructureBackfillOperationRecord` 增加 `failureCategory`。生成服务写入失败时传入类别，重放时从持久字段读出，不再返回 `null`。
+   - （DoR 修订 5）`recordFailure` 在 `marked.changed` 为 `false` 时返回数据库中已持久化的 `failureCategory`，不返回本次内存中的类别；AC6“已有终态不被覆盖”以此为准。
 5. **用户文案不在本卡**：类别只作为机器可读事实保存。转换为面向新手的“为什么失败/下一步做什么”说明由 b3d 负责。
 
 ### 生产文件边界
@@ -84,6 +93,7 @@
   - `server/src/prisma/schema.prisma` 与 `schema.sqlite.prisma`：仅 `failureCategory String?`。
 - 只读导入：`WorldStructureBackfillCommitService`（不改 `PrismaWorldStructureBackfillCommitStore.ts`）；`llm/structuredOutput.ts` 的类别类型。
 - 既有测试 `worldStructureBackfillStore.test.js`、`worldStructureBackfillCommit.test.js`、`worldStructureBackfillGeneration.test.js`、`backfillSingleAttemptPrompt.test.js` 不改，且须全部通过。
+- （PO 边界修订，2026-09-25）允许只改 `worldStructureBackfillStore.test.js` 的临时库夹具：先只应用排序在 `20260923120000_world_structure_backfill_store` 之前的迁移，按原样建表并完成原断言后，再应用排序在其后的迁移；断言不改不减。原因：原夹具只排除自身迁移，c1 迁移会在 store 表存在前执行 `ALTER TABLE` 而失败。
 - 根 PM/PO 独占 `TASK.md`、Roadmap、合同、Wiki、发布记录、提交与 beta 集成。GPT-6 Luna Medium QA/QC 只读验收。
 
 ### 验收条件
@@ -94,6 +104,7 @@
    - 首次调用返回 `result_pending_commit`，或经 `readCommitOutcome` 确认后返回 `committed`，模型调用 0 次。
    - 下一次重放完成提交，模型调用仍为 0，只递增一次 revision。
    - 没有可验证 receipt 时，不得报告 `committed`。
+   - （DoR 修订 2）另测冲突路径：注入的提交服务抛 `COMMIT_RESULT_UNKNOWN`，而持久状态已是 `conflict_result_retained` 时，返回 `conflict_result_retained`，不得返回 `result_pending_commit`。
 4. **作者并发修改**：生成完成后、提交前作者改了世界（revision 变化），结果为 `conflict_result_retained`。World 结构、revision 和其他作者字段均不变，result 保留。重放只读返回，模型调用 0、写入 0。
 5. **并发**：在同一文件型临时 SQLite 库上，用两个 worker 线程（Retro 改进②，禁止 `:memory:`、禁止同进程双连接）并发 `runBackfill` 同一 operation：
    - provider 调用总数为 1，revision 只递增 1 次，receipt 只有一份。
@@ -109,6 +120,10 @@
 9. **迁移**：
    - 隔离 SQLite 从既有迁移历史增量升级，既有 World、backfill operation、result、receipt 行数与内容不变，旧 operation 的 `failureCategory` 为 `null`。
    - 双 schema validate 通过；PostgreSQL 与 SQLite 同名 migration 只含一条加可空列语句，在测试中静态比对。
+   - （DoR 修订 1）`worldStructureBackfillRun.test.js` 用 `dist/db/runtimeMigrations.js` 的 `applyRuntimeMigrationsToDatabase` 在两个 `/tmp/ai-novel-s3-02b3c1-*` 文件上验证：
+     - (a) 全新：空文件应用完整迁移集；
+     - (b) 升级：先应用 beta 迁移集（除 `20260926120000_*` 外的全部目录），写入 World、operation、result、receipt 行，再应用完整迁移集。
+     - 断言两个文件的 `sqlite_master` 完全一致；升级前写入的行内容不变，且 `failureCategory` 为 `NULL`。
 10. **回归与边界**：
     - b3a、b3b1、b2a、b2b 既有测试不改且全部通过。
     - `git diff --stat` 只含上述边界。
@@ -142,13 +157,13 @@
   - `markUnknown` 带 `lease_expired`/`unknown_result` 原因。
 - [x] 共享调用方与零修复调用方已列出，确认不触及解析器。
 - [x] PO 已确认拆分与三项决定（2026-09-25）；c1 与 c2 各带自己的只加列 migration。
-- [ ] 独立 GPT-6 Scrum 与 QA DoR PASS。
+- [x] 独立 GPT-6 Scrum 与 QA DoR 有条件 PASS，修订已并入本合同。
 
 ### DoD
 
-- [ ] AC1～10 均有行为测试，最窄验证全部通过。
-- [ ] 独立 QA/QC PASS，重点核对：零新增模型调用路径、提交只一次、类别同事务写入、迁移只加列、边界。
-- [ ] 根 PM 作 Wiki 决策：失败类别持久化与运行 outcome 属于稳定恢复规则，预计更新世界维护恢复 Wiki。发布说明预计跳过：没有用户可见入口。
+- [x] AC1～10 均有行为测试，最窄验证全部通过。
+- [x] 独立 QA/QC PASS，重点核对：零新增模型调用路径、提交只一次、类别同事务写入、迁移只加列、边界。
+- [x] 根 PM 作 Wiki 决策：失败类别持久化与运行 outcome 属于稳定恢复规则，预计更新世界维护恢复 Wiki。发布说明预计跳过：没有用户可见入口。
 - [ ] 阶段提交，feature→beta 快进后在 beta 复跑同一合同命令。
 
 ### 估算与拆分触发
@@ -194,6 +209,7 @@
 - 新增：backfill `infrastructure/` 两个适配器；同名 migration `20260927120000_world_structure_backfill_post_commit_snapshot`（双库）；`server/tests/worldStructureBackfillPostCommit.test.js`。
 - 修改：`WorldStructureBackfillRunService.ts`、backfill contracts、facade、README，以及双 schema（仅新增列）。
 - 不改：`worldSnapshotService.ts`、`WorldService.ts`、维护模块、b3b1 提交事务。
+- 夹具规则（c1 PO 边界修订延伸）：c2 的迁移会 `ALTER` receipt 表，而 `worldStructureBackfillCommit.test.js` 夹具只排除自身迁移，届时须对该夹具做同样的“先前缀迁移、建表断言后再应用后续迁移”修订，并在 c2 DoR 中列入边界。
 
 ### 验收草案
 

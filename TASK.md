@@ -3,7 +3,7 @@
 更新时间：2026-09-25
 集成分支：`beta`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S3I 已完成 `S3-02b3b2a` 单次物理模型调用门 `3/3` 点，独立 QA/QC PASS，已合入 beta。此前 R1-S3E～S3H 均已完成并合入 beta。R1-S3J 已完成 `S3-02b3b2b` 模型→持久 result 编排 `5/5` 点。R1-S3K 已完成 `R1-G02a`+`R1-G02b` 独立发行版发布指向与版本线 `7/7` 点，独立 QA/QC PASS；`R1-G02c/d/e/g` 仍在 Refinement，下一窗口 R1-S3L 已起草 `S3-02b3c1` 提交编排与失败原因持久化（5 点），PO 已确认范围，独立 DoR 待执行，尚未开始。S3-02b3c2/c3、HTTP 与 UI 接线继续 Refinement；Release 1 未完成。
+当前状态：R1-S3I 已完成 `S3-02b3b2a` 单次物理模型调用门 `3/3` 点，独立 QA/QC PASS，已合入 beta。此前 R1-S3E～S3H 均已完成并合入 beta。R1-S3J 已完成 `S3-02b3b2b` 模型→持久 result 编排 `5/5` 点。R1-S3K 已完成 `R1-G02a`+`R1-G02b` 独立发行版发布指向与版本线 `7/7` 点，独立 QA/QC PASS；`R1-G02c/d/e/g` 仍在 Refinement，R1-S3L 已完成 `S3-02b3c1` 提交编排与失败原因持久化 `5/5` 点，独立 QA/QC PASS。S3-02b3c2/c3、HTTP 与 UI 接线继续 Refinement（Not Ready）；Release 1 未完成。
 
 ## 权威文档
 
@@ -375,12 +375,14 @@ R1-RC 独立 Refinement：[R1-G01 发布治理拆分合同](./docs/plans/r1-g01-
 - 非范围：不改应用名称、appId、数据目录或用户数据路径（G02c/d/e 仍在 Refinement）；不 bump 版本，不创建或推送 tag，不包装、签名、上传，不运行真实 Actions。UI 验收不适用。
 - Review/Retrospective：Sprint Goal 达成，`7/7`、carryover `0`。静态门 `PASS=12 / REVIEW=2 / BLOCKED=0`（`FORK-VERSION-LINE=REVIEW` 因版本仍为 0.x，`FORK-PUBLISH-TARGET=PASS`），`scripts/release/*.test.cjs` `50/50` PASS。返工为 DoR 2 次，逸出缺陷 `0`。改进：发布审计合同先列绕过类别；审计优先执行真实 guard。QA 跟进项登记为 `R1-G02g` Refinement（Not Ready）。下一 Story 未标 Ready。
 
-## 待 DoR Sprint：R1-S3L 结构补全提交编排与失败原因保存
+## 已完成 Sprint：R1-S3L 结构补全提交编排与失败原因保存
 
-- 状态：PO 已确认范围（2026-09-25），独立 DoR 待执行，未开始。合同：[R1-S3L](./docs/plans/r1-s3l-sprint-commitment.md)、[S3-02b3c1](./docs/plans/s3-02b3c-backfill-commit-orchestration-contract.md)，5 点，无 Stretch。
+- 状态：Done。独立 DoR 有条件 PASS（修订已并入合同），`5/5` 点，无 Stretch，无 carryover。合同：[R1-S3L](./docs/plans/r1-s3l-sprint-commitment.md)、[S3-02b3c1](./docs/plans/s3-02b3c-backfill-commit-orchestration-contract.md)，5 点，无 Stretch。
 - Sprint Goal：生成结果在世界未变时恰好提交一次，作者改动世界时保留结果；失败类别持久化，重启后仍可读出；重放、并发与提交结果不明时不重调模型、不重复提交。
 - PO 决定：新建 S3-02b3c3（HTTP 与 `/backfill` 接线，排在 c2 之后、b3d 之前）；c1、c2 各带只加列 migration；提交后 snapshot 同步 best-effort，RAG 复用既有索引任务自动入队（c2，Not Ready）。
 - 非范围：c2 snapshot/RAG、c3 HTTP/`/backfill`、UI、真实 PostgreSQL apply、Release 2。
+- 独立 QA/QC：PASS，迁移经独立复验，变异均被捕获；根评审 PASS。合同固定命令 `67/67` PASS，`git diff --check`、server `tsc --noEmit` 通过。
+- Review/Retrospective：Sprint Goal 在 backfill 内部范围达成，`5/5`、carryover `0`、逸出缺陷 `0`。触发 1 次拆分条件（store 测试夹具无法承受后续 `ALTER` 迁移），经 PO 边界修订解决；QA 后补 2 处测试缺口。改进：迁移夹具按真实升级顺序执行；DoR 核对边界外模块是否手工构造记录。c2/c3 未标 Ready。
 
 ## 强制敏捷门
 

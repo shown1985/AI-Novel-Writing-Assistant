@@ -4,7 +4,7 @@
 
 一次 AI 世界结构补全操作在内部闭环：生成结果会在世界未被改动时恰好提交一次；作者改动世界时保留结果、不覆盖。失败类别会持久化，重启后仍能读出“为何失败”。响应丢失、重启、并发或提交结果不明时，只能读回持久事实，不会再次调用模型，也不会重复提交。本窗口不接 HTTP 与现有 `/backfill`。
 
-- Release / Epic：Release 1 / S3 可信世界；规划基线 `beta@92af2d72`；PO 已于 2026-09-25 确认范围与拆分；**独立 DoR 待执行**，尚未开始。
+- Release / Epic：Release 1 / S3 可信世界；规划基线 `beta@92af2d72`；PO 已于 2026-09-25 确认范围与拆分；独立 DoR 有条件 PASS（修订已并入合同）；**Done**。
 - 仅承诺 [S3-02b3c1](./s3-02b3c-backfill-commit-orchestration-contract.md#s3-02b3c1提交编排与失败原因持久化) 5 点，无 Stretch。S3-02b3c2（提交后 snapshot/RAG）、S3-02b3c3（HTTP 与 `/backfill` 接线）、b3d/e 与 `R1-PROMPT02` 仍在 Refinement，不在本窗口。
 - 容量 5 点，未超过已知 velocity（S3G/S3H/S3J 各 5 点）或 25 点上限。采用单 Story、单工程师：运行门面、store 类别写入与双库 migration 属于同一份持久契约，拆给多人会产生 schema 与 store 的共享 owner 冲突。
 
@@ -39,4 +39,9 @@
 
 ## Review 与 Retrospective 出口
 
-（待 Sprint 结束填写）需记录：目标是否达成、承诺/完成点数、carryover 与原因、返工/逸出缺陷、最多两项可执行改进。未完成时不得以 build 通过代替 Done。
+Sprint 结束时记录目标是否达成、承诺/完成点数、carryover 与原因、返工/逸出缺陷、最多两项可执行改进；未完成不得以 build 通过代替 Done。
+
+Sprint Goal 在 backfill 内部范围达成；承诺/完成 `5/5`，carryover `0`。`runBackfill` 在世界未变时恰好提交一次，作者改动世界时保留结果；提交结果不明时只按持久状态收敛，不重调模型。失败类别随状态转换写入、只接受白名单且不被覆盖，重启后可由 `readRunOutcome` 读出。migration 只加一列，全新库与升级库的 `sqlite_master` 一致，旧行不变。合同固定命令 `67/67` PASS 两轮，`git diff --check` 与 server `tsc --noEmit` 通过。独立 QA/QC PASS，根评审 PASS。无 UI 改动，UI 验收不适用；现有 `/backfill` 尚未接入，不能称为生产补全已受保护。
+
+- 返工：DoR 有条件通过，2 项合同修正（提交不明按持久状态映射、迁移升级验证）加 3 项注记（白名单常量、可注入依赖、返回已存类别），均作为合同修订写入。实施中触发 1 次拆分条件：store 测试夹具只排除自身迁移，无法承受后续 `ALTER` 迁移；经 PO 边界修订只改该夹具，断言不变。QA PASS 后补齐 2 处测试缺口（生成服务直接返回已存类别、`committed` 无回执时重抛）。逸出缺陷 `0`。
+- 改进：①对临时库应用迁移的测试夹具必须按真实升级顺序（更早迁移 → 自身迁移 → 更晚迁移）执行，不能用“除自身外全部先跑”；②需要读取不可修改模块产出的记录时，DoR 须先核对该模块是否手工构造记录，避免新增字段在边界外丢失。

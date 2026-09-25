@@ -35,6 +35,9 @@ export const WORLD_STRUCTURE_BACKFILL_LOCAL_FAILURE_CATEGORIES = {
   leaseExpired: "lease_expired",
 } as const;
 
+export type WorldStructureBackfillLocalFailureCategory =
+  (typeof WORLD_STRUCTURE_BACKFILL_LOCAL_FAILURE_CATEGORIES)[keyof typeof WORLD_STRUCTURE_BACKFILL_LOCAL_FAILURE_CATEGORIES];
+
 export type WorldStructureBackfillFailurePhase = "provider_call" | "after_provider_output";
 export type WorldStructureBackfillFailureStatus = "failed_terminal" | "model_unknown";
 

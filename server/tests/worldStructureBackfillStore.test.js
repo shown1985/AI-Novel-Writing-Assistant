@@ -141,8 +141,11 @@ function createIsolatedFixture() {
   const historicalMigrationsPath = path.join(tempDir, "migrations-before-store");
   fs.mkdirSync(historicalMigrationsPath, { recursive: true });
 
+  // Ordering rule: the historical database is exactly what existed before this
+  // migration, so apply only migrations that sort before it. A later migration
+  // may alter this migration's tables and cannot run before they exist.
   for (const migrationName of listMigrationNames(sqliteMigrationsDir)) {
-    if (migrationName === newMigrationName) {
+    if (migrationName.localeCompare(newMigrationName) >= 0) {
       continue;
     }
     const targetDirectory = path.join(historicalMigrationsPath, migrationName);
@@ -207,6 +210,23 @@ function createIsolatedFixture() {
   assert.equal(rawDatabase.prepare('SELECT COUNT(*) AS count FROM "World"').get().count, worldCountBefore);
   assert.equal(rawDatabase.pragma("integrity_check", { simple: true }), "ok");
   assert.deepEqual(rawDatabase.pragma("foreign_key_check"), []);
+
+  // Ordering rule (continued): migrations that sort after this one run only
+  // after its tables exist, so the fixture matches the current Prisma schema.
+  const laterMigrationsPath = path.join(tempDir, "migrations-after-store");
+  fs.mkdirSync(laterMigrationsPath, { recursive: true });
+  for (const migrationName of listMigrationNames(sqliteMigrationsDir)) {
+    if (migrationName.localeCompare(newMigrationName) <= 0) {
+      continue;
+    }
+    const targetDirectory = path.join(laterMigrationsPath, migrationName);
+    fs.mkdirSync(targetDirectory, { recursive: true });
+    fs.copyFileSync(
+      path.join(sqliteMigrationsDir, migrationName, "migration.sql"),
+      path.join(targetDirectory, "migration.sql"),
+    );
+  }
+  applyRuntimeMigrationsToDatabase(rawDatabase, laterMigrationsPath);
   rawDatabase.close();
 
   const clientA = createPrisma(databasePath);

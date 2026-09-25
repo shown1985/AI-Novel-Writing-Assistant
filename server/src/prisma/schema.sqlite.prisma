@@ -1665,6 +1665,7 @@ model WorldStructureBackfillOperation {
   leaseExpiresAt         DateTime?
   modelRequestId         String?
   modelAttemptId         String?
+  failureCategory        String?
   world                  World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
   result                 WorldStructureBackfillResult?
   commitReceipt          WorldStructureBackfillCommitReceipt?

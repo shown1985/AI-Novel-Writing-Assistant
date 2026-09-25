@@ -1,4 +1,9 @@
 import { createHash } from "node:crypto";
+import type { StructuredOutputErrorCategory } from "../../../../llm/structuredOutput";
+import {
+  WORLD_STRUCTURE_BACKFILL_LOCAL_FAILURE_CATEGORIES,
+  type WorldStructureBackfillLocalFailureCategory,
+} from "./worldStructureBackfillGeneration";
 
 export const WORLD_STRUCTURE_BACKFILL_STATUSES = [
   "model_not_called",
@@ -11,6 +16,33 @@ export const WORLD_STRUCTURE_BACKFILL_STATUSES = [
 ] as const;
 
 export type WorldStructureBackfillStatus = (typeof WORLD_STRUCTURE_BACKFILL_STATUSES)[number];
+
+/**
+ * Every structured output category, checked in both directions by `satisfies`:
+ * adding or removing a value on either side fails type checking.
+ */
+const STRUCTURED_OUTPUT_FAILURE_CATEGORY_FLAGS = {
+  unsupported_native_json: true,
+  thinking_pollution: true,
+  incomplete_json: true,
+  malformed_json: true,
+  schema_mismatch: true,
+  reasoning_budget_exhausted: true,
+  output_truncated: true,
+  empty_content: true,
+  request_too_large: true,
+  transport_error: true,
+} as const satisfies Record<StructuredOutputErrorCategory, true>;
+
+export type WorldStructureBackfillFailureCategory =
+  | StructuredOutputErrorCategory
+  | WorldStructureBackfillLocalFailureCategory;
+
+/** Machine-readable failure categories that may be persisted on an operation. */
+export const WORLD_STRUCTURE_BACKFILL_FAILURE_CATEGORIES: ReadonlySet<WorldStructureBackfillFailureCategory> = new Set([
+  ...(Object.keys(STRUCTURED_OUTPUT_FAILURE_CATEGORY_FLAGS) as StructuredOutputErrorCategory[]),
+  ...Object.values(WORLD_STRUCTURE_BACKFILL_LOCAL_FAILURE_CATEGORIES),
+]);
 export type WorldStructureBackfillJsonValue =
   | string
   | number
@@ -53,6 +85,12 @@ export interface WorldStructureBackfillOperationRecord extends NormalizedWorldSt
   leaseExpiresAt: Date | null;
   modelRequestId: string | null;
   modelAttemptId: string | null;
+  /**
+   * Allowlisted category written with the failure transition; never a message
+   * or raw output. The backfill store always reads it; the commit read-back
+   * leaves it out because only failure states (which never commit) carry one.
+   */
+  failureCategory?: WorldStructureBackfillFailureCategory | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -147,6 +185,22 @@ function normalizeOptionalString(value: unknown, fieldName: string): string | nu
     invalidInput(`${fieldName} must be a string or null.`);
   }
   return value;
+}
+
+/** Missing categories persist as null; anything outside the allowlist is rejected. */
+export function normalizeWorldStructureBackfillFailureCategory(
+  value: unknown,
+): WorldStructureBackfillFailureCategory | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (
+    typeof value !== "string"
+    || !WORLD_STRUCTURE_BACKFILL_FAILURE_CATEGORIES.has(value as WorldStructureBackfillFailureCategory)
+  ) {
+    invalidInput("failureCategory must be an allowlisted backfill failure category.");
+  }
+  return value as WorldStructureBackfillFailureCategory;
 }
 
 export function normalizeWorldStructureBackfillRequest(

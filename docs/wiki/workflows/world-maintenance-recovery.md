@@ -110,6 +110,10 @@ S3-02b3b1 的 backfill-owned 提交门面只消费已持久化 result，不调�
 
 S3-02b3b2b 的生成编排固定为：`claim`（`model_not_called`），然后在 provider 调用前由 `startModel` 持久进入 `model_in_flight`，再用单次模式调用。之后只有三种出口：`model_succeeded_pending_commit`；`failed_terminal`（provider 已返回但内容不可用）；`model_unknown`（传输、取消、非结构化异常，或拿到输出后归一化/保存失败）。并发落败方从 `startModel` 取得当前状态直接返回，不比对引用、不调用模型。除唯一胜者推进 `model_not_called` 外，任何重放都不重调模型；`model_not_called` 重放前须确认世界 revision 与来源 digest 未漂移。
 
+S3-02b3c1 的运行门面 `runBackfill` 按 operation 的持久状态决定 outcome，从不按“有没有 receipt”推断：提交抛出 `COMMIT_RESULT_UNKNOWN` 等异常后，读回 `committed` 且带 receipt 才报已保存，`conflict_result_retained` 报冲突，`model_succeeded_pending_commit` 报待提交，读不到或其他状态则原样抛出。原因是冲突与待提交同样没有 receipt，按缺失推断会把冲突误报为可重提交。`readRunOutcome` 是零模型调用、零写入的唯一读取入口。
+
+失败类别 `failureCategory` 是机器可读事实：只接受与结构化输出类别双向类型对齐的白名单加本地类别，不保存错误消息或原始输出；它与 `failed_terminal`/`model_unknown` 转换在同一条件更新内写入，已落定的行不被覆盖，重放和并发落败方都返回库中已存类别。面向新手的原因说明由来源页负责。
+
 零修复解析失败归为 `malformed_json` 只在单次模式生效。其他零修复生产 Prompt 仍按原路径归为 `schema_mismatch`，因为策略循环只在 `prompt_json` 的 `schema_mismatch` 处提前停止；若对它们改判，每次调用会从 1 次升为 3 次。凡是改动共享解析分类，都须先列出全部零修复调用方。
 
 本机 SQLite runtime migration 是安全提交可运行的必要条件；PostgreSQL apply 属 Release gate，在发布组合验证时单独执行，不把发布环境尚未 apply 混同为本地提交合同失败。两套 schema 仍须保持可验证的一致性，且任何迁移演练都只使用隔离数据库。

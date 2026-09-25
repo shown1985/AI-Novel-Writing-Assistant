@@ -2,15 +2,18 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import {
   createWorldStructureBackfillRequestHash,
   createWorldStructureBackfillResultDigest,
+  normalizeWorldStructureBackfillFailureCategory,
   normalizeWorldStructureBackfillRequest,
   parseWorldStructureBackfillJsonObject,
   WorldStructureBackfillStoreError,
+  type WorldStructureBackfillFailureCategory,
   type WorldStructureBackfillJsonObject,
   type WorldStructureBackfillOperationRecord,
   type WorldStructureBackfillReadResult,
   type WorldStructureBackfillRequestInput,
   type WorldStructureBackfillResultRecord,
 } from "../domain/worldStructureBackfillContracts";
+import { WORLD_STRUCTURE_BACKFILL_LOCAL_FAILURE_CATEGORIES } from "../domain/worldStructureBackfillGeneration";
 
 interface OperationRow {
   id: string;
@@ -28,6 +31,7 @@ interface OperationRow {
   leaseExpiresAt: Date | null;
   modelRequestId: string | null;
   modelAttemptId: string | null;
+  failureCategory: string | null;
   createdAt: Date;
   updatedAt: Date;
   result?: ResultRow | null;
@@ -81,6 +85,12 @@ export interface MarkWorldStructureBackfillUnknownInput {
   operationId: string;
   reason: "unknown_result" | "lease_expired";
   now?: Date;
+  /**
+   * Allowlisted category written in the same conditional update as the
+   * transition. Omitted means null; the lease_expired reason always writes
+   * `lease_expired`.
+   */
+  failureCategory?: WorldStructureBackfillFailureCategory | null;
 }
 
 export interface WorldStructureBackfillStore {
@@ -92,7 +102,11 @@ export interface WorldStructureBackfillStore {
     changed: boolean;
     state: WorldStructureBackfillReadResult | null;
   }>;
-  markFailed(worldId: string, operationId: string): Promise<{
+  markFailed(
+    worldId: string,
+    operationId: string,
+    failureCategory?: WorldStructureBackfillFailureCategory | null,
+  ): Promise<{
     changed: boolean;
     state: WorldStructureBackfillReadResult | null;
   }>;
@@ -164,6 +178,7 @@ function toOperationRecord(row: OperationRow): WorldStructureBackfillOperationRe
     leaseExpiresAt: row.leaseExpiresAt,
     modelRequestId: row.modelRequestId,
     modelAttemptId: row.modelAttemptId,
+    failureCategory: row.failureCategory as WorldStructureBackfillFailureCategory | null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -490,7 +505,11 @@ export class PrismaWorldStructureBackfillStore implements WorldStructureBackfill
     }
   }
 
-  async markFailed(worldId: string, operationId: string): Promise<{
+  async markFailed(
+    worldId: string,
+    operationId: string,
+    failureCategory?: WorldStructureBackfillFailureCategory | null,
+  ): Promise<{
     changed: boolean;
     state: WorldStructureBackfillReadResult | null;
   }> {
@@ -500,9 +519,11 @@ export class PrismaWorldStructureBackfillStore implements WorldStructureBackfill
     if (typeof operationId !== "string" || operationId.trim().length === 0) {
       invalidInput("operationId must be a non-empty string.");
     }
+    const category = normalizeWorldStructureBackfillFailureCategory(failureCategory);
+    // Status and category change together; a replay on a settled row writes neither.
     const update = await this.client.worldStructureBackfillOperation.updateMany({
       where: { worldId, operationId, status: "model_in_flight" },
-      data: { status: "failed_terminal" },
+      data: { status: "failed_terminal", failureCategory: category },
     });
     const row = await this.readRow(worldId, operationId);
     return {
@@ -526,6 +547,12 @@ export class PrismaWorldStructureBackfillStore implements WorldStructureBackfill
     if (input.reason !== "unknown_result" && input.reason !== "lease_expired") {
       invalidInput("reason must be unknown_result or lease_expired.");
     }
+    const requestedCategory = normalizeWorldStructureBackfillFailureCategory(input.failureCategory);
+    const leaseExpired = WORLD_STRUCTURE_BACKFILL_LOCAL_FAILURE_CATEGORIES.leaseExpired;
+    if (input.reason === "lease_expired" && requestedCategory !== null && requestedCategory !== leaseExpired) {
+      invalidInput("The lease_expired reason can only persist the lease_expired category.");
+    }
+    const category = input.reason === "lease_expired" ? leaseExpired : requestedCategory;
     const update = await this.client.worldStructureBackfillOperation.updateMany({
       where: {
         worldId: input.worldId,
@@ -533,7 +560,7 @@ export class PrismaWorldStructureBackfillStore implements WorldStructureBackfill
         status: "model_in_flight",
         ...(input.reason === "lease_expired" ? { leaseExpiresAt: { lte: now } } : {}),
       },
-      data: { status: "model_unknown" },
+      data: { status: "model_unknown", failureCategory: category },
     });
     const row = await this.readRow(input.worldId, input.operationId);
     return {

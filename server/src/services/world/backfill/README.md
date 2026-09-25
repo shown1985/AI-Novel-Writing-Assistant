@@ -30,8 +30,18 @@ operation 属于一个 `World`，由 `(worldId, operationId)` 唯一标识；res
 
 `startModel` 时 attempt id 尚未产生，因此 `persistResult` 在事务内允许一次补绑：已存 `modelAttemptId` 为 null、`modelRequestId` 一致且入参带非空 attempt id 时，把它同时写入 operation 与 result。已存 attempt id 非空但不同、或 request id 不同，仍是 `MODEL_REFERENCE_MISMATCH`。不设 `onNotAcquired` 的 `startModel` 保持原有引用比对语义。
 
-失败映射是对已结构化错误的确定性后处理，表在 `domain/worldStructureBackfillGeneration.ts`：provider 已返回但内容不可用（`malformed_json`、`empty_content`、`incomplete_json`、`schema_mismatch`、`thinking_pollution`、`output_truncated`、`reasoning_budget_exhausted`）经 `markFailed` 进入 `failed_terminal`；传输错误、取消、未列出的类别、非结构化异常，以及拿到输出后的归一化或 `persistResult` 失败，一律 `markUnknown(unknown_result)` 进入 `model_unknown`。原因是结果不明时重调可能重复扣费，宁可保守。失败类别只随返回值交给调用方，不持久化。
+失败映射是对已结构化错误的确定性后处理，表在 `domain/worldStructureBackfillGeneration.ts`：provider 已返回但内容不可用（`malformed_json`、`empty_content`、`incomplete_json`、`schema_mismatch`、`thinking_pollution`、`output_truncated`、`reasoning_budget_exhausted`）经 `markFailed` 进入 `failed_terminal`；传输错误、取消、未列出的类别、非结构化异常，以及拿到输出后的归一化或 `persistResult` 失败，一律 `markUnknown(unknown_result)` 进入 `model_unknown`。原因是结果不明时重调可能重复扣费，宁可保守。
+
+失败类别写在 operation 的可空列 `failureCategory` 上，与状态转换处于同一条件更新：只有 `model_in_flight` 真正转换为 `failed_terminal`/`model_unknown` 时才写入，已落定的行不会被覆盖，`recordFailure` 此时返回库中已存类别。`lease_expired` 原因固定写 `lease_expired`。类别只接受 `WORLD_STRUCTURE_BACKFILL_FAILURE_CATEGORIES` 白名单（结构化输出类别经 `satisfies Record<StructuredOutputErrorCategory, true>` 与 `llm/structuredOutput.ts` 双向对齐，外加本地类别），其他值返回 `INVALID_INPUT` 且不改行；不保存错误消息、原始输出或 provider 响应。类别只是机器可读事实，面向新手的原因与下一步说明由来源页负责。
 
 重放一律不新开调用，唯一例外是 `model_not_called`：重新读取 World，revision 与重算的 `sourceDigest` 都等于已存值时，才由 `startModel` 的唯一胜者继续调用；否则返回 `BASE_REVISION_MISMATCH` 且不改行。`model_in_flight` 在 lease 未到期时返回生成中，到期后只能 `markUnknown(lease_expired)`；lease 只用于发现 owner 失联，不能证明 provider 未收到请求。调用方 base revision 或 provider/model 与已存请求不同返回 `OPERATION_ID_REUSED`。
 
 本模块目前持久化 `model_not_called`、`model_in_flight`、`model_succeeded_pending_commit`、`model_unknown`、`failed_terminal`、`committed` 和 `conflict_result_retained`。`failed_terminal` 只能从 `model_in_flight` 进入，与 `model_unknown` 一样不会重新取得调用权。`model_unknown` 不自动重开模型调用；提交服务也不改变旧 `/backfill` 路径的运行行为。现有 attempt 记录和手动维护回执都不能替代本模块的 backfill 结果或提交事实。
+
+## 运行门面与只读查询
+
+`WorldStructureBackfillRunService.runBackfill` 把一次补全推进到持久 outcome：`committed | conflict_result_retained | result_pending_commit | in_progress | failed_terminal | model_unknown`，携带 operation、result、仅已提交时的 receipt 与持久化的 `failureCategory`。顺序固定：先 `generatePersistedResult`；`model_succeeded_pending_commit` 才调用一次 `commitPersistedResult`；已是 `committed`/`conflict_result_retained` 只经 `readCommitOutcome` 读回；其余生成状态原样返回。生成、提交与 operation 读取都是构造注入的端口，facade `createWorldStructureBackfillRunService` 只做默认装配。提交回执读回不含 `failureCategory`，因此只读查询对 `failed_terminal`/`model_unknown` 从 backfill store 读取类别；这两个状态是终态，类别写入后不再变化，两次读取不会不一致。
+
+提交抛出 `COMMIT_RESULT_UNKNOWN` 或其他异常时，只按 `readCommitOutcome` 读回的 operation 状态收敛：`committed` 且有 receipt 为 `committed`，`conflict_result_retained` 为冲突，`model_succeeded_pending_commit` 为 `result_pending_commit`；读回为空或其他状态时原样抛出提交异常。不能把“没有 receipt”推断为待提交，因为冲突同样没有 receipt。待提交的重放再次提交，由提交事务的 CAS 与唯一回执保证只写一次。本门面不新增任何可能重开模型调用的路径。
+
+`readRunOutcome(worldId, operationId)` 返回同一形状，零模型调用、零写入；未知或跨世界 operation 返回 `null`。它是后续 HTTP 查询与来源页恢复投影的唯一读取入口。本门面不创建 snapshot、不排队 RAG。

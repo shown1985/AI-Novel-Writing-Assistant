@@ -17,6 +17,7 @@ import { buildWorldStructurePromptSource } from "../../worldServiceShared";
 import {
   createWorldStructureBackfillRequestHash,
   WorldStructureBackfillStoreError,
+  type WorldStructureBackfillFailureCategory,
   type WorldStructureBackfillJsonObject,
   type WorldStructureBackfillOperationRecord,
   type WorldStructureBackfillReadResult,
@@ -63,8 +64,12 @@ export interface WorldStructureBackfillGenerationOutcome {
   replayed: boolean;
   operation: WorldStructureBackfillOperationRecord;
   result: WorldStructureBackfillResultRecord | null;
-  /** Returned to the caller only; not persisted by this story. */
-  failureCategory: string | null;
+  /**
+   * Allowlisted failure category. Replays read it from the operation row; a
+   * fresh failure returns the category it wrote, or the stored one when the
+   * row had already settled.
+   */
+  failureCategory: WorldStructureBackfillFailureCategory | null;
 }
 
 export interface WorldStructureBackfillGenerationServiceDeps {
@@ -96,7 +101,7 @@ function outcomeKindForStatus(
 function toOutcome(
   state: WorldStructureBackfillReadResult,
   replayed: boolean,
-  failureCategory: string | null = null,
+  failureCategory: WorldStructureBackfillFailureCategory | null = state.operation.failureCategory ?? null,
 ): WorldStructureBackfillGenerationOutcome {
   return {
     kind: outcomeKindForStatus(state.operation.status),
@@ -214,14 +219,10 @@ export class WorldStructureBackfillGenerationService {
         worldId: input.worldId,
         operationId: input.operationId,
         reason: "lease_expired",
+        failureCategory: WORLD_STRUCTURE_BACKFILL_LOCAL_FAILURE_CATEGORIES.leaseExpired,
         now,
       });
-      const state = marked.state ?? existing;
-      return toOutcome(
-        state,
-        true,
-        marked.changed ? WORLD_STRUCTURE_BACKFILL_LOCAL_FAILURE_CATEGORIES.leaseExpired : null,
-      );
+      return toOutcome(marked.state ?? existing, true);
     }
 
     return toOutcome(existing, true);
@@ -322,15 +323,16 @@ export class WorldStructureBackfillGenerationService {
   private async recordFailure(
     input: GenerateWorldStructureBackfillResultInput,
     phase: WorldStructureBackfillFailurePhase,
-    category: string,
+    category: WorldStructureBackfillFailureCategory,
   ): Promise<WorldStructureBackfillGenerationOutcome> {
     const status = resolveWorldStructureBackfillFailureStatus({ phase, category });
     const marked = status === "failed_terminal"
-      ? await this.deps.store.markFailed(input.worldId, input.operationId)
+      ? await this.deps.store.markFailed(input.worldId, input.operationId, category)
       : await this.deps.store.markUnknown({
         worldId: input.worldId,
         operationId: input.operationId,
         reason: "unknown_result",
+        failureCategory: category,
       });
     if (!marked.state) {
       throw new WorldStructureBackfillStoreError(
@@ -338,6 +340,11 @@ export class WorldStructureBackfillGenerationService {
         "No backfill operation belongs to this world and operationId.",
       );
     }
-    return toOutcome(marked.state, false, category);
+    // A row that had already settled keeps its stored category; never report the unwritten one.
+    return toOutcome(
+      marked.state,
+      false,
+      marked.changed ? category : marked.state.operation.failureCategory ?? null,
+    );
   }
 }
