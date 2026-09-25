@@ -74,37 +74,49 @@
 - 状态 / Owner / 依赖：**Ready-candidate**（待独立 DoR）；优先级 P0；R1-S3K 唯一发布脚本工程师；依赖已合入 beta 的 G01a/G01b。
 - 用户价值：本发行版的安装包版本不会与上游混淆，不会误把 tag 推到上游，也不会把上游 tag 当成本发行版发布。
 - 生产文件边界（独占）：`.github/workflows/desktop-release.yml` 仅 `validate-release` 的 guard 步骤；`scripts/trigger-desktop-release.cjs`；`scripts/release/r1-03-static-gate-audit.cjs` 新增 `FORK-VERSION-LINE`，既有 finding 语义不变。
-- 测试文件边界：新增 `scripts/release/r1-g02a-fork-version-line.test.cjs`；`scripts/release/r1-g01a-release-trigger.test.cjs` 只允许让 guard 在临时目录中读取 major ≥ 1 的 fixture `desktop/package.json` 来完成正例，其余断言原样保留。不改 `desktop/package.json`、builder、stage 脚本或 beta workflow。
+- 测试文件边界：新增 `scripts/release/r1-g02a-fork-version-line.test.cjs`。`scripts/release/r1-g01a-release-trigger.test.cjs` 中的 `"the real workflow guard allows only the exact stable package tag"`（当前第 74-92 行）用真实仓库的 `0.4.28` 期望 `allowed=true`，G02a 的 major 门会让它失败；该用例必须改为在临时目录中运行同一段真实 guard 脚本，并读取 major ≥ 1 的 fixture `desktop/package.json`（如 `1.2.3`），正例与四个负例（版本不符、`desktop-v*`、`-rc1`、`v1.2`）都以 fixture 版本为基准。`runActualGuard` 可增加可选 `cwd` 参数，这是本文件唯一允许的改动，其余断言原样保留。不改 `desktop/package.json`、builder、stage 脚本或 beta workflow。
 
 ### 验收条件
 
 1. guard 在“严格 `vX.Y.Z` 且等于包版本”之外再要求 major ≥ 1；`v0.Y.Z` push tag（包括与当前 `0.4.28` 相等的 tag）只输出 `allowed=false`。审计器现有的 guard 文本检查继续成立，`PUBLIC-RELEASE-TRIGGER` 与 `MACOS-WORKFLOW` 保持 PASS。
-2. 发布脚本默认 remote 为 `fork`；remote URL 指向 `ExplosiveCoderflome/AI-Novel-Writing-Assistant` 时拒绝；tag 已在本地存在或已在 `origin` 远端存在时拒绝；major 为 0 时拒绝；只推送单个 tag，不使用 `--tags`。拒绝都发生在 dry-run 阶段之前或期间，dry-run 不写任何 ref。
-3. 审计 `FORK-VERSION-LINE`：guard 缺少 major 门或脚本默认 remote 不是 `fork` 时为 `BLOCKED`；包版本 major 为 0（继承上游版本线）时为 `REVIEW`；major ≥ 1 时为 `PASS`。
-4. G01a 的 `desktop-v*`、`-rc1`、版本不符、手动触发负例和三 job 白名单全部保留且通过。
+2. 发布脚本的 remote 与碰撞规则：
+   - 默认推送 remote 为 `fork`；只推送单个 tag，不使用 `--tags`；包版本 major 为 0 时拒绝。
+   - **上游 remote 的判定**：任一 remote 的 fetch URL 或 push URL（`git remote get-url` 与 `git remote get-url --push`）匹配 `ExplosiveCoderflome/AI-Novel-Writing-Assistant`，即为上游。匹配不区分大小写，覆盖 SSH（`git@github.com:…`、`ssh://git@github.com/…`）与 HTTPS 形式，允许末尾 `.git` 或 `/`。该匹配串只能出现在脚本内一个具名常量中。
+   - 推送目标 remote 的 fetch 或 push URL 被判为上游时拒绝。这项判定只依赖 URL 字符串，必须在任何网络调用之前完成。
+   - 碰撞检查依次覆盖本地 tag、推送目标 remote（`ls-remote --tags`）和上游 remote（`ls-remote --tags`）；任一处已存在 `vX.Y.Z` 即拒绝。
+   - 找不到任何上游 remote，或任一 `ls-remote` 失败时，以明确的错误信息拒绝（说明缺哪个 remote 或哪个查询失败、如何补齐）。不得跳过检查，也不得把失败当作“不存在”。
+   - 所有拒绝都发生在创建本地 tag 之前；`--dry-run` 不写任何 ref。
+   - 测试把 `scripts/trigger-desktop-release.cjs` 复制进临时 git 仓库再执行，因为脚本的 repoRoot 取自 `__dirname`。需要 `ls-remote` 的用例使用本地 bare 仓库作为远端；上游 URL 判定用例（推送目标为上游、push URL 与 fetch URL 不同且其一为上游、大小写与 SSH/HTTPS 变体）只配置 URL 字符串，断言在网络调用前拒绝。必须覆盖“没有上游 remote”与“push URL 与 fetch URL 不同”两个用例。
+3. 审计 `FORK-VERSION-LINE`：guard 缺少 major 门、脚本默认 remote 不是 `fork` 或脚本缺少上游碰撞检查时为 `BLOCKED`；上述均满足时，唯一的 `REVIEW` 情形是包版本 major 为 0（继承上游版本线），major ≥ 1 时为 `PASS`。
+4. G01a 的 `desktop-v*`、`-rc1`、版本不符、手动触发负例和三 job 白名单全部保留且通过；第 74-92 行正例已按测试文件边界迁到临时目录 fixture。
 
 ### 最窄验证与非范围
 
-- 验证：`node --check scripts/trigger-desktop-release.cjs scripts/release/r1-03-static-gate-audit.cjs`；`node --test scripts/release/r1-g01a-release-trigger.test.cjs scripts/release/r1-g01b-macos-candidate.test.cjs scripts/release/r1-g02a-fork-version-line.test.cjs`。发布脚本测试只使用临时 git 仓库和本地 bare remote，不访问网络。最后运行 `node scripts/release/r1-03-static-gate-audit.cjs --strict`，按 finding ID 对账，预期新增 `FORK-VERSION-LINE=REVIEW`。
+- 验证：`node --check scripts/trigger-desktop-release.cjs scripts/release/r1-03-static-gate-audit.cjs`；`node --test scripts/release/r1-g01a-release-trigger.test.cjs scripts/release/r1-g01b-macos-candidate.test.cjs scripts/release/r1-g02a-fork-version-line.test.cjs`。发布脚本测试只使用临时 git 仓库（复制入脚本）和本地 bare remote，不访问网络。最后运行 `node scripts/release/r1-03-static-gate-audit.cjs --strict`，按 finding ID 对账，预期新增 `FORK-VERSION-LINE=REVIEW`。
 - 非范围：把版本 bump 到 `1.0.0`；创建、推送或删除任何 tag；运行包装、签名或上传；运行真实 Actions；修改发布 owner、beta workflow 或身份字段。
 
 ## R1-G02b 发布与自动更新目标指向本发行版（3 点）
 
 - 状态 / Owner / 依赖：**Ready-candidate**（待独立 DoR）；优先级 P0；与 G02a 同一名工程师，在 G02a 自检通过后开始。先有 major 门，再切换可写的发布目标，避免上游 `v0.4.x` tag 在 fork 被发布。
 - 用户价值：本发行版用户只从本发行版仓库接收更新，不会被上游安装包替换；GA 前 fork 不会产生任何公开预发布 tag。
-- 生产文件边界（独占）：`desktop/electron-builder.config.cjs` 仅 owner/repo 默认值；`desktop/scripts/stage-desktop.cjs` 仅 `app-update.yml` 的 owner/repo 默认值；`.github/workflows/desktop-release.yml` 仅 `publish-release` 的 owner/repo env；`.github/workflows/desktop-beta-release.yml`；`scripts/release/r1-03-static-gate-audit.cjs` 新增 `FORK-PUBLISH-TARGET`。
+- 生产文件边界（独占）：`desktop/electron-builder.config.cjs` 仅 owner/repo 默认值；`desktop/scripts/stage-desktop.cjs` 仅 `app-update.yml` 的 owner/repo 默认值；`.github/workflows/desktop-release.yml` 仅 `publish-release` 的 owner/repo env；`.github/workflows/desktop-beta-release.yml`；`scripts/release/r1-03-static-gate-audit.cjs` 新增 `FORK-PUBLISH-TARGET`。不改 `.github/workflows/site-pages.yml`（它只有 `pages: write`/`id-token: write`，用于官网部署，不属于桌面发布副作用）。
 - 测试文件边界：新增 `scripts/release/r1-g02b-fork-publish-target.test.cjs`。
 
 ### 验收条件
 
 1. builder 默认值、stage 默认值、公开发布 job env、beta workflow env 四处 owner/repo 均为 `shown1985/AI-Novel-Writing-Assistant`。
-2. beta workflow 在 fork 中变为只验证、不上传：workflow 级与 job 级权限为 `contents: read`，不调用 `publish:desktop:beta` 或任何 `--publish`，保留构建、迁移与包装布局校验步骤。不新增 workflow。
-3. 审计 `FORK-PUBLISH-TARGET`：任一处 owner 回到上游、owner/repo 不一致、beta workflow 恢复写权限或上传步骤时为 `BLOCKED`，否则 `PASS`。聚焦测试对每一种回退做突变断言。
+2. beta workflow 在 fork 中变为只验证、不上传：workflow 级与 job 级权限为 `contents: read`；文件中不得出现 `publish:desktop:`、`update-desktop-release-notes`、`gh release`、`GH_TOKEN` 或 `--publish`。因此同时删除 `publish:desktop:beta:reuse-stage` 步骤与 `update-desktop-release-notes.cjs` 步骤（后者在 `contents: read` 下必然失败），并移除 `GH_TOKEN` env；保留安装、类型检查、stage、迁移测试与包装布局校验步骤。不新增 workflow。
+3. 审计 `FORK-PUBLISH-TARGET` 必须能在今后的上游同步后仍然拦住回退，出现以下任一情况即为 `BLOCKED`，否则 `PASS`：
+   - 四处 owner/repo 不是 `shown1985/AI-Novel-Writing-Assistant` 或彼此不一致。
+   - **上游 owner 扫描**：扫描 `.github/` 全部文件、`desktop/`（排除 `node_modules`、`build`、`dist`）与 `scripts/`，出现 `ExplosiveCoderflome`（不区分大小写）且文件不在具名白名单中。白名单只按精确路径列出，并逐条写明原因：`.github/pull_request_template.md`（CLA 链接）、`scripts/trigger-desktop-release.cjs`（G02a 上游判定常量）、`scripts/release/r1-03-static-gate-audit.cjs`（本扫描的匹配常量）、`scripts/release/r1-g02a-fork-version-line.test.cjs` 与 `scripts/release/r1-g02b-fork-publish-target.test.cjs`（测试 fixture）。白名单以外新增任何命中都算回退。
+   - **写权限与发布副作用扫描**：遍历 `.github/workflows/*.yml`，除 `desktop-release.yml` 的 `publish-release` job 外，任何 workflow 级或 job 级 `contents: write`，或任何发布副作用（`publish:desktop:`、`update-desktop-release-notes`、`gh release`、`--publish`、`GH_TOKEN`、`softprops/action-gh-release`）都为 `BLOCKED`。job 边界沿用审计器已有的 job 文本切分方式，不引入新依赖。
+   - 聚焦测试对每一项做突变断言：各 owner 回到上游、owner/repo 不一致、白名单外新增上游 owner、白名单文件被删除后不误报、beta workflow 恢复 `contents: write`、恢复任一禁用串、另一 workflow 新增 `contents: write`、`desktop-release.yml` 中非 `publish-release` job 新增写权限或发布步骤。
 4. `PUBLIC-RELEASE-TRIGGER`、`MACOS-WORKFLOW`、`FORK-VERSION-LINE` 状态不退化；Windows 发布 job 仍是唯一有写权限、唯一有发布副作用的 job。
 
 ### 最窄验证与非范围
 
 - 验证：`node --check` 改动的脚本和配置（`desktop/electron-builder.config.cjs` 需设置 `AI_NOVEL_RELEASE_CHANNEL=beta` 来绕过签名检查，再 `require` 以读取 publish 配置）；`node --test` 运行 G01a、G01b、G02a、G02b 四份测试；审计 `--strict`。不运行 `stage`、`dist`、`publish`。
+- 估点说明：上游 owner 扫描与写权限扫描都是文件遍历加文本匹配，复用审计器已有的 job 切分，约增加 0.5 点，G02b 维持 3 点，处于上限。若实现时需要 YAML 解析依赖或需改动白名单以外的文件，停回 Refinement 重新估点。
 - 非范围：appId、productName、数据目录、更新缓存目录名（G02c）；应用内 GitHub 链接 `client/src/components/layout/ProjectGithubLink.tsx`、官网 `site/`、`NOTICE` 上游版权声明（保留）；更新器在 fork 暂无 Release 时的提示行为；签名与真实 Release。
 
 ## R1-G02c 桌面身份拆分：appId、productName、数据目录（5 点）

@@ -8,13 +8,14 @@
 - 承诺 [R1-G02a 独立版本线与 tag 碰撞门](./r1-g02-fork-desktop-identity-contract.md) 3 点加 [R1-G02b 发布与自动更新目标指向本发行版](./r1-g02-fork-desktop-identity-contract.md) 3 点，共 6 点，无 Stretch。
 - 状态：**DoR 待执行**。两张卡为 Ready-candidate，进入 Sprint 前须取得独立 GPT-6 Scrum 与 QA DoR PASS；任一张未通过，本窗口不开工。
 - 容量 6 点，与已知 velocity（S3G/S3H/S3J 各 5 点）相当，未超过 25 点上限。两张卡共同编辑 `desktop-release.yml` 与静态审计器，必须由同一名工程师严格按 **G02a → G02b** 顺序完成：先有 major 门，再切换有写权限的发布目标，避免上游 `v0.4.x` tag 在 fork 触发发布。G02a 未自检通过前不得开始 G02b，WIP 始终为 1。
+- 首次独立 DoR（2026-09-25）未通过：G02a 缺少上游 remote 的判定方式与失败处理，G02b 的审计无法抵御后续上游同步的回退。合同已补齐，G02b 增量约 0.5 点，仍按 6 点承诺，待复核。
 - G02c/d/e（身份拆分与旧数据复制）仍在 Refinement，不在本窗口。
 
 ## Owner 与退出门
 
 - 一名 GPT-6 Luna xhigh 发布工程师依次独占两张卡合同列出的生产文件与测试文件：G02a 为 `desktop-release.yml` 的 validate guard、`scripts/trigger-desktop-release.cjs`、审计器 `FORK-VERSION-LINE`、新增 G02a 测试及 G01a 正例 fixture；G02b 为 builder 与 stage 脚本的 owner/repo 默认值、`desktop-release.yml` 的发布 env、`desktop-beta-release.yml`、审计器 `FORK-PUBLISH-TARGET` 与新增 G02b 测试。不得改 `desktop/package.json`、appId、productName、数据目录、`desktop/src`、`server/src` 或客户端。
 - 根 PM/PO 独占 `TASK.md`、Roadmap、合同、Wiki/发布记录判断、阶段提交、feature→beta 集成与 Review。
-- GPT-6 Luna Medium QA/QC 独立核查：真实 workflow guard 对 `v0.4.28`、`v1.2.3`（fixture）、`desktop-v*`、`-rc1` 的输出；发布脚本在临时仓库与本地 bare remote 中拒绝上游 URL、本地已有 tag、`origin` 已有 tag 与 major 0；四处 owner 与 beta 无上传的突变断言；Windows 发布 job 仍是唯一写权限 job；文件边界。Scrum Master 审查 WIP、DoR/DoD、范围与 Sprint Review。
+- GPT-6 Luna Medium QA/QC 独立核查：真实 workflow guard 对 `v0.4.28`、`v1.2.3`（fixture）、`desktop-v*`、`-rc1` 的输出；发布脚本（复制进临时仓库、配合本地 bare remote）按 fetch/push URL 判定上游并拒绝推送目标为上游、本地/目标/上游已有 tag、major 0，且在无上游 remote 或 `ls-remote` 失败时明确拒绝；G01a 第 74-92 行正例已迁到临时目录 fixture；四处 owner、上游 owner 白名单扫描、beta 禁用串与跨 workflow 写权限扫描的突变断言；Windows 发布 job 仍是唯一写权限 job；文件边界。Scrum Master 审查 WIP、DoR/DoD、范围与 Sprint Review。
 - 固定最窄命令：`node --check` 改动脚本；`node --test scripts/release/r1-g01a-release-trigger.test.cjs scripts/release/r1-g01b-macos-candidate.test.cjs scripts/release/r1-g02a-fork-version-line.test.cjs scripts/release/r1-g02b-fork-publish-target.test.cjs`；`node scripts/release/r1-03-static-gate-audit.cjs --strict`。预期 `FORK-VERSION-LINE=REVIEW`（版本仍为 `0.4.28`）、`FORK-PUBLISH-TARGET=PASS`，既有 finding 不退化。
 - 满足以下全部条件才能标 Done：工程师自检、固定命令 PASS、独立 QA/QC PASS、Wiki 决策（预计补充 [桌面版本号与发布标识规则](../wiki/workflows/desktop-release-versioning.md) 的 fork 版本线与发布目标规则）、UI 验收记为不适用、每张卡一次阶段提交、beta 快进后同一命令复核。
 
