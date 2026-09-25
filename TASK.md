@@ -3,7 +3,7 @@
 更新时间：2026-09-25
 集成分支：`beta`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S3I 已完成 `S3-02b3b2a` 单次物理模型调用门 `3/3` 点，独立 QA/QC PASS，已合入 beta。此前 R1-S3E～S3H 均已完成并合入 beta。R1-S3J 已完成 `S3-02b3b2b` 模型→持久 result 编排 `5/5` 点。下一窗口 R1-S3K 计划承诺 `R1-G02a`+`R1-G02b` 独立发行版发布指向与版本线（6 点），PO 已确认身份取值，独立 DoR 待执行。HTTP 与 UI 接线继续 Refinement；Release 1 未完成。
+当前状态：R1-S3I 已完成 `S3-02b3b2a` 单次物理模型调用门 `3/3` 点，独立 QA/QC PASS，已合入 beta。此前 R1-S3E～S3H 均已完成并合入 beta。R1-S3J 已完成 `S3-02b3b2b` 模型→持久 result 编排 `5/5` 点。下一窗口 R1-S3K 计划承诺 `R1-G02a`+`R1-G02b` 独立发行版发布指向与版本线（7 点），PO 已确认身份取值；独立 DoR 两轮未通过，合同已补齐，待复核。HTTP 与 UI 接线继续 Refinement；Release 1 未完成。
 
 ## 权威文档
 
@@ -369,7 +369,7 @@ R1-RC 独立 Refinement：[R1-G01 发布治理拆分合同](./docs/plans/r1-g01-
 
 ## 待开始 Sprint：R1-S3K 独立发行版发布指向与版本线
 
-- 状态：DoR 待执行。PO 于 2026-09-25 答复 R1-G02 全部开放问题（`R1-G02f` Done）。合同：[R1-S3K](./docs/plans/r1-s3k-sprint-commitment.md)、[R1-G02](./docs/plans/r1-g02-fork-desktop-identity-contract.md)，计划 `R1-G02a` 3 点加 `R1-G02b` 3 点，共 6 点，无 Stretch。
+- 状态：DoR 待复核（前两轮未通过，阻断项已补入合同；PO 把 G02b 由 3 点重估为 4 点）。PO 于 2026-09-25 答复 R1-G02 全部开放问题（`R1-G02f` Done）。合同：[R1-S3K](./docs/plans/r1-s3k-sprint-commitment.md)、[R1-G02](./docs/plans/r1-g02-fork-desktop-identity-contract.md)，计划 `R1-G02a` 3 点加 `R1-G02b` 4 点，共 7 点，无 Stretch。
 - Sprint Goal：fork 公开发布只能使用 major ≥ 1 的版本线，tag 只推到 `fork` 且不与上游碰撞，已安装应用只从本发行版仓库检查更新；GA 前 fork 不产生任何公开 tag 或预发布。
 - Owner：一名发布工程师按 G02a→G02b 顺序独占 workflow、发布脚本、builder/stage 的 owner 默认值与静态审计器；根 PM/PO 独占计划、Wiki 与 beta 集成；独立 QA/QC 验收。
 - 非范围：不改应用名称、appId、数据目录或用户数据路径（G02c/d/e 仍在 Refinement）；不 bump 版本，不创建或推送 tag，不包装、签名、上传，不运行真实 Actions。UI 验收不适用。

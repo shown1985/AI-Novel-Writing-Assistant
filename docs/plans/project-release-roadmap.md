@@ -113,11 +113,11 @@ R1-S2H 承诺并完成 [S2-04c1 实况模型来源只读显示](./s2-04c1-live-m
 
 ### R1-G02 独立发行版桌面身份 Backlog Refinement
 
-[R1-G02 合同](./r1-g02-fork-desktop-identity-contract.md)规划独立发行版的桌面版本线与数据隔离。当前 appId、productName、数据目录和发布/更新 owner 均与上游相同：同时安装时两个应用共用同一份 SQLite，本发行版的自动更新也会拉取上游安装包。PO 于 2026-09-25 决定：显示名称 `Biz Novel Studio Next`（GA 前可改），appId `io.github.shown1985.biz-novel-studio-next`，数据目录 `biz-novel-studio-next`；版本从 major 1 起步，公开 tag 从 GA 的 `v1.0.0` 开始；旧数据经用户确认后先备份再复制，生成图片一并复制。`G02f` 决定 Done；`G02a` 版本线与碰撞门 3 点、`G02b` 发布/更新目标 3 点为 Ready-candidate；`G02c` 身份拆分 5 点、`G02d` 旧数据复制引导 5 点、`G02e` 生成图片复制 2 点仍在 Refinement，须同批进入 beta。
+[R1-G02 合同](./r1-g02-fork-desktop-identity-contract.md)规划独立发行版的桌面版本线与数据隔离。当前 appId、productName、数据目录和发布/更新 owner 均与上游相同：同时安装时两个应用共用同一份 SQLite，本发行版的自动更新也会拉取上游安装包。PO 于 2026-09-25 决定：显示名称 `Biz Novel Studio Next`（GA 前可改），appId `io.github.shown1985.biz-novel-studio-next`，数据目录 `biz-novel-studio-next`；版本从 major 1 起步，公开 tag 从 GA 的 `v1.0.0` 开始；旧数据经用户确认后先备份再复制，生成图片一并复制。`G02f` 决定 Done；`G02a` 版本线与碰撞门 3 点、`G02b` 发布/更新目标 4 点为 Ready-candidate；`G02c` 身份拆分 5 点、`G02d` 旧数据复制引导 5 点、`G02e` 生成图片复制 2 点仍在 Refinement，须同批进入 beta。
 
 ### R1-S3K 当前窗口（DoR 待执行）
 
-本窗口计划承诺 [R1-G02a](./r1-g02-fork-desktop-identity-contract.md) 3 点加 R1-G02b 3 点，共 6 点，无 Stretch。由同一名工程师按 G02a→G02b 顺序完成：fork 发布 guard 要求 major ≥ 1，发布脚本只推 `fork` 且拒绝与上游碰撞的 tag，四处发布/更新 owner 指向本发行版，beta workflow 变为只验证不上传。验证只用静态审计和聚焦 node 测试；不改身份字段或数据目录，不做包装、上传或真实 tag，不运行 Actions。进入前须通过独立 DoR。合同见 [R1-S3K Sprint 承诺](./r1-s3k-sprint-commitment.md)。
+本窗口计划承诺 [R1-G02a](./r1-g02-fork-desktop-identity-contract.md) 3 点加 R1-G02b 4 点，共 7 点，无 Stretch（第二轮 DoR 后 PO 把 G02b 重估为 4 点）。由同一名工程师按 G02a→G02b 顺序完成：fork 发布 guard 要求 major ≥ 1，发布脚本只推 `fork` 且拒绝与上游碰撞的 tag，四处发布/更新 owner 指向本发行版，beta workflow 变为只验证不上传，审计按精确命中数白名单与写权限/令牌扫描拦截上游同步带来的回退。验证只用静态审计和聚焦 node 测试；不改身份字段或数据目录，不做包装、上传或真实 tag，不运行 Actions。进入前须通过独立 DoR。合同见 [R1-S3K Sprint 承诺](./r1-s3k-sprint-commitment.md)。
 
 ### R1-S0 新增 Story
 

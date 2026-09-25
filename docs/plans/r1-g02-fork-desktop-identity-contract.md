@@ -4,7 +4,7 @@
 
 - Release / Epic：Release 1 / R1-RC 桌面发布候选。
 - 父项：`R1-G02` 独立发行版桌面身份；父项不重复计点，也不作为一张混合实现卡进入 Sprint。
-- 当前状态：PO 已于 2026-09-25 答复全部开放问题，`R1-G02f` Done。`R1-G02a`、`R1-G02b` 为 **Ready-candidate**，已规划进 [R1-S3K](./r1-s3k-sprint-commitment.md)，须先通过独立 DoR。`R1-G02c/d/e` 取值已确定，但仍为 **Refinement**，不在 S3K。
+- 当前状态：PO 已于 2026-09-25 答复全部开放问题，`R1-G02f` Done。`R1-G02a`（3 点）、`R1-G02b`（4 点）为 **Ready-candidate**，已规划进 [R1-S3K](./r1-s3k-sprint-commitment.md)，须先通过独立 DoR。`R1-G02c/d/e` 取值已确定，但仍为 **Refinement**，不在 S3K。
 - 背景：本仓库（`fork` = shown1985/AI-Novel-Writing-Assistant）是长期独立产品线，周期性把上游（`origin` = ExplosiveCoderflome，桌面产品 “Biz Novel Studio”，`0.4.x`，tag `vX.Y.Z`）合入 `beta`。独立发行版的桌面应用使用**自己的版本号线**。当前 `desktop/package.json` 的 `0.4.28` 是上次同步继承的上游版本。
 - 约束继承：G01 严格标签门不变——`desktop/package.json.version` 为稳定 `X.Y.Z`，公开 tag 严格为 `vX.Y.Z` 且与之相等；不引入 `-rc`、`desktop-v*` 或分支名版本。
 
@@ -95,7 +95,7 @@
 - 验证：`node --check scripts/trigger-desktop-release.cjs scripts/release/r1-03-static-gate-audit.cjs`；`node --test scripts/release/r1-g01a-release-trigger.test.cjs scripts/release/r1-g01b-macos-candidate.test.cjs scripts/release/r1-g02a-fork-version-line.test.cjs`。发布脚本测试只使用临时 git 仓库（复制入脚本）和本地 bare remote，不访问网络。最后运行 `node scripts/release/r1-03-static-gate-audit.cjs --strict`，按 finding ID 对账，预期新增 `FORK-VERSION-LINE=REVIEW`。
 - 非范围：把版本 bump 到 `1.0.0`；创建、推送或删除任何 tag；运行包装、签名或上传；运行真实 Actions；修改发布 owner、beta workflow 或身份字段。
 
-## R1-G02b 发布与自动更新目标指向本发行版（3 点）
+## R1-G02b 发布与自动更新目标指向本发行版（4 点）
 
 - 状态 / Owner / 依赖：**Ready-candidate**（待独立 DoR）；优先级 P0；与 G02a 同一名工程师，在 G02a 自检通过后开始。先有 major 门，再切换可写的发布目标，避免上游 `v0.4.x` tag 在 fork 被发布。
 - 用户价值：本发行版用户只从本发行版仓库接收更新，不会被上游安装包替换；GA 前 fork 不会产生任何公开预发布 tag。
@@ -108,15 +108,15 @@
 2. beta workflow 在 fork 中变为只验证、不上传：workflow 级与 job 级权限为 `contents: read`；文件中不得出现 `publish:desktop:`、`update-desktop-release-notes`、`gh release`、`GH_TOKEN` 或 `--publish`。因此同时删除 `publish:desktop:beta:reuse-stage` 步骤与 `update-desktop-release-notes.cjs` 步骤（后者在 `contents: read` 下必然失败），并移除 `GH_TOKEN` env；保留安装、类型检查、stage、迁移测试与包装布局校验步骤。不新增 workflow。
 3. 审计 `FORK-PUBLISH-TARGET` 必须能在今后的上游同步后仍然拦住回退，出现以下任一情况即为 `BLOCKED`，否则 `PASS`：
    - 四处 owner/repo 不是 `shown1985/AI-Novel-Writing-Assistant` 或彼此不一致。
-   - **上游 owner 扫描**：扫描 `.github/` 全部文件、`desktop/`（排除 `node_modules`、`build`、`dist`）与 `scripts/`，出现 `ExplosiveCoderflome`（不区分大小写）且文件不在具名白名单中。白名单只按精确路径列出，并逐条写明原因：`.github/pull_request_template.md`（CLA 链接）、`scripts/trigger-desktop-release.cjs`（G02a 上游判定常量）、`scripts/release/r1-03-static-gate-audit.cjs`（本扫描的匹配常量）、`scripts/release/r1-g02a-fork-version-line.test.cjs` 与 `scripts/release/r1-g02b-fork-publish-target.test.cjs`（测试 fixture）。白名单以外新增任何命中都算回退。
-   - **写权限与发布副作用扫描**：遍历 `.github/workflows/*.yml`，除 `desktop-release.yml` 的 `publish-release` job 外，任何 workflow 级或 job 级 `contents: write`，或任何发布副作用（`publish:desktop:`、`update-desktop-release-notes`、`gh release`、`--publish`、`GH_TOKEN`、`softprops/action-gh-release`）都为 `BLOCKED`。job 边界沿用审计器已有的 job 文本切分方式，不引入新依赖。
-   - 聚焦测试对每一项做突变断言：各 owner 回到上游、owner/repo 不一致、白名单外新增上游 owner、白名单文件被删除后不误报、beta workflow 恢复 `contents: write`、恢复任一禁用串、另一 workflow 新增 `contents: write`、`desktop-release.yml` 中非 `publish-release` job 新增写权限或发布步骤。
+   - **上游 owner 扫描（精确路径 + 精确命中数）**：扫描 `.github/` 全部文件、`desktop/`（排除 `node_modules`、`build`、`dist`）与 `scripts/`，按行统计 `ExplosiveCoderflome`（不区分大小写）命中。白名单按精确路径与精确命中数列出，并逐条写明原因：`.github/pull_request_template.md` 恰好 1 处（CLA 链接）；`scripts/trigger-desktop-release.cjs` 恰好 1 处，且必须位于 G02a 具名上游匹配常量的声明行；`scripts/release/r1-03-static-gate-audit.cjs` 恰好 1 处，且必须位于本扫描的具名匹配常量声明行；`scripts/release/r1-g02a-fork-version-line.test.cjs` 与 `scripts/release/r1-g02b-fork-publish-target.test.cjs` 的命中只能出现在具名 fixture 字符串常量中（测试文件以集中声明的 fixture 常量承载上游 URL，审计按常量名识别，常量外的命中即违规）。白名单外文件的任何命中、白名单文件超出规定命中数、或命中不在规定常量行，均为 `BLOCKED`。这同时使 G02a AC2 的“匹配串只能出现在一个具名常量中”成为可审计规则。
+   - **写权限与发布副作用扫描**：遍历 `.github/workflows/*.yml`。唯一豁免范围是 `desktop-release.yml` 的 `publish-release` job 文本；除此之外，出现以下任一即为 `BLOCKED`：workflow 级或 job 级 `contents: write`；`permissions: write-all`；workflow 文件没有顶层 `permissions:` 块（会继承仓库默认权限）；任何发布副作用（`publish:desktop:`、`update-desktop-release-notes`、`gh release`、`--publish`、`softprops/action-gh-release`）；任何令牌引用 `GITHUB_TOKEN`、`secrets.GITHUB_TOKEN`、`AI_NOVEL_GITHUB_TOKEN` 或 `GH_TOKEN`（`desktop/scripts/run-electron-builder.cjs:116` 会接受其中任一作为发布令牌）。`site-pages.yml` 具备顶层 `permissions:`、只有 `contents: read`/`pages: write`/`id-token: write` 且不引用令牌，应为 PASS。job 边界沿用审计器已有的 job 文本切分方式，不引入新依赖。
+   - 聚焦测试对每一项做突变断言，每条规则至少一个用例：各 owner 回到上游、owner/repo 不一致、白名单外新增上游 owner、在 `scripts/trigger-desktop-release.cjs` 常量行之外加入第二处上游命中（期望 `BLOCKED`）、审计器或测试文件出现常量外命中、白名单文件删除后不误报；beta workflow 恢复 `contents: write`、恢复任一禁用串；另一 workflow 新增 `contents: write`、新增 `permissions: write-all`、删除顶层 `permissions:` 块、引用四种令牌名中的任一个（逐个断言）；`desktop-release.yml` 中非 `publish-release` job 新增写权限、令牌或发布步骤；以及真实 `site-pages.yml` 保持 PASS 的正例。
 4. `PUBLIC-RELEASE-TRIGGER`、`MACOS-WORKFLOW`、`FORK-VERSION-LINE` 状态不退化；Windows 发布 job 仍是唯一有写权限、唯一有发布副作用的 job。
 
 ### 最窄验证与非范围
 
 - 验证：`node --check` 改动的脚本和配置（`desktop/electron-builder.config.cjs` 需设置 `AI_NOVEL_RELEASE_CHANNEL=beta` 来绕过签名检查，再 `require` 以读取 publish 配置）；`node --test` 运行 G01a、G01b、G02a、G02b 四份测试；审计 `--strict`。不运行 `stage`、`dist`、`publish`。
-- 估点说明：上游 owner 扫描与写权限扫描都是文件遍历加文本匹配，复用审计器已有的 job 切分，约增加 0.5 点，G02b 维持 3 点，处于上限。若实现时需要 YAML 解析依赖或需改动白名单以外的文件，停回 Refinement 重新估点。
+- 估点说明：第二轮独立 DoR 后，PO 于 2026-09-25 把 G02b 由 3 点重估为 4 点（精确命中数白名单与写权限/令牌/缺省权限扫描加上各自突变测试），不另立后续卡。实现仍只用文件遍历加文本匹配，复用审计器已有的 job 切分；若需要 YAML 解析依赖或需改动白名单以外的文件，停回 Refinement 重新估点。
 - 非范围：appId、productName、数据目录、更新缓存目录名（G02c）；应用内 GitHub 链接 `client/src/components/layout/ProjectGithubLink.tsx`、官网 `site/`、`NOTICE` 上游版权声明（保留）；更新器在 fork 暂无 Release 时的提示行为；签名与真实 Release。
 
 ## R1-G02c 桌面身份拆分：appId、productName、数据目录（5 点）
@@ -163,7 +163,7 @@
 ```text
 R1-G02f 品牌与取值决定（PO，Done）
 R1-G02a 版本线与碰撞门（3，S3K）
-  └─ R1-G02b 发布/更新目标（3，S3K）
+  └─ R1-G02b 发布/更新目标（4，S3K）
        └─ R1-G02c 身份拆分（5）══ 同批 ══ R1-G02d 旧数据复制引导（5）
                                             └─ R1-G02e 生成图片复制（2）
 ```
