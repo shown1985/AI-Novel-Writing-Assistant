@@ -30,6 +30,7 @@ const routedPaths = [
   "/titles",
   "/prompt-workbench",
   "/settings/models",
+  "/settings/model-routes",
   "/settings/director",
   "/settings/knowledge",
   "/settings/maintenance",
