@@ -24,6 +24,7 @@
 - [LLM Schema Refactor Checkpoint](./checkpoints/llm-schema-refactor-checkpoint.md)
 - [Windows Desktop Installer Manual Checklist](./checkpoints/windows-desktop-installer-manual-checklist.md)
 - [开发进度审查与纠偏指引 2026-09-24](./checkpoints/codex-progress-audit-2026-09-24.md)
+- [本地接续开发指引 2026-09-25](./checkpoints/next-steps-handoff-2026-09-25.md)
 - [用户验收清单 2026-09-25](./checkpoints/user-acceptance-checklist.md)
 
 ### `docs/plans`

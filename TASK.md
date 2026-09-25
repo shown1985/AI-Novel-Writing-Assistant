@@ -5,6 +5,8 @@
 开发基线：`main@a580a27`
 阶段状态：收尾与纠偏 —— 主线正文生产链（P0/P1/P1.1/执行链清理 Phase 1–5）与 WGR-001～023 的代码均已合入 `main`，尚未经过构建验证与用户验收。
 
+> 本机接续开发请先读 `docs/checkpoints/next-steps-handoff-2026-09-25.md`。
+
 ## 工作纪律（先读 `docs/checkpoints/codex-progress-audit-2026-09-24.md` 第 4 节）
 
 1. `TASK.md` 是唯一事实源，WGR 台账（`docs/plans/github-issue-expectations.md`）只记录条目细节。
