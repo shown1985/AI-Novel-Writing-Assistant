@@ -6,8 +6,12 @@ const {
   pickApplicableVisibleProfileFields,
 } = require("../dist/services/novel/characterProfile/CharacterVisibleProfileService");
 const {
-  buildCharactersContextText,
-} = require("../dist/services/novel/runtime/runtimeContextBlocks");
+  buildDynamicCharacterGuidance,
+} = require("../dist/prompting/prompts/novel/chapterLayeredContextCharacters");
+const {
+  buildCharacterGuidanceText,
+  buildParticipantText,
+} = require("../dist/prompting/prompts/novel/chapterLayeredContextShared");
 const {
   characterVisibleProfileCompletionPrompt,
 } = require("../dist/prompting/prompts/novel/characterVisibleProfile.prompts");
@@ -51,22 +55,61 @@ test("visible profile validator treats generic prose as vague", () => {
 });
 
 test("chapter character context includes compact visible profile summary", () => {
-  const text = buildCharactersContextText([
-    {
-      name: "林照",
-      role: "主角",
-      personality: "谨慎但不退让",
-      appearance: "眼尾狭长，额前总有被火燎卷的碎发",
-      physique: "少年感偏瘦，肩背却很稳",
-      signatureDetail: "思考时会用拇指摩挲旧铜戒",
-      voiceTexture: "声音偏低，短句多，越危险越慢",
+  const character = {
+    id: "char-1",
+    name: "林照",
+    role: "主角",
+    personality: "谨慎但不退让",
+    appearance: "眼尾狭长，额前总有被火燎卷的碎发",
+    physique: "少年感偏瘦，肩背却很稳",
+    signatureDetail: "思考时会用拇指摩挲旧铜戒",
+    voiceTexture: "声音偏低，短句多，越危险越慢",
+    currentGoal: null,
+    currentState: null,
+  };
+  const contextPackage = {
+    chapter: { order: 5 },
+    plan: { participants: ["林照"] },
+    openConflicts: [],
+    characterRoster: [character],
+    characterMindStates: [],
+    characterDialogueGuidances: [],
+    characterDynamics: {
+      characters: [{
+        characterId: "char-1",
+        name: "林照",
+        role: "主角",
+        castRole: null,
+        volumeRoleLabel: null,
+        volumeResponsibility: null,
+        currentGoal: null,
+        currentState: null,
+        factionLabel: null,
+        stanceLabel: null,
+        plannedChapterOrders: [5],
+        absenceRisk: "none",
+        absenceSpan: 0,
+        isCoreInVolume: true,
+      }],
+      relations: [],
+      candidates: [],
     },
-  ]);
+  };
 
-  assert.match(text, /外显/);
-  assert.match(text, /样貌\/体态=/);
-  assert.match(text, /标志=/);
-  assert.match(text, /声音=/);
+  const { characterBehaviorGuides } = buildDynamicCharacterGuidance(contextPackage);
+  const guidanceText = buildCharacterGuidanceText({ characterBehaviorGuides });
+  assert.match(guidanceText, /可见表现：/);
+  assert.match(guidanceText, /样貌\/体态=/);
+  assert.match(guidanceText, /标志=/);
+  assert.match(guidanceText, /声音=/);
+
+  const participantText = buildParticipantText({
+    participants: [character],
+    characterBehaviorGuides,
+  });
+  assert.match(participantText, /外观：眼尾狭长/);
+  assert.match(participantText, /标志细节：/);
+  assert.match(participantText, /声音：/);
 });
 
 test("visible profile prompt carries author guidance into the request", () => {

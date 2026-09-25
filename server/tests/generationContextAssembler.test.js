@@ -14,6 +14,7 @@ const { novelReferenceService } = require("../dist/services/novel/NovelReference
 const { characterDynamicsQueryService } = require("../dist/services/novel/dynamics/CharacterDynamicsQueryService.js");
 const { payoffLedgerSyncService } = require("../dist/services/payoff/PayoffLedgerSyncService.js");
 const { characterResourceLedgerService } = require("../dist/services/novel/characterResource/CharacterResourceLedgerService.js");
+const { buildChapterReviewContext } = require("../dist/prompting/prompts/novel/chapterLayeredContext.js");
 
 test("blocking pending-review proposals are scoped to the current chapter plus global proposals", () => {
   const where = buildBlockingPendingReviewProposalWhere("novel-1", "chapter-2");
@@ -285,8 +286,16 @@ test("assembler refreshes chapter execution fields after chapter plan regenerati
     assert.equal(assembled.chapter.taskSheet, "新任务单");
     assert.equal(assembled.contextPackage.chapter.sceneCards, freshSceneCards);
     assert.equal(assembled.contextPackage.storyWorldSlice, storyWorldSlice);
-    assert.match(assembled.contextPackage.chapter.supportingContextText, /本书世界上下文/);
-    assert.match(assembled.contextPackage.chapter.supportingContextText, /星核枯竭的北境舞台/);
+    // The world slice reaches chapter prompts through the layered review/repair
+    // context; the legacy supporting-context blob is intentionally not built.
+    assert.equal(assembled.contextPackage.chapter.supportingContextText, "");
+    const reviewContext = buildChapterReviewContext(
+      assembled.contextPackage.chapterWriteContext,
+      assembled.contextPackage,
+    );
+    assert.ok(reviewContext.worldRules.includes("星核枯竭的北境舞台。"));
+    assert.ok(reviewContext.worldRules.includes("星核代价: 透支星核会损伤寿命。"));
+    assert.ok(reviewContext.worldRules.includes("不要把星核写成普通灵石"));
     assert.equal(assembled.contextPackage.chapterWriteContext.chapterBoundary.entryState, "新合同入口1");
     assert.ok(assembled.contextPackage.chapterWriteContext.chapterBoundary.doNotCross.includes("新禁止"));
   } finally {
