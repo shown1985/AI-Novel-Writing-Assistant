@@ -35,6 +35,7 @@
 - 如果自动生成世界默认保存到世界库，会把一次性书内设定污染为通用世界样本，并引入不必要的同步语义。
 - 如果角色准备直接读取旧扁平字段，会绕过本书世界 slice，导致导入世界、生成世界和跳过世界三种路径行为不一致。
 - 如果把“存在冲突”误判为“必须有战力体系”，现实、悬疑、言情和日常故事会被强行加入等级与升级线；推荐器必须允许并优先考虑 `none`。
+- `NovelCreateResourceRecommendationService.resolveRequired` 只有在题材、主/副推进模式全部由用户显式给出，且 `powerSystemPreference` 同时是非 `ai_recommend` 的明确值时，才会跳过 `novel.create.resource_recommendation` 这次 AI 调用；三项资源 id 齐全但没有显式给出战力体系偏好时，`powerSystemPreference` 会缺省为 `ai_recommend`，仍然会触发真实 LLM 调用。`POST /api/novels`（简单创建流程，`NovelCreate.tsx` 走的路由，不经过自动导演的战力体系选择面板）在加入战力体系功能前默认三项 id 齐全即可跳过 AI；后续接入战力体系时如果不同步给这条路由的请求体加上可显式传入的 `powerSystemPreference` 字段，会让简单创建流程即便已经手动选好题材和推进模式，也会在没有配置 LLM Key 的环境里因为这次隐式 AI 调用而 500。给任何调用 `resolveRequired` 的入口新增能跳过 AI 的资源选择表单时，必须同时检查战力体系偏好是否也能被显式传入，不能只看三项资源 id。
 
 ## Related Modules
 

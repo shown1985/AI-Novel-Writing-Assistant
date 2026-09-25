@@ -42,9 +42,11 @@ function flattenTreeIds(nodes) {
 }
 
 // Resolves real, seeded genre/story-mode ids so novel-creation requests can supply
-// them explicitly. Providing all three ids lets the create route skip its AI-based
-// resource recommendation step (see NovelCreateResourceRecommendationService.resolveRequired),
-// keeping this route test free of real LLM calls.
+// them explicitly. Providing all three ids plus a non-"ai_recommend" powerSystemPreference
+// lets the create route skip its AI-based resource recommendation step (see
+// NovelCreateResourceRecommendationService.resolveRequired's selectedGenre && selectedPrimary
+// && selectedSecondary && powerSystemPreference !== "ai_recommend" short-circuit), keeping
+// this route test free of real LLM calls.
 async function resolveCreationFoundationIds() {
   await ensureSystemResourceStarterData();
   const genreTree = await new GenreService().listGenreTree();
@@ -57,6 +59,7 @@ async function resolveCreationFoundationIds() {
     genreId: genreIds[0],
     primaryStoryModeId,
     secondaryStoryModeId,
+    powerSystemPreference: "none",
   };
 }
 

@@ -66,6 +66,7 @@ const createNovelSchema = z.object({
   genreId: z.string().trim().optional(),
   primaryStoryModeId: z.string().trim().optional(),
   secondaryStoryModeId: z.string().trim().optional(),
+  powerSystemPreference: z.enum(["ai_recommend", "none", "soft", "ranked"]).optional(),
   worldId: z.string().trim().optional(),
   writingMode: z.enum(["original", "continuation"]).optional(),
   sourceNovelId: z.string().trim().optional(),
