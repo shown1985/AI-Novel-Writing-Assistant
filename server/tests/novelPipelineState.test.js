@@ -7,6 +7,7 @@ const reviewService = require("../dist/services/novel/novelCoreReviewService.js"
 const { NovelCorePipelineService } = require("../dist/services/novel/novelCorePipelineService.js");
 const { ChapterEmptyContentError } = require("../dist/services/novel/runtime/chapterEmptyContentError.js");
 const { decoratePipelineJob } = require("../dist/services/novel/pipelineJobState.js");
+const { DIRECTOR_ISSUE_GOVERNANCE_VERSION } = require("@ai-novel/shared/types/directorIssue");
 
 test("listRecoverablePipelineJobs excludes cancellation-pending jobs", async () => {
   const originalFindMany = prisma.generationJob.findMany;
@@ -33,11 +34,17 @@ test("startPipelineJob persists maxRetries as a single repair pass", async () =>
     generationCreate: prisma.generationJob.create,
     chapterAggregate: prisma.chapter.aggregate,
     chapterFindMany: prisma.chapter.findMany,
+    novelFindUnique: prisma.novel.findUnique,
+    appSettingFindUnique: prisma.appSetting.findUnique,
   };
 
   let createdInput = null;
   let scheduledOptions = null;
   let capturedChapterQuery = null;
+  // startPipelineJob freezes the novel's effective issue policy into the job
+  // (global default here, no novel override) before any chapter runs.
+  prisma.novel.findUnique = async () => ({ directorIssuePolicyOverridesJson: null });
+  prisma.appSetting.findUnique = async () => null;
   prisma.character.count = async () => 1;
   prisma.generationJob.findMany = async () => [];
   prisma.chapter.aggregate = async () => ({
@@ -88,8 +95,12 @@ test("startPipelineJob persists maxRetries as a single repair pass", async () =>
     });
 
     assert.equal(createdInput.data.maxRetries, 1);
-    assert.equal(JSON.parse(createdInput.data.payload).maxRetries, 1);
+    const persistedPayload = JSON.parse(createdInput.data.payload);
+    assert.equal(persistedPayload.maxRetries, 1);
     assert.equal(scheduledOptions.maxRetries, 1);
+    assert.equal(persistedPayload.issueGovernanceVersion, DIRECTOR_ISSUE_GOVERNANCE_VERSION);
+    assert.ok(persistedPayload.issuePolicySnapshot);
+    assert.deepEqual(scheduledOptions.issuePolicySnapshot, persistedPayload.issuePolicySnapshot);
     const terminalContinueCondition = capturedChapterQuery.where.NOT.AND[2].OR.find((condition) => Array.isArray(condition.AND));
     assert.equal(terminalContinueCondition.AND[0].riskFlags.not, null);
     assert.equal(terminalContinueCondition.AND[1].riskFlags.contains, '"terminalAction":"defer_and_continue"');
@@ -101,6 +112,8 @@ test("startPipelineJob persists maxRetries as a single repair pass", async () =>
     prisma.generationJob.create = original.generationCreate;
     prisma.chapter.aggregate = original.chapterAggregate;
     prisma.chapter.findMany = original.chapterFindMany;
+    prisma.novel.findUnique = original.novelFindUnique;
+    prisma.appSetting.findUnique = original.appSettingFindUnique;
   }
 });
 
