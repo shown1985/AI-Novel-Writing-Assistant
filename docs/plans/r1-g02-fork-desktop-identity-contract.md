@@ -4,7 +4,7 @@
 
 - Release / Epic：Release 1 / R1-RC 桌面发布候选。
 - 父项：`R1-G02` 独立发行版桌面身份；父项不重复计点，也不作为一张混合实现卡进入 Sprint。
-- 当前状态：PO 已于 2026-09-25 答复全部开放问题，`R1-G02f` Done。`R1-G02a`（3 点）、`R1-G02b`（4 点）为 **Ready-candidate**，已规划进 [R1-S3K](./r1-s3k-sprint-commitment.md)，须先通过独立 DoR。`R1-G02c/d/e` 取值已确定，但仍为 **Refinement**，不在 S3K。
+- 当前状态：PO 已于 2026-09-25 答复全部开放问题，`R1-G02f` Done。`R1-G02a`（3 点）、`R1-G02b`（4 点）已在 [R1-S3K](./r1-s3k-sprint-commitment.md) **Done**。`R1-G02c/d/e` 取值已确定，但仍为 **Refinement**；`R1-G02g` 审计加固跟进为 **Refinement**。
 - 背景：本仓库（`fork` = shown1985/AI-Novel-Writing-Assistant）是长期独立产品线，周期性把上游（`origin` = ExplosiveCoderflome，桌面产品 “Biz Novel Studio”，`0.4.x`，tag `vX.Y.Z`）合入 `beta`。独立发行版的桌面应用使用**自己的版本号线**。当前 `desktop/package.json` 的 `0.4.28` 是上次同步继承的上游版本。
 - 约束继承：G01 严格标签门不变——`desktop/package.json.version` 为稳定 `X.Y.Z`，公开 tag 严格为 `vX.Y.Z` 且与之相等；不引入 `-rc`、`desktop-v*` 或分支名版本。
 
@@ -71,7 +71,7 @@
 
 ## R1-G02a 独立版本线与 tag 碰撞门（3 点）
 
-- 状态 / Owner / 依赖：**Ready-candidate**（待独立 DoR）；优先级 P0；R1-S3K 唯一发布脚本工程师；依赖已合入 beta 的 G01a/G01b。
+- 状态 / Owner / 依赖：**Done**（R1-S3K）；优先级 P0；R1-S3K 唯一发布脚本工程师；依赖已合入 beta 的 G01a/G01b。
 - 用户价值：本发行版的安装包版本不会与上游混淆，不会误把 tag 推到上游，也不会把上游 tag 当成本发行版发布。
 - 生产文件边界（独占）：`.github/workflows/desktop-release.yml` 仅 `validate-release` 的 guard 步骤；`scripts/trigger-desktop-release.cjs`；`scripts/release/r1-03-static-gate-audit.cjs` 新增 `FORK-VERSION-LINE`，既有 finding 语义不变。
 - 测试文件边界：新增 `scripts/release/r1-g02a-fork-version-line.test.cjs`。`scripts/release/r1-g01a-release-trigger.test.cjs` 中的 `"the real workflow guard allows only the exact stable package tag"`（当前第 74-92 行）用真实仓库的 `0.4.28` 期望 `allowed=true`，G02a 的 major 门会让它失败；该用例必须改为在临时目录中运行同一段真实 guard 脚本，并读取 major ≥ 1 的 fixture `desktop/package.json`（如 `1.2.3`），正例与四个负例（版本不符、`desktop-v*`、`-rc1`、`v1.2`）都以 fixture 版本为基准。`runActualGuard` 可增加可选 `cwd` 参数，这是本文件唯一允许的改动，其余断言原样保留。不改 `desktop/package.json`、builder、stage 脚本或 beta workflow。
@@ -97,7 +97,7 @@
 
 ## R1-G02b 发布与自动更新目标指向本发行版（4 点）
 
-- 状态 / Owner / 依赖：**Ready-candidate**（待独立 DoR）；优先级 P0；与 G02a 同一名工程师，在 G02a 自检通过后开始。先有 major 门，再切换可写的发布目标，避免上游 `v0.4.x` tag 在 fork 被发布。
+- 状态 / Owner / 依赖：**Done**（R1-S3K）；优先级 P0；与 G02a 同一名工程师，在 G02a 自检通过后开始。先有 major 门，再切换可写的发布目标，避免上游 `v0.4.x` tag 在 fork 被发布。
 - 用户价值：本发行版用户只从本发行版仓库接收更新，不会被上游安装包替换；GA 前 fork 不会产生任何公开预发布 tag。
 - 生产文件边界（独占）：`desktop/electron-builder.config.cjs` 仅 owner/repo 默认值；`desktop/scripts/stage-desktop.cjs` 仅 `app-update.yml` 的 owner/repo 默认值；`.github/workflows/desktop-release.yml` 仅 `publish-release` 的 owner/repo env；`.github/workflows/desktop-beta-release.yml`；`scripts/release/r1-03-static-gate-audit.cjs` 新增 `FORK-PUBLISH-TARGET`。不改 `.github/workflows/site-pages.yml`（它只有 `pages: write`/`id-token: write`，用于官网部署，不属于桌面发布副作用）。
 - 测试文件边界：新增 `scripts/release/r1-g02b-fork-publish-target.test.cjs`。
@@ -149,6 +149,18 @@
 - 内容：在用户同意的同一次复制中，把 `storage/generated-images` 一并复制到新目录，并做失败回滚与旧目录只读断言；不复制日志。
 - 验证：临时目录单元测试。非范围：图片去重和压缩。
 
+## R1-G02g 发布审计加固跟进（约 2 点，Refinement）
+
+- 状态：**Refinement / Not Ready**；来源为 R1-S3K 独立 QA/QC 的非阻断跟进项；依赖 G02a/G02b（Done）。进入 Sprint 前须补齐每项的 AC、突变测试与文件边界，并经独立 DoR。
+- 用户价值：今后的上游同步或 workflow 改动不能用审计尚未覆盖的写法，把发布或自动更新重新指向上游，也不能绕开 major ≥ 1 门。
+- 待细化条目：
+  1. 拆分字符串（如 `"Explosive" + "Coderflome"`）或 `vars.*` 等仓库变量覆盖 owner/repo 的写法。
+  2. `.github/actions/` 下的 composite action 纳入写权限、发布副作用与令牌扫描。
+  3. 审计改为在临时目录对 0.x fixture 执行真实 guard 并断言 `allowed=false`，且 guard 中恰好只有一处 `allowed=true`，取代当前的字面文本匹配。
+  4. 发布脚本增加 `pushInsteadOf` 用例：push URL 经改写指向上游时同样拒绝。
+  5. beta workflow 的签名 secrets 从 job 级 env 收窄到需要它的验证步骤。
+- 非范围：身份字段与数据目录（G02c/d/e）、真实 Actions、tag 与上传。
+
 ## R1-G02f 品牌与身份取值决定（1 点，PO）
 
 - 状态：**Done**（2026-09-25）。PO 已答复 Q1-Q6，取值写入上文“PO 决定”与第四节。显示名称在 GA 前仍可能更改，更名只影响 G02c 的常量与文案。
@@ -162,8 +174,9 @@
 
 ```text
 R1-G02f 品牌与取值决定（PO，Done）
-R1-G02a 版本线与碰撞门（3，S3K）
-  └─ R1-G02b 发布/更新目标（4，S3K）
+R1-G02a 版本线与碰撞门（3，S3K Done）
+  └─ R1-G02b 发布/更新目标（4，S3K Done）
+       ├─ R1-G02g 发布审计加固跟进（约 2，Refinement）
        └─ R1-G02c 身份拆分（5）══ 同批 ══ R1-G02d 旧数据复制引导（5）
                                             └─ R1-G02e 生成图片复制（2）
 ```

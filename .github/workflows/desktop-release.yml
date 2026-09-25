@@ -40,7 +40,11 @@ jobs:
           else
             version="$(node -p "require('./desktop/package.json').version")"
             if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && "${RELEASE_REF_NAME#v}" == "$version" ]]; then
-              allowed=true
+              if (( 10#${version%%.*} >= 1 )); then
+                allowed=true
+              else
+                reason="public releases of this distribution require desktop major version 1 or higher"
+              fi
             else
               reason="tag version does not match desktop/package.json"
             fi
@@ -64,7 +68,7 @@ jobs:
     env:
       AI_NOVEL_RELEASE_CHANNEL: release
       AI_NOVEL_ALLOW_UNSIGNED_RELEASE: "true"
-      AI_NOVEL_GITHUB_OWNER: ExplosiveCoderflome
+      AI_NOVEL_GITHUB_OWNER: shown1985
       AI_NOVEL_GITHUB_REPO: AI-Novel-Writing-Assistant
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}

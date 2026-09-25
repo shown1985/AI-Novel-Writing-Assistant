@@ -256,6 +256,314 @@ function auditDesktopReleaseWorkflow() {
   }
 }
 
+function extractWorkflowJobs(workflow) {
+  const jobsStart = workflow.indexOf("jobs:\n");
+  if (jobsStart < 0) return [];
+  const bodyOffset = jobsStart + "jobs:\n".length;
+  const body = workflow.slice(bodyOffset);
+  const matches = [...body.matchAll(/^  ([A-Za-z0-9_-]+):\n/gm)];
+  return matches.map((match, index) => ({
+    name: match[1],
+    text: workflow.slice(
+      bodyOffset + match.index,
+      index + 1 < matches.length ? bodyOffset + matches[index + 1].index : workflow.length,
+    ),
+  }));
+}
+
+const FORK_MAJOR_GATE = "(( 10#${version%%.*} >= 1 ))";
+
+function collectForkVersionLineBlockers(workflow, triggerScript) {
+  const validationJob = extractWorkflowJobs(workflow).find((job) => job.name === "validate-release")?.text ?? "";
+  const guardStep = validationJob.match(/\n\s+run: \|\n([\s\S]*?)(?=\n\s{6}- name:|$)/)?.[1] ?? "";
+  const blockers = [];
+
+  const gateIndex = guardStep.indexOf(FORK_MAJOR_GATE);
+  const allowIndex = guardStep.indexOf("allowed=true");
+  if (gateIndex < 0 || allowIndex < 0 || gateIndex > allowIndex) {
+    blockers.push("the release guard does not require desktop major version 1 or higher before allowed=true");
+  }
+  if (!/^    remote: "fork",$/m.test(triggerScript)) {
+    blockers.push("the trigger script default push remote is not fork");
+  }
+  if (/\[\s*"push"[^\]]*"--tags"/.test(triggerScript) || /"--mirror"|"--follow-tags"/.test(triggerScript)) {
+    blockers.push("the trigger script pushes more than the single release tag");
+  }
+  if (!/Number\(version\.split\("\."\)\[0\]\) < 1/.test(triggerScript)) {
+    blockers.push("the trigger script does not refuse a major 0 package version");
+  }
+  const hasUpstreamCollisionCheck = /^const UPSTREAM_REPOSITORY_SLUG = "[^"]+";$/m.test(triggerScript)
+    && triggerScript.includes('["remote", "get-url", "--all", remote]')
+    && triggerScript.includes('["remote", "get-url", "--push", "--all", remote]')
+    && triggerScript.includes("assertTargetRemoteIsNotUpstream(options.remote, remotes);")
+    && triggerScript.includes("const upstreamRemotes = findUpstreamRemotes(remotes);")
+    && triggerScript.includes("assertTagAbsentLocally(tagName);")
+    && triggerScript.includes('assertTagAbsentOnRemote(options.remote, tagName, "push");')
+    && triggerScript.includes('assertTagAbsentOnRemote(upstreamRemote, tagName, "upstream");')
+    && triggerScript.includes('["ls-remote", "--tags", remote, `refs/tags/${tagName}`]');
+  if (!hasUpstreamCollisionCheck) {
+    blockers.push("the trigger script is missing the upstream remote URL check or the local/push/upstream tag collision checks");
+  } else {
+    const upstreamCheckIndex = triggerScript.indexOf('assertTagAbsentOnRemote(upstreamRemote, tagName, "upstream");');
+    const tagCreateIndex = triggerScript.indexOf('git(["tag", "-a"');
+    const dryRunIndex = triggerScript.indexOf("if (options.dryRun)");
+    if (tagCreateIndex >= 0 && (upstreamCheckIndex > tagCreateIndex || dryRunIndex < 0 || dryRunIndex > tagCreateIndex)) {
+      blockers.push("the trigger script creates the tag before every collision check and the dry-run exit");
+    }
+  }
+  return blockers;
+}
+
+function evaluateForkVersionLine(workflow, triggerScript, desktopPackage) {
+  const blockers = collectForkVersionLineBlockers(workflow, triggerScript);
+  if (blockers.length > 0) {
+    return { status: "BLOCKED", message: blockers.join("; ") };
+  }
+  const version = typeof desktopPackage.version === "string" ? desktopPackage.version : "";
+  const major = /^\d+\.\d+\.\d+$/.test(version) ? Number(version.split(".")[0]) : Number.NaN;
+  if (major >= 1) {
+    return {
+      status: "PASS",
+      message: `desktop version ${version} is on this distribution's major>=1 line; guard, fork push remote, and tag collision checks are in place`,
+    };
+  }
+  return {
+    status: "REVIEW",
+    message: `desktop version ${version || "(empty)"} is still the inherited upstream 0.x line; the guard refuses to publish it until the Release 1 version bump`,
+  };
+}
+
+function auditForkVersionLine() {
+  const result = evaluateForkVersionLine(
+    read(".github/workflows/desktop-release.yml"),
+    read("scripts/trigger-desktop-release.cjs"),
+    JSON.parse(read("desktop/package.json")),
+  );
+  record(result.status, "FORK-VERSION-LINE", result.message);
+}
+
+const FORK_GITHUB_OWNER = "shown1985";
+const FORK_GITHUB_REPO = "AI-Novel-Writing-Assistant";
+// The only place this audit names the upstream owner; every scanned line is tested against it.
+const UPSTREAM_OWNER_SCAN_PATTERN = /explosivecoderflome/i;
+const UPSTREAM_OWNER_SCAN_ROOTS = [".github", "desktop", "scripts", "package.json"];
+const UPSTREAM_OWNER_SCAN_EXCLUDED_DESKTOP_DIRS = new Set(["node_modules", "build", "dist"]);
+// Exact path + exact hit count + required line shape. A listed file that is absent is not reported.
+const UPSTREAM_OWNER_ALLOWLIST = [
+  {
+    path: ".github/pull_request_template.md",
+    hits: 1,
+    linePattern: /CLA\.md/,
+    reason: "the contributor license agreement link points to the upstream CLA, which remains the governing agreement",
+  },
+  {
+    path: "scripts/trigger-desktop-release.cjs",
+    hits: 1,
+    linePattern: /^const UPSTREAM_REPOSITORY_SLUG = "[^"]*";$/,
+    reason: "the release trigger needs the upstream repository path to refuse pushes to upstream and check upstream tag collisions",
+  },
+  {
+    path: "scripts/release/r1-03-static-gate-audit.cjs",
+    hits: 1,
+    linePattern: /^const UPSTREAM_OWNER_SCAN_PATTERN = \/[^/]+\/i;$/,
+    reason: "this audit's own scan pattern",
+  },
+  {
+    path: "scripts/release/r1-g02a-fork-version-line.test.cjs",
+    hits: null,
+    linePattern: /^const UPSTREAM_FIXTURE_[A-Z0-9_]+ = "[^"]*";$/,
+    reason: "upstream URL fixtures for the release trigger tests, declared only as named UPSTREAM_FIXTURE_* string constants",
+  },
+  {
+    path: "scripts/release/r1-g02b-fork-publish-target.test.cjs",
+    hits: null,
+    linePattern: /^const UPSTREAM_FIXTURE_[A-Z0-9_]+ = "[^"]*";$/,
+    reason: "upstream owner fixtures for the publish-target audit mutations, declared only as named UPSTREAM_FIXTURE_* string constants",
+  },
+];
+const WORKFLOW_RELEASE_EFFECT_PATTERNS = [
+  /publish:desktop:/,
+  /update-desktop-release-notes/,
+  /gh\s+release/,
+  /--publish/,
+  /softprops\/action-gh-release/,
+];
+const WORKFLOW_TOKEN_PATTERN = /secrets\.GITHUB_TOKEN|AI_NOVEL_GITHUB_TOKEN|GH_TOKEN|GITHUB_TOKEN|github\.token/gi;
+
+function collectOwnerDefaults({ builderConfig, stageScript, releaseWorkflow, betaWorkflow }) {
+  const valuesOf = (text, pattern) => [...text.matchAll(pattern)].map((match) => match[1]);
+  const envPattern = (name) => new RegExp(`^\\s+${name}:\\s*["']?([^"'\\s]+)["']?\\s*$`, "gm");
+  const publishJob = extractWorkflowJobs(releaseWorkflow ?? "").find((job) => job.name === "publish-release")?.text ?? "";
+  return [
+    {
+      place: "desktop/electron-builder.config.cjs publish default",
+      owners: valuesOf(builderConfig ?? "", /process\.env\.AI_NOVEL_GITHUB_OWNER,\s*"([^"]*)"/g),
+      repos: valuesOf(builderConfig ?? "", /process\.env\.AI_NOVEL_GITHUB_REPO,\s*"([^"]*)"/g),
+    },
+    {
+      place: "desktop/scripts/stage-desktop.cjs app-update.yml default",
+      owners: valuesOf(stageScript ?? "", /process\.env\.AI_NOVEL_GITHUB_OWNER\s*\|\|\s*"([^"]*)"/g),
+      repos: valuesOf(stageScript ?? "", /process\.env\.AI_NOVEL_GITHUB_REPO\s*\|\|\s*"([^"]*)"/g),
+    },
+    {
+      place: "desktop-release.yml publish-release env",
+      owners: valuesOf(publishJob, envPattern("AI_NOVEL_GITHUB_OWNER")),
+      repos: valuesOf(publishJob, envPattern("AI_NOVEL_GITHUB_REPO")),
+    },
+    {
+      place: "desktop-beta-release.yml env",
+      owners: valuesOf(betaWorkflow ?? "", envPattern("AI_NOVEL_GITHUB_OWNER")),
+      repos: valuesOf(betaWorkflow ?? "", envPattern("AI_NOVEL_GITHUB_REPO")),
+    },
+  ];
+}
+
+function collectUpstreamOwnerScanViolations(scannedFiles) {
+  const violations = [];
+  for (const file of scannedFiles) {
+    const hitLines = file.text.split("\n")
+      .map((line, index) => ({ line, number: index + 1 }))
+      .filter(({ line }) => UPSTREAM_OWNER_SCAN_PATTERN.test(line));
+    if (hitLines.length === 0) continue;
+    const entry = UPSTREAM_OWNER_ALLOWLIST.find((candidate) => candidate.path === file.path);
+    if (!entry) {
+      violations.push(`upstream owner appears outside the allowlist in ${file.path}:${hitLines.map((hit) => hit.number).join(",")}`);
+      continue;
+    }
+    if (entry.hits !== null && hitLines.length !== entry.hits) {
+      violations.push(`${file.path} must contain exactly ${entry.hits} upstream owner reference(s), found ${hitLines.length}`);
+    }
+    const misplaced = hitLines.filter(({ line }) => !entry.linePattern.test(line));
+    if (misplaced.length > 0) {
+      violations.push(`upstream owner in ${file.path}:${misplaced.map((hit) => hit.number).join(",")} is outside its allowed named constant or line`);
+    }
+  }
+  return violations;
+}
+
+function collectWorkflowWriteViolations(workflows) {
+  const violations = [];
+  for (const workflowFile of workflows) {
+    const fileName = path.posix.basename(workflowFile.path);
+    let scanned = workflowFile.text;
+    if (fileName === "desktop-release.yml") {
+      const publishJob = extractWorkflowJobs(scanned).find((job) => job.name === "publish-release");
+      if (publishJob) scanned = scanned.replace(publishJob.text, "");
+    }
+    if (!/^permissions\s*:/m.test(workflowFile.text)) {
+      violations.push(`${fileName} has no top-level permissions block and inherits the repository default token permissions`);
+    }
+    if (/contents\s*:\s*["']?write\b/.test(scanned)) {
+      violations.push(`${fileName} grants contents: write outside the guarded publish-release job`);
+    }
+    if (/permissions\s*:\s*["']?write-all/.test(scanned)) {
+      violations.push(`${fileName} grants permissions: write-all`);
+    }
+    const effects = WORKFLOW_RELEASE_EFFECT_PATTERNS.filter((pattern) => pattern.test(scanned));
+    if (effects.length > 0) {
+      violations.push(`${fileName} has release side effects outside the guarded publish-release job (${effects.map(String).join(", ")})`);
+    }
+    const tokens = [...new Set([...scanned.matchAll(WORKFLOW_TOKEN_PATTERN)].map((match) => match[0]))];
+    if (tokens.length > 0) {
+      violations.push(`${fileName} references a release token outside the guarded publish-release job (${tokens.join(", ")})`);
+    }
+  }
+  return violations;
+}
+
+function collectForkPublishTargetViolations({ builderConfig, stageScript, workflows, scannedFiles }) {
+  const releaseWorkflow = workflows.find((file) => file.path === ".github/workflows/desktop-release.yml")?.text;
+  const betaWorkflow = workflows.find((file) => file.path === ".github/workflows/desktop-beta-release.yml")?.text;
+  const violations = [];
+
+  const places = collectOwnerDefaults({ builderConfig, stageScript, releaseWorkflow, betaWorkflow });
+  for (const place of places) {
+    if (place.owners.length === 0 || place.repos.length === 0) {
+      violations.push(`${place.place} does not declare a GitHub owner/repo`);
+      continue;
+    }
+    const wrong = [
+      ...place.owners.filter((owner) => owner !== FORK_GITHUB_OWNER),
+      ...place.repos.filter((repo) => repo !== FORK_GITHUB_REPO),
+    ];
+    if (wrong.length > 0) {
+      violations.push(`${place.place} publishes to ${place.owners.join("|")}/${place.repos.join("|")} instead of ${FORK_GITHUB_OWNER}/${FORK_GITHUB_REPO}`);
+    }
+  }
+  const targets = new Set(places.flatMap((place) => place.owners.flatMap((owner) => place.repos.map((repo) => `${owner}/${repo}`))));
+  if (targets.size > 1) {
+    violations.push(`publish targets are inconsistent: ${[...targets].join(", ")}`);
+  }
+
+  if (betaWorkflow === undefined) {
+    violations.push("desktop-beta-release.yml is missing");
+  } else {
+    const betaJobs = extractWorkflowJobs(betaWorkflow);
+    if (!/^permissions:\n  contents: read\s*$/m.test(betaWorkflow)
+      || betaJobs.length === 0
+      || betaJobs.some((job) => !/^    permissions:\n      contents: read\s*$/m.test(job.text))) {
+      violations.push("the beta workflow must declare contents: read at workflow and job level");
+    }
+  }
+
+  violations.push(...collectUpstreamOwnerScanViolations(scannedFiles));
+  violations.push(...collectWorkflowWriteViolations(workflows));
+  return violations;
+}
+
+function listScanFiles(rootRelativePath) {
+  const results = [];
+  const rootStat = fs.existsSync(path.join(repoRoot, rootRelativePath)) ? fs.statSync(path.join(repoRoot, rootRelativePath)) : null;
+  if (rootStat?.isFile()) return [rootRelativePath];
+  const walk = (relativeDir) => {
+    const absoluteDir = path.join(repoRoot, relativeDir);
+    if (!fs.existsSync(absoluteDir)) return;
+    for (const entry of fs.readdirSync(absoluteDir, { withFileTypes: true })) {
+      const relativePath = path.posix.join(relativeDir, entry.name);
+      if (entry.isDirectory()) {
+        if (rootRelativePath === "desktop" && UPSTREAM_OWNER_SCAN_EXCLUDED_DESKTOP_DIRS.has(entry.name)) continue;
+        walk(relativePath);
+      } else if (entry.isFile()) {
+        results.push(relativePath);
+      }
+    }
+  };
+  walk(rootRelativePath);
+  return results;
+}
+
+function readForkPublishTargetSources() {
+  const workflowDir = ".github/workflows";
+  const workflows = fs.existsSync(path.join(repoRoot, workflowDir))
+    ? fs.readdirSync(path.join(repoRoot, workflowDir))
+      .filter((name) => /\.ya?ml$/.test(name))
+      .sort()
+      .map((name) => ({ path: `${workflowDir}/${name}`, text: read(`${workflowDir}/${name}`) }))
+    : [];
+  const scannedFiles = UPSTREAM_OWNER_SCAN_ROOTS
+    .flatMap(listScanFiles)
+    .map((relativePath) => ({ path: relativePath, text: read(relativePath) }));
+  return {
+    builderConfig: exists("desktop/electron-builder.config.cjs") ? read("desktop/electron-builder.config.cjs") : "",
+    stageScript: exists("desktop/scripts/stage-desktop.cjs") ? read("desktop/scripts/stage-desktop.cjs") : "",
+    workflows,
+    scannedFiles,
+  };
+}
+
+function auditForkPublishTarget() {
+  const violations = collectForkPublishTargetViolations(readForkPublishTargetSources());
+  if (violations.length > 0) {
+    record("BLOCKED", "FORK-PUBLISH-TARGET", violations.join("; "));
+  } else {
+    record(
+      "PASS",
+      "FORK-PUBLISH-TARGET",
+      `builder, stage, public release, and beta targets are ${FORK_GITHUB_OWNER}/${FORK_GITHUB_REPO}; upstream owner references match the exact allowlist; only publish-release can write, publish, or hold a release token`,
+    );
+  }
+}
+
 function auditDesktopTargets() {
   const config = read("desktop/electron-builder.config.cjs");
   const hasWindowsX64 = config.includes('target: "nsis"') && config.includes('arch: ["x64"]');
@@ -309,6 +617,8 @@ function runAudit() {
   auditCommandInventory();
   auditMigrationOverlap();
   auditDesktopReleaseWorkflow();
+  auditForkVersionLine();
+  auditForkPublishTarget();
   auditDesktopTargets();
 
   for (const finding of findings) {
@@ -330,4 +640,11 @@ if (require.main === module) {
   runAudit();
 }
 
-module.exports = { collectMacCandidateViolations, collectReleaseWorkflowViolations };
+module.exports = {
+  collectForkPublishTargetViolations,
+  collectForkVersionLineBlockers,
+  collectMacCandidateViolations,
+  collectReleaseWorkflowViolations,
+  evaluateForkVersionLine,
+  readForkPublishTargetSources,
+};

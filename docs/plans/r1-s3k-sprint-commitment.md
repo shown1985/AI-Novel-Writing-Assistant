@@ -6,7 +6,7 @@
 
 - Release / Epic：Release 1 / R1-RC 桌面发布候选；规划基线 `beta@64d128a1`；PO 已于 2026-09-25 答复 [R1-G02](./r1-g02-fork-desktop-identity-contract.md) 全部开放问题（`R1-G02f` Done）。
 - 承诺 [R1-G02a 独立版本线与 tag 碰撞门](./r1-g02-fork-desktop-identity-contract.md) 3 点加 [R1-G02b 发布与自动更新目标指向本发行版](./r1-g02-fork-desktop-identity-contract.md) 4 点，共 7 点，无 Stretch。
-- 状态：**DoR 待执行**。两张卡为 Ready-candidate，进入 Sprint 前须取得独立 GPT-6 Scrum 与 QA DoR PASS；任一张未通过，本窗口不开工。
+- 状态：**Done**。第三轮独立 DoR PASS 后开工，`7/7` 点，无 carryover；独立 QA/QC PASS。
 - 容量 7 点，高于已知 velocity（S3G/S3H/S3J 各 5 点）2 点，但未超过 25 点上限；两张卡同属一条发布审计链，由同一人串行完成，PO 接受这一容量。两张卡共同编辑 `desktop-release.yml` 与静态审计器，必须由同一名工程师严格按 **G02a → G02b** 顺序完成：先有 major 门，再切换有写权限的发布目标，避免上游 `v0.4.x` tag 在 fork 触发发布。G02a 未自检通过前不得开始 G02b，WIP 始终为 1。
 - 首次独立 DoR（2026-09-25）未通过：G02a 缺少上游 remote 的判定方式与失败处理，G02b 的审计无法抵御后续上游同步的回退。合同已补齐。
 - 第二轮独立 DoR（2026-09-25）仍未通过，剩余 2 项阻断：上游 owner 白名单只按路径、未限定命中数与所在常量行；写权限扫描未覆盖 `write-all`、缺省顶层权限与令牌引用。合同已按精确路径加精确命中数、写权限/令牌/缺省权限扫描和逐条突变测试补齐。PO 据此把 G02b 由 3 点重估为 4 点，Sprint 由 6 点变为 7 点，不另立后续卡；待第三轮复核。
@@ -31,4 +31,7 @@
 
 Sprint 结束时记录目标是否达成、承诺/完成点数、carryover 与原因、返工/逸出缺陷、最多两项可执行改进；未完成不得以审计通过代替 Done。
 
-（Review 待填写。）
+Sprint Goal 达成；承诺/完成 `7/7`，carryover `0`。公开发布 guard 要求 major ≥ 1，当前 `0.4.28` 的同名 tag 也只得到 `allowed=false`。发布脚本默认只向 `fork` 推送单个 tag，按 fetch/push URL 识别上游 remote 并在联网前拒绝，本地、`fork` 或上游已有同名 tag、缺少上游 remote 或 `ls-remote` 失败时均拒绝。四处发布/更新 owner 指向本发行版，beta workflow 只验证不上传。审计新增 `FORK-VERSION-LINE=REVIEW`（版本仍为 0.x）与 `FORK-PUBLISH-TARGET=PASS`，`--strict` 为 `PASS=12 / REVIEW=2 / BLOCKED=0`；`scripts/release/*.test.cjs` `50/50` PASS，`git diff --check` 通过。UI 验收不适用；无 fork 安装包，发布记录不更新。
+
+- 返工：DoR 返工 2 次（第三轮 PASS），缺口依次为上游 remote 判定、白名单精度与写权限扫描绕过。QA PASS 时附带 3 项加固，已在本窗口完成：令牌识别补 `github.token` 并忽略大小写，权限识别覆盖带引号的 `write`/`write-all`，上游 owner 扫描加入根 `package.json`。其余 QA 跟进项登记为 `R1-G02g` Refinement（Not Ready）。逸出缺陷 `0`。
+- 改进：①发布审计合同在 DoR 前先列出绕过类别（令牌写法、引号、扫描根目录），每类配突变测试；②审计优先执行真实 guard 断言行为，文本匹配只作补充。

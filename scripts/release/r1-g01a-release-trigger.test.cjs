@@ -40,12 +40,12 @@ function extractJob(jobName) {
   return workflow.slice(start, nextJob < 0 ? workflow.length : start + 1 + nextJob);
 }
 
-function runActualGuard({ eventName, refType, refName }) {
+function runActualGuard({ eventName, refType, refName, cwd = repoRoot }) {
   const outputDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "r1-g01a-guard-"));
   const outputPath = path.join(outputDirectory, "github-output");
   try {
     execFileSync("bash", ["-c", extractReleaseGuardScript()], {
-      cwd: repoRoot,
+      cwd,
       env: {
         ...process.env,
         GITHUB_OUTPUT: outputPath,
@@ -72,22 +72,34 @@ test("the workflow has one push v* trigger and no legacy/manual public trigger",
 });
 
 test("the real workflow guard allows only the exact stable package tag", () => {
-  const matching = runActualGuard({
-    eventName: "push",
-    refType: "tag",
-    refName: `v${desktopVersion}`,
-  });
-  assert.equal(matching.allowed, "true");
-  assert.equal(matching.version, desktopVersion);
+  const fixtureVersion = "1.2.3";
+  const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), "r1-g01a-guard-fixture-"));
+  try {
+    fs.mkdirSync(path.join(fixtureRoot, "desktop"));
+    fs.writeFileSync(
+      path.join(fixtureRoot, "desktop", "package.json"),
+      JSON.stringify({ name: "@ai-novel/desktop", version: fixtureVersion }),
+    );
+    const matching = runActualGuard({
+      eventName: "push",
+      refType: "tag",
+      refName: `v${fixtureVersion}`,
+      cwd: fixtureRoot,
+    });
+    assert.equal(matching.allowed, "true");
+    assert.equal(matching.version, fixtureVersion);
 
-  for (const invalid of [
-    { name: "version mismatch", refName: "v9.9.9" },
-    { name: "legacy desktop tag", refName: `desktop-v${desktopVersion}` },
-    { name: "pre-release tag", refName: `v${desktopVersion}-rc1` },
-    { name: "non-strict tag", refName: "v1.2" },
-  ]) {
-    const result = runActualGuard({ eventName: "push", refType: "tag", refName: invalid.refName });
-    assert.equal(result.allowed, "false", `${invalid.name} must not pass the actual release guard`);
+    for (const invalid of [
+      { name: "version mismatch", refName: "v9.9.9" },
+      { name: "legacy desktop tag", refName: `desktop-v${fixtureVersion}` },
+      { name: "pre-release tag", refName: `v${fixtureVersion}-rc1` },
+      { name: "non-strict tag", refName: "v1.2" },
+    ]) {
+      const result = runActualGuard({ eventName: "push", refType: "tag", refName: invalid.refName, cwd: fixtureRoot });
+      assert.equal(result.allowed, "false", `${invalid.name} must not pass the actual release guard`);
+    }
+  } finally {
+    fs.rmSync(fixtureRoot, { recursive: true, force: true });
   }
 });
 
