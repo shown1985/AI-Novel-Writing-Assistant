@@ -15,6 +15,7 @@ function fixture({
   let calls = 0;
   const transitions = [];
   const applied = [];
+  const boundaries = [];
   let releaseRecovery;
   let markRecoveryStarted;
   const recoveryStarted = new Promise((resolve) => {
@@ -43,6 +44,7 @@ function fixture({
       const artifactType = where.novelId_chapterId_contentHash_artifactType_syncMode.artifactType;
       if (artifactType !== recoveryArtifactType) {
         if (boundaryWriteError) throw new Error("checkpoint storage unavailable");
+        boundaries.push(JSON.parse(create.metadataJson));
         return;
       }
       row = row ? { ...row, ...update } : { ...create, updatedAt: new Date() };
@@ -92,7 +94,7 @@ function fixture({
     create: () => new ChapterArtifactBackgroundSyncService(),
     get status() { return row?.status; },
     get calls() { return calls; },
-    transitions, applied,
+    transitions, applied, boundaries,
     waitForRecoveryStart: () => recoveryStarted,
     releaseRecovery: () => releaseRecovery?.(),
   };
@@ -117,12 +119,29 @@ test("checkpoint: partial failure marks failed, fresh instance reclaims, success
 });
 
 test("checkpoint: active running claim does not start another extraction", async () => {
+  // deferred/adaptive sync records chapter-level artifact debt and lets the
+  // chapter chain continue; the owner of the running claim keeps it untouched.
   const f = fixture({ initialStatus: "running" });
   const result = await sync(f.create());
+  assert.equal(result.status, "degraded");
+  assert.match(result.reason, /资产同步仍在运行/);
+  assert.deepEqual(result.completedArtifacts, []);
+  assert.equal(f.calls, 0);
+  assert.equal(f.status, "running");
+  assert.deepEqual(f.transitions, []);
+  assert.deepEqual(f.boundaries.map((boundary) => boundary.outcome), ["degraded"]);
+});
+
+test("checkpoint: strict sync waits on an active running claim without extracting", async () => {
+  const f = fixture({ initialStatus: "running" });
+  const service = f.create();
+  service.shouldRunPayoffFullReconcile = async () => false;
+  const result = await service.runChapterSyncNow("n", "c", "draft", { artifactSyncMode: "strict" });
   assert.equal(result.status, "pending");
   assert.equal(f.calls, 0);
   assert.equal(f.status, "running");
   assert.deepEqual(f.transitions, []);
+  assert.deepEqual(f.boundaries, [], "pending must not publish a continuity boundary");
 });
 
 test("checkpoint: succeeded claim skips extraction in a fresh instance", async () => {
