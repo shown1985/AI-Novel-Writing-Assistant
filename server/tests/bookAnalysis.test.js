@@ -1197,6 +1197,8 @@ test("NovelExportService exports generated chapters as a knowledge document for 
     return {
       title: "雪夜旧案",
       description: "刑侦悬疑",
+      narrativeForm: "long_novel",
+      shortStorySegments: [],
       chapters: [
         { order: 1, title: "雨夜来客", content: "主角在雨夜接到旧案线索。" },
         { order: 2, title: "反向试探", content: "同伴隐瞒关键证词，矛盾升级。" },
