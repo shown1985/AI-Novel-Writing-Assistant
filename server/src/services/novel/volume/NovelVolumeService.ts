@@ -302,11 +302,14 @@ export class NovelVolumeService {
     if (!hydrated.changed) {
       return hydrated.document;
     }
-    return this.persistWorkspaceDocument(novelId, hydrated.document, {
+    const persisted = await this.persistWorkspaceDocument(novelId, hydrated.document, {
       emitEvent: false,
       syncPayoffLedger: false,
       volumeUpdateReason: "chapter_sync",
     });
+    // Persisting chapter links always stores a volume workspace, but callers such as
+    // migrateLegacyVolumes still need to know this read performed the legacy backfill.
+    return document.source === "legacy" ? { ...persisted, source: "legacy" } : persisted;
   }
 
   private findVolumeChapterMatch(
