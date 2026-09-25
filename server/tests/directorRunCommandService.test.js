@@ -543,8 +543,8 @@ test("director command service applies the full-book autopilot contract before q
     await harness.service.enqueueConfirmCandidateCommand(createConfirmRequest({
       runMode: "full_book_autopilot",
       autoExecutionPlan: {
-        mode: "chapter_range",
-        endOrder: 10,
+        mode: "volume",
+        volumeOrder: 1,
         autoReview: false,
         autoRepair: false,
       },
@@ -569,6 +569,46 @@ test("director command service applies the full-book autopilot contract before q
       autoReview: true,
       autoRepair: true,
     });
+    assert.equal(harness.bootstraps[0].seedPayload.autoApproval.enabled, true);
+  } finally {
+    harness.restore();
+  }
+});
+
+test("director command service keeps an explicit rolling chapter target under the full-book autopilot contract", async () => {
+  const harness = createHarness(createTask({
+    novelId: null,
+    status: "waiting_approval",
+  }));
+  try {
+    await harness.service.enqueueConfirmCandidateCommand(createConfirmRequest({
+      runMode: "full_book_autopilot",
+      autoExecutionPlan: {
+        mode: "chapter_range",
+        endOrder: 10,
+        autoReview: false,
+        autoRepair: false,
+      },
+      autoApproval: {
+        enabled: false,
+        approvalPointCodes: ["candidate_direction_confirmed"],
+      },
+    }));
+
+    const payload = JSON.parse(harness.commands[0].payloadJson);
+    assert.equal(payload.confirmRequest.runMode, "full_book_autopilot");
+    assert.deepEqual(payload.confirmRequest.autoExecutionPlan, {
+      mode: "chapter_range",
+      endOrder: 10,
+      autoReview: false,
+      autoRepair: false,
+    });
+    assert.equal(payload.confirmRequest.autoApproval.enabled, true);
+    assert.ok(payload.confirmRequest.autoApproval.approvalPointCodes.includes("chapter_execution_continue"));
+    assert.deepEqual(
+      harness.bootstraps[0].seedPayload.autoExecutionPlan,
+      payload.confirmRequest.autoExecutionPlan,
+    );
     assert.equal(harness.bootstraps[0].seedPayload.autoApproval.enabled, true);
   } finally {
     harness.restore();
