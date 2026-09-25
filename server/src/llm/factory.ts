@@ -1,4 +1,4 @@
-import type { LLMProvider, ReasoningEffort } from "@ai-novel/shared/types/llm";
+import type { LLMProvider, ProviderAuthMode, ReasoningEffort } from "@ai-novel/shared/types/llm";
 import type { ModelRouteRequestProtocol } from "@ai-novel/shared/types/novel";
 import { ChatOpenAI } from "@langchain/openai";
 import type { PromptInvocationMeta } from "../prompting/core/promptTypes";
@@ -32,6 +32,7 @@ interface LLMOptions {
   temperature?: number;
   apiKey?: string;
   baseURL?: string;
+  authMode?: ProviderAuthMode;
   maxTokens?: number;
   timeoutMs?: number;
   reasoningEnabled?: boolean;
@@ -52,6 +53,7 @@ export interface ProviderSecret {
   key?: string;
   model?: string;
   baseURL?: string;
+  authMode?: ProviderAuthMode;
   displayName?: string;
   reasoningEnabled?: boolean;
   reasoningEffort?: ReasoningEffort;
@@ -66,6 +68,7 @@ export interface ResolvedLLMClientOptions {
   temperature: number;
   apiKey?: string;
   baseURL: string;
+  authMode: ProviderAuthMode;
   maxTokens?: number;
   timeoutMs?: number;
   concurrencyLimit: number;
@@ -117,11 +120,16 @@ function normalizeOptionalTimeoutMs(value: number | undefined): number | undefin
   return Math.floor(value);
 }
 
+function normalizeProviderAuthMode(value: unknown): ProviderAuthMode {
+  return value === "x-api-key" || value === "none" ? value : "bearer";
+}
+
 function normalizeProviderSecret(secret: ProviderSecret): ProviderSecret {
   return {
     key: normalizeOptionalText(secret.key),
     model: normalizeOptionalText(secret.model),
     baseURL: normalizeOptionalText(secret.baseURL),
+    authMode: normalizeProviderAuthMode(secret.authMode),
     displayName: normalizeOptionalText(secret.displayName),
     reasoningEnabled: secret.reasoningEnabled ?? true,
     reasoningEffort: secret.reasoningEffort,
@@ -141,6 +149,7 @@ function toProviderSecret(item: {
   key?: string | null;
   model?: string | null;
   baseURL?: string | null;
+  authMode?: string | null;
   displayName?: string | null;
   reasoningEnabled?: boolean | null;
   reasoningEffort?: string | null;
@@ -151,6 +160,7 @@ function toProviderSecret(item: {
     key: item.key ?? undefined,
     model: item.model ?? undefined,
     baseURL: item.baseURL ?? undefined,
+    authMode: normalizeProviderAuthMode(item.authMode),
     displayName: item.displayName ?? undefined,
     reasoningEnabled: item.reasoningEnabled ?? undefined,
     reasoningEffort: item.reasoningEffort === "low" || item.reasoningEffort === "high" || item.reasoningEffort === "max"
@@ -280,6 +290,7 @@ export async function resolveLLMClientOptions(
   if (!baseURL) {
     throw new Error(`未配置 ${providerName} 的 API URL。`);
   }
+  const authMode = normalizeProviderAuthMode(options.authMode ?? dbSecret?.authMode);
 
   const openCodeSessionId = resolveOpenCodeSessionId({
     provider: resolvedProvider,
@@ -350,6 +361,7 @@ export async function resolveLLMClientOptions(
     temperature,
     apiKey,
     baseURL,
+    authMode,
     maxTokens: effectiveMaxTokens,
     timeoutMs,
     concurrencyLimit,
@@ -369,6 +381,26 @@ export async function resolveLLMClientOptions(
     routeDegraded: resolvedRouteDegraded,
     openCodeSessionId,
   };
+}
+
+export function buildOpenAICompatibleDefaultHeaders(
+  authMode: ProviderAuthMode,
+  apiKey?: string,
+): Record<string, string | null> | undefined {
+  if (authMode === "bearer") {
+    return undefined;
+  }
+  return {
+    Authorization: null,
+    ...(authMode === "x-api-key" && apiKey ? { "x-api-key": apiKey } : {}),
+  };
+}
+
+function mergeDefaultHeaders(
+  ...headerSets: Array<Record<string, string | null> | undefined>
+): Record<string, string | null> | undefined {
+  const present = headerSets.filter((headers): headers is Record<string, string | null> => Boolean(headers));
+  return present.length > 0 ? Object.assign({}, ...present) : undefined;
 }
 
 export function createLLMFromResolvedOptions(resolved: ResolvedLLMClientOptions): ChatOpenAI {
@@ -393,11 +425,15 @@ export function createLLMFromResolvedOptions(resolved: ResolvedLLMClientOptions)
       temperature: resolved.temperature,
       maxTokens: resolved.maxTokens,
       timeout: resolved.timeoutMs,
+      maxRetries: 0,
       modelKwargs: resolved.modelKwargs,
       __includeRawResponse: resolved.includeRawResponse,
       configuration: {
         baseURL: resolved.baseURL,
-        ...(openCodeDefaultHeaders ? { defaultHeaders: openCodeDefaultHeaders } : {}),
+        defaultHeaders: mergeDefaultHeaders(
+          buildOpenAICompatibleDefaultHeaders(resolved.authMode, resolved.apiKey),
+          openCodeDefaultHeaders,
+        ),
       },
     });
   const meta = {

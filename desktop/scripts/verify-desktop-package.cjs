@@ -13,6 +13,8 @@ const distDir = path.join(buildDir, "dist");
 const appDir = path.join(buildDir, "app");
 const appPackageJsonPath = path.join(appDir, "package.json");
 const desktopPackageJsonPath = path.join(desktopDir, "package.json");
+const sourceServerSqliteMigrationsDir = path.join(repoRoot, "server", "src", "prisma", "migrations.sqlite");
+const stagedServerSqliteMigrationsDir = path.join(appDir, "node_modules", "@ai-novel", "server", "src", "prisma", "migrations.sqlite");
 const stagedAppUpdateConfig = path.join(buildDir, "resources", "app-update.yml");
 const stagedClientIndex = path.join(buildDir, "resources", "client", "dist", "index.html");
 const stagedRuntimeFile = path.join(appDir, "dist", "runtime", "server.js");
@@ -205,6 +207,17 @@ function verifyHostNodeNativeBinding() {
   }
 }
 
+function listMigrationNames(migrationsDir) {
+  return fs.readdirSync(migrationsDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(migrationsDir, entry.name, "migration.sql")))
+    .map((entry) => entry.name)
+    .sort((left, right) => left.localeCompare(right));
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function main() {
   const options = parseArgs(process.argv.slice(2));
   const layout = resolvePackagedLayout(options.platform, options.arch);
@@ -222,6 +235,8 @@ function main() {
   assertExists(appArchive, "packaged app archive");
   assertExists(layout.windowIcon, "packaged desktop window icon");
   assertExists(stagedRuntimeFile, "desktop runtime server bundle");
+  assertExists(sourceServerSqliteMigrationsDir, "source SQLite migrations");
+  assertExists(stagedServerSqliteMigrationsDir, "staged SQLite migrations");
   assertNotExists(path.join(appDir, "src"), "desktop source directory inside staged app");
   assertNotExists(path.join(appDir, "node_modules", "electron"), "Electron runtime inside staged app node_modules");
   assertResolvesWithinDirectory(
@@ -250,17 +265,24 @@ function main() {
 
   const packagedEntries = asar.listPackage(appArchive)
     .map((entry) => entry.replace(/^[\\/]+/, "").replace(/\\/g, "/"));
+  const sourceSqliteMigrations = listMigrationNames(sourceServerSqliteMigrationsDir);
+  const stagedSqliteMigrations = listMigrationNames(stagedServerSqliteMigrationsDir);
+  if (JSON.stringify(stagedSqliteMigrations) !== JSON.stringify(sourceSqliteMigrations)) {
+    throw new Error("Staged SQLite migrations do not match the source migration set.");
+  }
   assertSomeMatch(packagedEntries, /^dist\/runtime\/server\.js$/, "desktop runtime server bundle inside app.asar");
   assertSomeMatch(
     packagedEntries,
     /^node_modules\/(?:\.pnpm\/[^/]+\/node_modules\/)?@ai-novel\/server\/dist\/app\.js$/,
     "bundled server entry inside app.asar",
   );
-  assertSomeMatch(
-    packagedEntries,
-    /^node_modules\/(?:\.pnpm\/[^/]+\/node_modules\/)?@ai-novel\/server\/src\/prisma\/migrations\/[^/]+\/migration\.sql$/,
-    "bundled Prisma migration files inside app.asar",
-  );
+  for (const migrationName of sourceSqliteMigrations) {
+    assertSomeMatch(
+      packagedEntries,
+      new RegExp(`^node_modules/(?:\\.pnpm/[^/]+/node_modules/)?@ai-novel/server/src/prisma/migrations\\.sqlite/${escapeRegExp(migrationName)}/migration\\.sql$`),
+      `SQLite migration ${migrationName} inside app.asar`,
+    );
+  }
   assertSomeMatch(
     packagedEntries,
     /^node_modules\/(?:\.pnpm\/[^/]+\/node_modules\/)?@prisma\/client\/generated-client\/default\.js$/,

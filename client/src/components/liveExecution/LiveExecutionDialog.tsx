@@ -31,6 +31,64 @@ function sessionId(session: LlmLiveSessionSnapshot): string {
   return session.context.interactionId;
 }
 
+function durationLabel(durationMs: number): string {
+  if (!Number.isFinite(durationMs)) {
+    return "未知";
+  }
+  const seconds = Math.max(0, durationMs) / 1_000;
+  if (seconds < 60) {
+    return `${seconds.toFixed(1)} 秒`;
+  }
+  return `${Math.floor(seconds / 60)} 分 ${Math.floor(seconds % 60).toString().padStart(2, "0")} 秒`;
+}
+
+function sessionDurationMs(session: LlmLiveSessionSnapshot, nowMs: number): number {
+  const startedAt = Date.parse(session.startedAt);
+  const endedAt = session.completedAt ? Date.parse(session.completedAt) : nowMs;
+  return Number.isFinite(startedAt) && Number.isFinite(endedAt) ? endedAt - startedAt : 0;
+}
+
+function SessionModelRoute({
+  session,
+  className,
+}: {
+  session: LlmLiveSessionSnapshot;
+  className?: string;
+}) {
+  const provider = session.context.provider?.trim() || "未记录";
+  const model = session.context.model?.trim() || "未记录";
+  return (
+    <span
+      className={cn("block truncate text-[10px] text-emerald-100/55", className)}
+      title={`本次调用：厂商 ${provider}，模型 ${model}`}
+    >
+      厂商 <span className="text-emerald-100/80">{provider}</span>
+      <span className="px-1 text-emerald-400/45">·</span>
+      模型 <span className="text-emerald-100/80">{model}</span>
+    </span>
+  );
+}
+
+function SessionMetrics({ session, nowMs }: { session: LlmLiveSessionSnapshot; nowMs: number }) {
+  const firstResponseMs = session.firstResponseAt
+    ? Date.parse(session.firstResponseAt) - Date.parse(session.startedAt)
+    : null;
+  const usage = session.tokenUsage;
+  return (
+    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-emerald-100/55">
+      <span>总耗时 {durationLabel(sessionDurationMs(session, nowMs))}</span>
+      <span>首返 {firstResponseMs === null ? (isActive(session.phase) ? "等待中" : "未返回") : durationLabel(firstResponseMs)}</span>
+      {usage ? (
+        <span title="思考 Token 通常包含在输出 Token 中">
+          Token 输入 {usage.promptTokens.toLocaleString()} / 输出 {usage.completionTokens.toLocaleString()} / 思考 {usage.reasoningTokens?.toLocaleString() ?? "未提供"} / 合计 {usage.totalTokens.toLocaleString()}
+        </span>
+      ) : (
+        <span>Token {isActive(session.phase) ? "统计中" : "未返回"}</span>
+      )}
+    </div>
+  );
+}
+
 interface LiveExecutionDialogProps {
   compact?: boolean;
   className?: string;
@@ -46,6 +104,7 @@ export default function LiveExecutionDialog(props: LiveExecutionDialogProps) {
   const [followingLatest, setFollowingLatest] = useState(true);
   const [collapsedSessionIds, setCollapsedSessionIds] = useState<Set<string>>(() => new Set());
   const [promptSessionIds, setPromptSessionIds] = useState<Set<string>>(() => new Set());
+  const [nowMs, setNowMs] = useState(Date.now());
   const logRef = useRef<HTMLDivElement | null>(null);
   const latestSessionRef = useRef<HTMLDivElement | null>(null);
   const dragStartRef = useRef<{ pointerX: number; pointerY: number; offsetX: number; offsetY: number } | null>(null);
@@ -66,6 +125,15 @@ export default function LiveExecutionDialog(props: LiveExecutionDialogProps) {
     ? latestSession.preview.slice(-1200)
     : "等待模型开始返回内容…";
   const activeCount = sessions.filter((session) => isActive(session.phase)).length;
+
+  useEffect(() => {
+    if (!open || activeCount === 0) {
+      return;
+    }
+    setNowMs(Date.now());
+    const timer = window.setInterval(() => setNowMs(Date.now()), 250);
+    return () => window.clearInterval(timer);
+  }, [activeCount, open]);
 
   useEffect(() => {
     if (!props.autoOpenOnActivity) {
@@ -341,6 +409,15 @@ export default function LiveExecutionDialog(props: LiveExecutionDialogProps) {
                     <span className="shrink-0 text-emerald-100/55">{phaseLabel(latestSession.phase)}</span>
                   </div>
                   <div className="mb-1 truncate text-[11px] text-emerald-100/45">{latestSession.phaseMessage}</div>
+                  <SessionModelRoute session={latestSession} className="mb-1" />
+                  <SessionMetrics session={latestSession} nowMs={nowMs} />
+                  {latestSession.reasoning ? (
+                    <>
+                      <div className="mt-2 text-[11px] font-semibold text-amber-200/80">思考过程</div>
+                      <pre className="m-0 whitespace-pre-wrap break-words text-amber-100/80">{latestSession.reasoning}</pre>
+                      <div className="mt-2 text-[11px] font-semibold text-emerald-200/80">生成内容</div>
+                    </>
+                  ) : null}
                   <pre className="m-0 whitespace-pre-wrap break-words text-emerald-100/90">{latestPreview}</pre>
                 </section>
               ) : orderedSessions.length > 0 ? (
@@ -365,15 +442,25 @@ export default function LiveExecutionDialog(props: LiveExecutionDialogProps) {
                           aria-expanded={!collapsed}
                         >
                           {collapsed ? <ChevronRight className="h-4 w-4 shrink-0 text-emerald-300" /> : <ChevronDown className="h-4 w-4 shrink-0 text-emerald-300" />}
-                          <span className="min-w-0 flex-1 truncate font-semibold text-emerald-50">{session.context.label}</span>
-                          <span className="shrink-0 text-[11px] text-emerald-100/55">{session.totalChars.toLocaleString()} 字符</span>
+                          <div className="min-w-0 flex-1">
+                            <span className="block truncate font-semibold text-emerald-50">{session.context.label}</span>
+                            <SessionModelRoute session={session} className="mt-0.5" />
+                          </div>
+                          <span className="shrink-0 text-[11px] text-emerald-100/55">
+                            {durationLabel(sessionDurationMs(session, nowMs))}
+                            {session.tokenUsage ? ` · ${session.tokenUsage.totalTokens.toLocaleString()} Tokens` : ""}
+                          </span>
                           <span className={cn("shrink-0 rounded border px-1.5 py-0.5 text-[10px]", active ? "border-emerald-400/45 text-emerald-200" : "border-emerald-400/20 text-emerald-100/65")}>
                             {phaseLabel(session.phase)}
                           </span>
                         </button>
                         {!collapsed ? (
                           <div className="border-t border-emerald-400/15 px-3 py-2">
-                            <div className="mb-2 text-[11px] text-emerald-100/60">{session.phaseMessage}</div>
+                            <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                              <span className="text-[11px] text-emerald-100/60">{session.phaseMessage}</span>
+                              <SessionModelRoute session={session} className="max-w-full" />
+                            </div>
+                            <div className="mb-2"><SessionMetrics session={session} nowMs={nowMs} /></div>
                             {session.context.promptText ? (
                               <div className="mb-2">
                                 <button type="button" className="inline-flex items-center gap-1.5 text-[11px] text-emerald-200/80 hover:text-emerald-50" onClick={() => togglePrompt(interactionId)}>
@@ -385,6 +472,15 @@ export default function LiveExecutionDialog(props: LiveExecutionDialogProps) {
                                 ) : null}
                               </div>
                             ) : null}
+                            {session.reasoning ? (
+                              <div className="mb-3 border-l-2 border-amber-300/35 pl-3">
+                                <div className="mb-1 text-[11px] font-semibold text-amber-200/80">
+                                  思考过程 · {session.totalReasoningChars.toLocaleString()} 字符
+                                </div>
+                                <pre className="m-0 whitespace-pre-wrap break-words text-amber-100/80">{session.reasoning}</pre>
+                              </div>
+                            ) : null}
+                            {session.reasoning ? <div className="mb-1 text-[11px] font-semibold text-emerald-200/80">生成内容</div> : null}
                             <pre className="m-0 whitespace-pre-wrap break-words text-emerald-100">{session.preview || "等待模型开始返回内容…"}</pre>
                           </div>
                         ) : null}

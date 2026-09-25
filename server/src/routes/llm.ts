@@ -1,5 +1,6 @@
 import { Router } from "express";
 import type { ApiResponse } from "@ai-novel/shared/types/api";
+import { PROVIDER_AUTH_MODES } from "@ai-novel/shared/types/llm";
 import { z } from "zod";
 import { prisma } from "../db/prisma";
 import { llmConnectivityService } from "../llm/connectivity";
@@ -19,6 +20,7 @@ const llmTestSchema = z.object({
   apiKey: z.string().trim().optional(),
   model: z.string().trim().optional(),
   baseURL: z.string().trim().url("API URL 格式不正确。").optional(),
+  authMode: z.enum(PROVIDER_AUTH_MODES).optional(),
   probeMode: z.enum(["plain", "structured", "both"]).optional(),
 });
 
@@ -28,6 +30,7 @@ const structuredFallbackSchema = z.object({
   model: z.string().trim().min(1).optional(),
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.union([z.number().int().min(64).max(32768), z.null()]).optional(),
+  retryCount: z.number().int().min(0).max(3).optional(),
 });
 
 router.use(authMiddleware);
@@ -65,6 +68,7 @@ router.get("/providers", async (_req, res, next) => {
           const models = filterHiddenModels(await getProviderModels(item.provider, {
             apiKey: item.key ?? undefined,
             baseURL: item.baseURL ?? undefined,
+            authMode: item.authMode === "x-api-key" || item.authMode === "none" ? item.authMode : "bearer",
             fallbackModel: currentModel,
             fallbackModels: [currentModel],
           }), parseHiddenModels(item.hiddenModels), currentModel);
@@ -190,8 +194,8 @@ router.post(
   validate({ body: llmTestSchema }),
   async (req, res, next) => {
     try {
-      const { provider, apiKey, model, baseURL, probeMode } = req.body as z.infer<typeof llmTestSchema>;
-      const result = await llmConnectivityService.testConnection({ provider, apiKey, model, baseURL, probeMode });
+      const { provider, apiKey, model, baseURL, authMode, probeMode } = req.body as z.infer<typeof llmTestSchema>;
+      const result = await llmConnectivityService.testConnection({ provider, apiKey, model, baseURL, authMode, probeMode });
       const shouldFail =
         probeMode === "structured"
           ? result.structured?.ok === false

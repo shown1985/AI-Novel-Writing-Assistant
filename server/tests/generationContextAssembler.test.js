@@ -137,8 +137,7 @@ function createStoryWorldSlice() {
   };
 }
 
-test("assembler refreshes chapter execution fields after chapter plan regeneration", async () => {
-  const staleSceneCards = createSceneCards("旧合同");
+test("assembler only reads planning artifacts prepared before context assembly", async () => {
   const freshSceneCards = createSceneCards("新合同");
   const now = new Date();
   let chapterFindFirstCalls = 0;
@@ -154,6 +153,7 @@ test("assembler refreshes chapter execution fields after chapter plan regenerati
     consistencyFactFindMany: prisma.consistencyFact.findMany,
     chapterFindMany: prisma.chapter.findMany,
     creativeDecisionFindMany: prisma.creativeDecision.findMany,
+    getChapterPlan: plannerService.getChapterPlan,
     ensureChapterPlan: plannerService.ensureChapterPlan,
     buildPlanPromptBlock: plannerService.buildPlanPromptBlock,
     buildStateContext: contextAssemblyService.build,
@@ -192,14 +192,14 @@ test("assembler refreshes chapter execution fields after chapter plan regenerati
         title: "第1章",
         order: 1,
         content: null,
-        expectation: chapterFindFirstCalls === 1 ? "旧目标" : "新目标",
+        expectation: "新目标",
         targetWordCount: 3000,
         conflictLevel: 2,
         revealLevel: 1,
-        mustAvoid: chapterFindFirstCalls === 1 ? "旧禁止" : "新禁止",
-        taskSheet: chapterFindFirstCalls === 1 ? "旧任务单" : "新任务单",
-        sceneCards: chapterFindFirstCalls === 1 ? staleSceneCards : freshSceneCards,
-        hook: chapterFindFirstCalls === 1 ? "旧钩子" : "新钩子",
+        mustAvoid: "新禁止",
+        taskSheet: "新任务单",
+        sceneCards: freshSceneCards,
+        hook: "新钩子",
       };
     };
     prisma.stateChangeProposal.count = async () => 0;
@@ -210,7 +210,7 @@ test("assembler refreshes chapter execution fields after chapter plan regenerati
     prisma.consistencyFact.findMany = async () => [];
     prisma.chapter.findMany = async () => [];
     prisma.creativeDecision.findMany = async () => [];
-    plannerService.ensureChapterPlan = async () => ({
+    plannerService.getChapterPlan = async () => ({
       id: "plan-1",
       chapterId: "chapter-1",
       planRole: "pressure",
@@ -230,6 +230,9 @@ test("assembler refreshes chapter execution fields after chapter plan regenerati
       createdAt: now,
       updatedAt: now,
     });
+    plannerService.ensureChapterPlan = async () => {
+      throw new Error("context assembly must not generate or persist planning artifacts");
+    };
     plannerService.buildPlanPromptBlock = async () => "";
     contextAssemblyService.build = async () => ({
       snapshot: createCanonicalSnapshot(),
@@ -282,7 +285,7 @@ test("assembler refreshes chapter execution fields after chapter plan regenerati
 
     const assembled = await assembler.assemble("novel-1", "chapter-1", {});
 
-    assert.equal(chapterFindFirstCalls, 2);
+    assert.equal(chapterFindFirstCalls, 1);
     assert.equal(assembled.chapter.taskSheet, "新任务单");
     assert.equal(assembled.contextPackage.chapter.sceneCards, freshSceneCards);
     assert.equal(assembled.contextPackage.storyWorldSlice, storyWorldSlice);
@@ -309,6 +312,7 @@ test("assembler refreshes chapter execution fields after chapter plan regenerati
     prisma.consistencyFact.findMany = originals.consistencyFactFindMany;
     prisma.chapter.findMany = originals.chapterFindMany;
     prisma.creativeDecision.findMany = originals.creativeDecisionFindMany;
+    plannerService.getChapterPlan = originals.getChapterPlan;
     plannerService.ensureChapterPlan = originals.ensureChapterPlan;
     plannerService.buildPlanPromptBlock = originals.buildPlanPromptBlock;
     contextAssemblyService.build = originals.buildStateContext;

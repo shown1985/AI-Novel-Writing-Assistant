@@ -2,6 +2,10 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const {
+  ChapterScenePlanNormalizationError,
+} = require("../../shared/dist/types/chapterLengthControl.js");
+
+const {
   assessChapterExecutionContractShape,
   aiChapterTaskSheetQualityAssessmentSchema,
   formatChapterTaskSheetQualityFailure,
@@ -16,6 +20,9 @@ const {
 const {
   ChapterTaskSheetQualityGateError,
 } = require("../dist/services/novel/volume/ChapterTaskSheetQualityGateService.js");
+const {
+  inspectChapterExecutionContractReadiness,
+} = require("../dist/services/novel/volume/chapterDetail/chapterExecutionContractReadiness.js");
 const {
   chapterTaskSheetQualityPrompt,
 } = require("../dist/prompting/prompts/novel/volume/chapterTaskSheetQuality.prompts.js");
@@ -117,6 +124,61 @@ test("incomplete persisted contracts are regenerated instead of reused", () => {
   }), false);
 });
 
+test("contract readiness distinguishes structural completeness from current requirement compatibility", () => {
+  const requirement = {
+    ...buildCandidate(),
+    id: "volume-chapter-1",
+    chapterId: "chapter-1",
+    volumeId: "volume-1",
+    chapterOrder: 1,
+    payoffRefs: ["资源危机"],
+    createdAt: "2026-09-08T00:00:00.000Z",
+    updatedAt: "2026-09-08T00:00:00.000Z",
+  };
+  const persisted = {
+    targetWordCount: requirement.targetWordCount,
+    conflictLevel: requirement.conflictLevel,
+    revealLevel: requirement.revealLevel,
+    mustAvoid: requirement.mustAvoid,
+    taskSheet: requirement.taskSheet,
+    sceneCards: requirement.sceneCards,
+  };
+
+  const compatible = inspectChapterExecutionContractReadiness({
+    novelId: "novel-1",
+    volumeId: "volume-1",
+    requirement,
+    persisted,
+  });
+  assert.equal(compatible.structure.canEnterExecution, true);
+  assert.equal(compatible.compatibility, "compatible");
+  assert.equal(compatible.canReuse, true);
+
+  const stale = inspectChapterExecutionContractReadiness({
+    novelId: "novel-1",
+    volumeId: "volume-1",
+    requirement: {
+      ...requirement,
+      mustAvoid: "不要提前揭示幕后主使，也不要让主角离开当前地点。",
+    },
+    persisted,
+  });
+  assert.equal(stale.structure.canEnterExecution, true);
+  assert.equal(stale.compatibility, "incompatible");
+  assert.deepEqual(stale.mismatchedFields, ["mustAvoid"]);
+  assert.equal(stale.canReuse, false);
+
+  const incomplete = inspectChapterExecutionContractReadiness({
+    novelId: "novel-1",
+    volumeId: "volume-1",
+    requirement: { ...requirement, purpose: null },
+    persisted,
+  });
+  assert.equal(incomplete.structure.canEnterExecution, false);
+  assert.equal(incomplete.compatibility, "compatible");
+  assert.equal(incomplete.canReuse, false);
+});
+
 test("chapter execution contract does not retry a semantic quality warning", () => {
   const qualityError = new ChapterTaskSheetQualityGateError({
     status: "repairable",
@@ -133,6 +195,10 @@ test("chapter execution contract does not retry a semantic quality warning", () 
   assert.equal(shouldRetryChapterExecutionContract(qualityError, 0), false);
   assert.equal(shouldRetryChapterExecutionContract(qualityError, 1), false);
   assert.equal(shouldRetryChapterExecutionContract(postValidateError, 0), true);
+  assert.equal(shouldRetryChapterExecutionContract(
+    new ChapterScenePlanNormalizationError("scene_count_below_minimum", "章节场景拆解至少需要 3 个有效场景。"),
+    0,
+  ), true);
   assert.equal(shouldRetryChapterExecutionContract(new Error("terminated"), 0), false);
 });
 

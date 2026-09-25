@@ -7,6 +7,7 @@ const THINK_OPEN_TAG = "<think>";
 const THINK_CLOSE_TAG = "</think>";
 const DEEPSEEK_HOST_PATTERN = /(?:^|:\/\/)(?:api\.)?deepseek\.com(?:\/|$)/i;
 const GLM_MODEL_PATTERN = /^glm-5(?:\.\d+)?(?:-flash)?(?:[-.]|$)/i;
+const GLM_HOST_PATTERN = /(?:^|:\/\/)open\.bigmodel\.cn(?:\/|$)/i;
 const MINIMAX_HOST_PATTERN = /(?:^|:\/\/)(?:api\.)?minimax(?:i)?\.(?:io|com)(?:\/|$)/i;
 const MINIMAX_MODEL_PATTERN = /^minimax-m2(?:[.-]|$)/i;
 
@@ -62,8 +63,13 @@ export function supportsReasoningEffort(
   baseURL?: string,
   model?: string,
 ): boolean {
+  // Official GLM endpoints only accept the thinking toggle (see resolveProviderReasoningBehavior),
+  // so the effort selector applies to DeepSeek and to GLM served through gateways such as OpenCode Go.
   return isDeepSeekThinkingModeProvider(provider, baseURL, model)
-    || isGlmReasoningModeProvider(provider, baseURL, model);
+    || (
+      isGlmReasoningModeProvider(provider, baseURL, model)
+      && !isGlmThinkingModeProvider(provider, baseURL, model)
+    );
 }
 
 function collectTextArray(value: unknown): string[] {
@@ -123,16 +129,24 @@ export function isMiniMaxCompatibleProvider(
   return Boolean(normalizedModel && MINIMAX_MODEL_PATTERN.test(normalizedModel));
 }
 
+function isDeepSeekThinkingToggleModel(model?: string): boolean {
+  const normalizedModel = normalizeOptionalText(model)?.toLowerCase();
+  if (!normalizedModel) {
+    return false;
+  }
+  return normalizedModel === "deepseek-reasoner"
+    || normalizedModel.startsWith("deepseek-flash")
+    || normalizedModel.startsWith("deepseek-pro")
+    || normalizedModel.startsWith("deepseek-v4-flash")
+    || normalizedModel.startsWith("deepseek-v4-pro");
+}
+
 export function isDeepSeekThinkingModeProvider(
   provider: LLMProvider,
   baseURL?: string,
   model?: string,
 ): boolean {
-  const normalizedModel = normalizeOptionalText(model)?.toLowerCase();
-  const supportsThinkingToggle = normalizedModel?.startsWith("deepseek-v4-pro")
-    || normalizedModel?.startsWith("deepseek-v4-flash")
-    || normalizedModel === "deepseek-reasoner";
-  if (!supportsThinkingToggle) {
+  if (!isDeepSeekThinkingToggleModel(model)) {
     return false;
   }
   if (provider === "deepseek") {
@@ -145,6 +159,30 @@ export function isDeepSeekThinkingModeProvider(
   return Boolean(normalizedBaseURL && DEEPSEEK_HOST_PATTERN.test(normalizedBaseURL));
 }
 
+export function isGlmThinkingModeProvider(
+  provider: LLMProvider,
+  baseURL?: string,
+  model?: string,
+): boolean {
+  // Gateways such as OpenCode Go serve GLM with their own reasoning contract (they reject the
+  // official thinking toggle); those are handled by the GLM reasoning-mode branch instead.
+  if (isOpenCodeGoEndpoint(baseURL)) {
+    return false;
+  }
+  const normalizedModel = normalizeOptionalText(model)?.toLowerCase().split("/").at(-1);
+  const version = normalizedModel?.match(/^glm-(\d+)(?:\.(\d+))?/);
+  const major = Number(version?.[1] ?? 0);
+  const minor = Number(version?.[2] ?? 0);
+  if (major < 4 || (major === 4 && minor < 5)) {
+    return false;
+  }
+  if (provider === "glm") {
+    return true;
+  }
+  const normalizedBaseURL = normalizeOptionalText(baseURL);
+  return Boolean(normalizedBaseURL && GLM_HOST_PATTERN.test(normalizedBaseURL));
+}
+
 export function resolveProviderReasoningBehavior(input: {
   provider: LLMProvider;
   baseURL: string;
@@ -152,6 +190,20 @@ export function resolveProviderReasoningBehavior(input: {
   reasoningEnabled: boolean;
   reasoningEffort?: ReasoningEffort | null;
 }): ProviderReasoningBehavior {
+  if (isGlmThinkingModeProvider(input.provider, input.baseURL, input.model)) {
+    return {
+      reasoningEnabled: input.reasoningEnabled,
+      reasoningEffort: null,
+      modelKwargs: {
+        thinking: {
+          type: input.reasoningEnabled ? "enabled" : "disabled",
+        },
+      },
+      includeRawResponse: false,
+      usesAccumulatedStreamDeltas: false,
+    };
+  }
+
   if (isDeepSeekThinkingModeProvider(input.provider, input.baseURL, input.model)) {
     const reasoningEffort = normalizeReasoningEffort(input.reasoningEffort);
     return {
@@ -379,5 +431,25 @@ export class ThinkTagStreamFilter {
       text,
       reasoning,
     };
+  }
+}
+
+export class ReasoningStreamCollector {
+  private readonly thinkFilter = new ThinkTagStreamFilter();
+
+  private miniMaxReasoningBuffer = "";
+
+  push(chunk: BaseMessageChunk, text: string): string {
+    const rawResponse = (chunk.additional_kwargs as { __raw_response?: unknown } | undefined)
+      ?.__raw_response;
+    const rawReasoning = extractMiniMaxRawStreamData(rawResponse).reasoningBuffer;
+    const normalized = diffAccumulatedText(this.miniMaxReasoningBuffer, rawReasoning);
+    this.miniMaxReasoningBuffer = normalized.nextBuffer;
+    const direct = normalized.delta || extractReasoningTextFromChunk(chunk);
+    return uniqueJoinedText([direct, this.thinkFilter.push(text).reasoning]);
+  }
+
+  flush(): string {
+    return this.thinkFilter.flush().reasoning;
   }
 }

@@ -1,5 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const { createHash } = require("node:crypto");
 
 const { prisma } = require("../dist/db/prisma.js");
 const { novelEventBus } = require("../dist/events/index.js");
@@ -8,6 +9,22 @@ const { NovelCorePipelineService } = require("../dist/services/novel/novelCorePi
 const { ChapterEmptyContentError } = require("../dist/services/novel/runtime/chapterEmptyContentError.js");
 const { decoratePipelineJob } = require("../dist/services/novel/pipelineJobState.js");
 const { DIRECTOR_ISSUE_GOVERNANCE_VERSION } = require("@ai-novel/shared/types/directorIssue");
+
+function installSuccessfulExecutionLease(service) {
+  const executor = service.pipelineExecutor;
+  executor.automaticAttempts = {
+    async used() { return 0; },
+    async claim() { return true; },
+  };
+  service.pipelineExecutionLeases = {
+    async claim() { return true; },
+    async renew() { return true; },
+    async release() { return true; },
+  };
+  service.pipelineExecutor = {
+    execute: (jobId, novelId, options) => executor.execute(jobId, novelId, options),
+  };
+}
 
 test("listRecoverablePipelineJobs excludes cancellation-pending jobs", async () => {
   const originalFindMany = prisma.generationJob.findMany;
@@ -92,6 +109,8 @@ test("startPipelineJob persists maxRetries as a single repair pass", async () =>
       qualityThreshold: 75,
       repairMode: "light_repair",
       maxRetries: 5,
+      issueGovernanceVersion: 1,
+      issuePolicySnapshot: { maxAutomaticRetries: 1, issueActions: {} },
     });
 
     assert.equal(createdInput.data.maxRetries, 1);
@@ -101,11 +120,8 @@ test("startPipelineJob persists maxRetries as a single repair pass", async () =>
     assert.equal(persistedPayload.issueGovernanceVersion, DIRECTOR_ISSUE_GOVERNANCE_VERSION);
     assert.ok(persistedPayload.issuePolicySnapshot);
     assert.deepEqual(scheduledOptions.issuePolicySnapshot, persistedPayload.issuePolicySnapshot);
-    const terminalContinueCondition = capturedChapterQuery.where.NOT.AND[2].OR.find((condition) => Array.isArray(condition.AND));
-    assert.equal(terminalContinueCondition.AND[0].riskFlags.not, null);
-    assert.equal(terminalContinueCondition.AND[1].riskFlags.contains, '"terminalAction":"defer_and_continue"');
-    assert.equal(terminalContinueCondition.AND[2].riskFlags.not.contains, '"rootCauseCode":"replan_required"');
-    assert.equal(terminalContinueCondition.AND[3].riskFlags.not.contains, '"recommendedAction":"replan"');
+    assert.equal(capturedChapterQuery.select.artifactSyncCheckpoints.where.artifactType, "artifact_sync_boundary:v1");
+    assert.equal(capturedChapterQuery.select.artifactSyncCheckpoints.where.status, "succeeded");
   } finally {
     prisma.character.count = original.characterCount;
     prisma.generationJob.findMany = original.generationFindMany;
@@ -128,6 +144,7 @@ test("executePipeline skips chapters already marked for deferred continue when s
   };
 
   const updates = [];
+  let processedChapters = 0;
   let capturedChapterQuery = null;
   prisma.generationJob.findUnique = async (input) => {
     if (input.select?.startedAt) {
@@ -168,26 +185,42 @@ test("executePipeline skips chapters already marked for deferred continue when s
   prisma.chapter.findMany = async (input) => {
     capturedChapterQuery = input;
     return [
-      { id: "chapter-terminal", order: 4, title: "第四章", content: "正文", chapterStatus: "pending_review" },
+      {
+        id: "chapter-terminal",
+        order: 4,
+        title: "第四章",
+        content: "正文",
+        generationState: "reviewed",
+        chapterStatus: "pending_review",
+        riskFlags: JSON.stringify({ qualityLoop: { terminalAction: "defer_and_continue" } }),
+        artifactSyncCheckpoints: [{
+          contentHash: createHash("sha256").update("正文").digest("hex").slice(0, 24),
+          metadataJson: JSON.stringify({ outcome: "completed" }),
+        }],
+      },
     ];
   };
   reviewService.createQualityReport = async () => null;
   novelEventBus.emit = async () => null;
 
   const service = new NovelCorePipelineService();
-  service.chapterRuntimeCoordinator.runPipelineChapter = async () => ({
-    retryCountUsed: 0,
-    score: {
-      coherence: 88,
-      repetition: 88,
-      pacing: 82,
-      voice: 80,
-      engagement: 86,
-      overall: 84,
-    },
-    issues: [],
-    pass: true,
-  });
+  installSuccessfulExecutionLease(service);
+  service.chapterRuntimeCoordinator.runPipelineChapter = async () => {
+    processedChapters += 1;
+    return {
+      retryCountUsed: 0,
+      score: {
+        coherence: 88,
+        repetition: 88,
+        pacing: 82,
+        voice: 80,
+        engagement: 86,
+        overall: 84,
+      },
+      issues: [],
+      pass: true,
+    };
+  };
 
   try {
     await service.executePipeline("job-terminal", "novel-1", {
@@ -207,6 +240,7 @@ test("executePipeline skips chapters already marked for deferred continue when s
 
     const finalUpdate = updates[updates.length - 1];
     assert.equal(finalUpdate.data.status, "succeeded");
+    assert.equal(processedChapters, 0);
   } finally {
     prisma.generationJob.findUnique = original.generationFindUnique;
     prisma.generationJob.update = original.generationUpdate;
@@ -309,6 +343,7 @@ test("executePipeline stops remaining chapters after a replan recommendation", a
   novelEventBus.emit = async () => null;
 
   const service = new NovelCorePipelineService();
+  installSuccessfulExecutionLease(service);
   service.chapterRuntimeCoordinator.runPipelineChapter = async (_novelId, chapterId) => {
     processedChapters.push(chapterId);
     return {
@@ -426,6 +461,7 @@ test("executePipeline records local patch recommendations as quality debt and co
   novelEventBus.emit = async () => null;
 
   const service = new NovelCorePipelineService();
+  installSuccessfulExecutionLease(service);
   service.chapterRuntimeCoordinator.runPipelineChapter = async (_novelId, chapterId) => {
     processedChapters.push(chapterId);
     return {
@@ -543,6 +579,7 @@ test("executePipeline preserves persisted quality alerts across resume", async (
   novelEventBus.emit = async () => null;
 
   const service = new NovelCorePipelineService();
+  installSuccessfulExecutionLease(service);
   service.chapterRuntimeCoordinator.runPipelineChapter = async () => ({
     retryCountUsed: 0,
     score: {
@@ -639,6 +676,7 @@ test("executePipeline records empty chapter output in failed job notice payload"
   novelEventBus.emit = async () => null;
 
   const service = new NovelCorePipelineService();
+  installSuccessfulExecutionLease(service);
   service.chapterRuntimeCoordinator.runPipelineChapter = async (_novelId, _chapterId, _options, hooks) => {
     const error = new ChapterEmptyContentError({
       novelId: "novel-1",
