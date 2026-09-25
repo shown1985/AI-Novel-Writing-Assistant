@@ -132,7 +132,7 @@ SQLite 与 PostgreSQL schema/migration 必须同一字段和唯一约束；migra
 | --- | ---: | --- |
 | S3-02b3a Durable backfill claim/result store | 5 | 双 schema + 增量 migration；唯一 operation/request hash、lease、状态终态和 result record；隔离双库证明未知不重调、结果可读；不接来源页 |
 | S3-02b3b Backfill runtime 与 CAS recovery | 5 | Prompt/attempt 关联、归一化结果持久化、同 operation CAS、冲突零写入、receipt/result replay；真实 mock/provider seam 与故障回放通过 |
-| S3-02b3c Backfill HTTP operation query | 3 | 请求接收 operation/base revision/hash 输入，新增按 operation 读状态/receipt/result 的内部接口，响应丢失和错误码契约通过；不扩任务中心 |
+| S3-02b3c Backfill HTTP operation query | 3（范围扩大后须重估） | 请求接收 operation/base revision/hash 输入，新增按 operation 读状态/receipt/result 的内部接口，响应丢失和错误码契约通过；不扩任务中心。PO 2026-09-25 追加：组合 b3b2b 持久 result→b3b1 `commitPersistedResult` 及提交后 snapshot/RAG；持久化失败类别（必要时带 migration），使来源页重启后仍能说明“为何失败”。保持 Refinement / Not Ready |
 | S3-02b3d 来源页恢复投影 | 3 | 同一世界工作台的两处“AI 整理/提取”入口/视图共用 operation；生成中、已保存、未保存结果可处理、冲突、状态待确认均能回到当前世界工作台；不在运行记录放操作按钮 |
 | S3-02b3e 组合恢复与发布门 | 3 | SQLite/PostgreSQL 迁移检查、并发/重启/lease/响应丢失行为回归、真实来源页验收和 beta 组合验证；不引入真实模型计费验证 |
 
@@ -146,7 +146,7 @@ b3b2a 已于 R1-S3I Done。`S3-02b3b2b` 仍为 Refinement / Not Ready，冻结�
 
 - 范围/AC（必须）：单次模式下 JSON 修复次数为 0 时，`structuredInvokeParser.ts` 对无法解析的输出须立即抛出 `malformed_json`（空正文为 `empty_content`），不得继续落入 schema 校验而被归为 `schema_mismatch`；以分类测试验收。原因是 b2b 的恢复决策可能按失败类别分支。重复的 not_adopted finalize 为幂等，无需处理。
 - 注记：`runTextPrompt`/`streamTextPrompt` 当前静默忽略 `singleProviderTransportAttempt`；b2b 只能经非流式 `runStructuredPrompt` 使用单次门，若需要文本或流式入口须另行拆卡，不能假设其受保护。
-- 跟踪（2026-09-25）：`S3-02b3b2b` 合同草案见 [b3b2b 模型→持久结果编排](./s3-02b3b2b-backfill-generation-orchestration-contract.md)，5 点，拟入 R1-S3J，**待 PO 确认**与独立 DoR。上述分类 AC 已纳入该合同 AC1。
+- 跟踪（2026-09-25）：`S3-02b3b2b` 合同草案见 [b3b2b 模型→持久结果编排](./s3-02b3b2b-backfill-generation-orchestration-contract.md)，5 点，拟入 R1-S3J；PO 已于 2026-09-25 确认范围，独立 Scrum/QA DoR 待执行。上述分类 AC 已纳入该合同 AC1。result→World 提交、提交后 snapshot/RAG 与失败类别持久化归 S3-02b3c。
 
 ### Spike 出口记录
 

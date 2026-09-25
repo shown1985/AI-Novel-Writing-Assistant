@@ -13,7 +13,7 @@
 2. 在 `server/src/services/world/backfill/` 的 owned application/infrastructure 边界提供 `commitPersistedResult(worldId, operationId)` 与只读 `readCommitOutcome`。事务先读取并核验 operation/result 的世界归属、request hash、基线 revision、digest 与 pending-commit 状态；用 `worldStructure.ts` 已公开的 `normalizeWorldStructuredData`、`normalizeWorldBindingSupport`、`applyStructuredWorldToLegacyFields` 和 maintenance facade 已公开的 `validateWorldMaintenanceCandidate` 处理结构。先以事务内读出的完整 World 行加 result 的**原始持久化结构与 binding support** 组成候选，让维护校验在任何 normalization 之前拒绝悬空关系及使用建议引用；再归一化和生成兼容投影。无需修改这两个现有模块或复制手动保存的字段映射。不得相信调用方再传的一份生成结果。
 3. 同一事务内按 `World.contentRevision == baseContentRevision` 条件更新世界结构、兼容投影及 `contentRevision + 1`，写 backfill 专属 receipt，并将 operation 置为 `committed`；若 CAS 失配，只将 operation 置为 `conflict_result_retained` 并保留 result，世界内容、revision、手动 receipt、snapshot/RAG 零写入。对同 world/operation 并发提交只允许一次内容递增和一份 receipt。
 4. `committed` 重放返回原 receipt/result，不再次更新世界；两个连接并发提交同一 operation 时，落败方须读回赢家的同一 receipt/result，而不能把已成功的同一操作误报为内容冲突。`conflict_result_retained` 重放只读保留结果，不能用较新世界 revision 自动套用。事务结果或响应未知时先按同 operation 查 backfill receipt/result，不盲重提交；receipt 存在才宣称已保存。不得把世界写成功而 backfill 状态/receipt 未落库的半提交当成 Done。
-5. 只保存结构相关字段和既有兼容投影，不把生成结果中的无关字段覆盖作者世界元数据。提交后的 snapshot/RAG 派生副作用留给 b3b2 的运行时接线；本 Story 不对外宣称它们已执行。
+5. 只保存结构相关字段和既有兼容投影，不把生成结果中的无关字段覆盖作者世界元数据。提交后的 snapshot/RAG 派生副作用由 S3-02b3c 负责接线（PO 2026-09-25 决定；b3b2b 只到持久 result，不调用提交）；本 Story 不对外宣称它们已执行。
 
 ## Owner 与文件边界
 
@@ -34,4 +34,4 @@
 
 ## DoR 核对依据
 
-`worldStructure.ts` 的三个结构函数与 maintenance domain 的候选校验函数均已公开。backfill-owned 事务可从自身的 World/result 行组成完整候选并通过这些函数完成校验、归一化和投影，不需要修改手动保存路径。若实现发现公开函数不足以保持既有规则，Story 返回 Refinement，而不是扩增文件边界。b3b2 只消费本 Story 的提交 facade；不重做 CAS、receipt 或本 Story 的 schema/migration。
+`worldStructure.ts` 的三个结构函数与 maintenance domain 的候选校验函数均已公开。backfill-owned 事务可从自身的 World/result 行组成完整候选并通过这些函数完成校验、归一化和投影，不需要修改手动保存路径。若实现发现公开函数不足以保持既有规则，Story 返回 Refinement，而不是扩增文件边界。S3-02b3c 在组合 result→World 提交时只消费本 Story 的提交 facade；不重做 CAS、receipt 或本 Story 的 schema/migration。

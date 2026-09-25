@@ -2,7 +2,7 @@
 
 ## 身份、价值与状态
 
-- Release / Epic：Release 1 / S3 可信世界；Story ID：`S3-02b3b2b`；估算 5 点（不拆分，见“估算”）；优先级 P1；状态 Refinement，**待 PO 确认**，独立 Scrum 与 QA DoR 尚未执行。规划基线 `beta@cb169a52`。
+- Release / Epic：Release 1 / S3 可信世界；Story ID：`S3-02b3b2b`；估算 5 点（不拆分，见“估算”）；优先级 P1；状态 Refinement；PO 已于 2026-09-25 确认范围，独立 Scrum 与 QA DoR 尚未执行。规划基线 `beta@cb169a52`。
 - 用户价值：作为发起“AI 补全世界结构”的作者，我希望同一次操作只会让系统向模型发出一次请求；生成出的结构先安全保存下来，即使页面断开、服务重启或多次点击，也能按同一次操作读回结果，或明确知道“生成失败”“状态待确认”，而不会被再次扣费。
 - 前置（均 Done）：[S3-02b3s](./s3-02b3s-structure-backfill-idempotency-spike.md) 冻结的状态/恢复矩阵；[S3-02b3a](./s3-02b3a-backfill-store-contract.md) 持久 claim/result store；[S3-02b3b1](./s3-02b3b1-backfill-result-commit-contract.md) 已持久 result→世界 CAS/回执；[S3-02b3b2a](./s3-02b3b2a-backfill-single-attempt-prompt-contract.md) `singleProviderTransportAttempt` 单次物理调用门。
 - 本卡输出止于 `model_succeeded_pending_commit`（或失败/未知终态）。不调用 `commitPersistedResult`，不写 World。本卡完成后，现有 `/backfill` 仍走旧路径、仍不受保护。
@@ -19,7 +19,7 @@
 2. **失败到状态的确定映射**：映射只作用于已结构化的错误，由 backfill `domain/` 中的一张表完成，属于 AGENTS.md 允许的确定性后处理。
    - provider 已经返回响应、但内容不可用时置 `failed_terminal`。这类 `StructuredOutputError.category` 包括 `malformed_json`、`empty_content`、`incomplete_json`、`schema_mismatch`、`thinking_pollution`、`output_truncated`、`reasoning_budget_exhausted`。
    - 其他情况一律 `markUnknown(unknown_result)` → `model_unknown`，宁可保守。其他情况包括：`transport_error`、取消/超时、未在白名单中的类别、非结构化异常，以及归一化或 `persistResult` 失败。
-   - 服务返回的 outcome 带上失败类别。类别不持久化；持久化类别需要 migration，列为 PO 问题。
+   - 服务返回的 outcome 带上失败类别。类别不持久化（PO 已批准）；持久化由 S3-02b3c 承担。
 3. **store 最小扩展**：新增状态 `failed_terminal`，新增 `markFailed(worldId, operationId)`，只能从 `model_in_flight` 进入，进入后不能重新取得调用权。`status` 列是无 CHECK 的 TEXT，因此**不改 schema、不加 migration**。另新增错误码 `BASE_REVISION_MISMATCH`：首次请求时世界 revision 已变化，在 claim 之前拒绝，零 operation、零调用。
 4. **单次模式解析分类修正（QA 强制）**：`structuredInvokeParser.ts` 在 JSON 修复预算为 0 时（当前只有单次模式如此）的处理：
    - 非空但无法解析的输出须立即抛出 `malformed_json`。
@@ -98,7 +98,8 @@
 - [x] Story ID、用户价值、前置 Done、非范围、单 owner 与文件边界已写明。
 - [x] 已核对复用 seam 存在：store `claim/read/startModel/persistResult/markUnknown`，`startModel` 可携带 `modelRequestId`；`status` 为无 CHECK 的 TEXT；`runWithModelAttemptRequestContext` 与 `getModelAttemptRequestState` 已由 provenance facade 导出；零修复时解析失败落入 `safeParse(null)` 的缺陷位于 `structuredInvokeParser.ts`。
 - [x] 错误分类契约与状态映射在 DoR 同时列出（R1-S3I 改进项①）。
-- [ ] PO 确认下方开放问题；独立 GPT-6 Scrum 与 QA DoR PASS。
+- [x] PO 已确认下方两项决定（2026-09-25）。
+- [ ] 独立 GPT-6 Scrum 与 QA DoR PASS。
 
 ## DoD
 
@@ -117,7 +118,7 @@
 - 需要改 PromptRunner 或 structuredInvoke；
 - 需要持久化失败类别。
 
-## 需 PO 决定的问题
+## PO 决定（2026-09-25 已确认）
 
-1. S3-02b3b1 合同把提交后的 snapshot/RAG 派生副作用留给“b3b2 运行时接线”。本合同将它们与 result→commit 的组合一并划出 b2b，建议改由 S3-02b3c 承担。需要 PO 确认新的归属。
-2. 失败类别仅在 outcome 中返回，不持久化。若 b3c/b3d 的来源页需要在重启后展示“为何失败”，需要另开带 migration 的小卡，或在 b3c 内追加字段。
+1. result→World 提交与提交后 snapshot/RAG 不属于 b2b，归 S3-02b3c；b3b1 合同的前向引用已同步。
+2. b2b 只返回失败类别、不持久化；S3-02b3c 追加范围：持久化失败类别（必要时带 migration），使来源页重启后仍能说明“为何失败”。S3-02b3c 保持 Not Ready。
