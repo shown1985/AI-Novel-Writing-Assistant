@@ -3,7 +3,7 @@
 更新时间：2026-09-25
 集成分支：`beta`
 当前里程碑：Release 1（单机成书版）
-当前状态：R1-S3I 已完成 `S3-02b3b2a` 单次物理模型调用门 `3/3` 点，独立 QA/QC PASS，已合入 beta。此前 R1-S3E～S3H 均已完成并合入 beta。下一窗口 R1-S3J 已起草 `S3-02b3b2b` 模型→持久 result 编排合同（5 点），PO 已确认范围，独立 DoR PASS，实施中。HTTP 与 UI 接线继续 Refinement；Release 1 未完成。
+当前状态：R1-S3I 已完成 `S3-02b3b2a` 单次物理模型调用门 `3/3` 点，独立 QA/QC PASS，已合入 beta。此前 R1-S3E～S3H 均已完成并合入 beta。R1-S3J 已完成 `S3-02b3b2b` 模型→持久 result 编排 `5/5` 点。下一窗口 R1-S3K 计划承诺 `R1-G02a`+`R1-G02b` 独立发行版发布指向与版本线（6 点），PO 已确认身份取值，独立 DoR 待执行。HTTP 与 UI 接线继续 Refinement；Release 1 未完成。
 
 ## 权威文档
 
@@ -366,6 +366,13 @@ R1-RC 独立 Refinement：[R1-G01 发布治理拆分合同](./docs/plans/r1-g01-
 - 非范围：不接 `/backfill`、不写 World、不改 HTTP/UI/schema/migration/PromptRunner，不做真实模型或 PostgreSQL apply，不引入 Release 2。
 - 独立 QA/QC：首轮 FAIL，1 项阻断：零修复解析改判波及非单次零修复 Prompt，会使 `prompt_json` 下调用由 1 次升至 3 次。PO 批准在 `structuredInvoke.ts` 增加一行守卫，把新分类限于单次模式；复验 PASS，非单次调用次数与 fallback 路径和改动前一致，根代码评审 PASS。合同固定命令 `76/76` PASS，`git diff --check`、server `tsc --noEmit` 通过。
 - Review/Retrospective：Sprint Goal 在 backfill 内部编排范围达成，`5/5`、carryover `0`。返工为 DoR 1 次（3 项缺口加 mode 用词）和 QA 阻断 1 项（合并前修复），逸出缺陷 `0`。改进：触及共享解析器的合同须列出全部零修复调用方；文件型双连接并发验收默认用 worker 线程。`prompting-governance` 基线失败登记为 `R1-PROMPT03` Refinement（Not Ready）。下一 Story 未标 Ready。
+
+## 待开始 Sprint：R1-S3K 独立发行版发布指向与版本线
+
+- 状态：DoR 待执行。PO 于 2026-09-25 答复 R1-G02 全部开放问题（`R1-G02f` Done）。合同：[R1-S3K](./docs/plans/r1-s3k-sprint-commitment.md)、[R1-G02](./docs/plans/r1-g02-fork-desktop-identity-contract.md)，计划 `R1-G02a` 3 点加 `R1-G02b` 3 点，共 6 点，无 Stretch。
+- Sprint Goal：fork 公开发布只能使用 major ≥ 1 的版本线，tag 只推到 `fork` 且不与上游碰撞，已安装应用只从本发行版仓库检查更新；GA 前 fork 不产生任何公开 tag 或预发布。
+- Owner：一名发布工程师按 G02a→G02b 顺序独占 workflow、发布脚本、builder/stage 的 owner 默认值与静态审计器；根 PM/PO 独占计划、Wiki 与 beta 集成；独立 QA/QC 验收。
+- 非范围：不改应用名称、appId、数据目录或用户数据路径（G02c/d/e 仍在 Refinement）；不 bump 版本，不创建或推送 tag，不包装、签名、上传，不运行真实 Actions。UI 验收不适用。
 
 ## 强制敏捷门
 
