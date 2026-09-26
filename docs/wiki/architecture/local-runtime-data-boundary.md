@@ -76,7 +76,7 @@ Release 1 的桌面端、本机浏览器和开发服务器都只能监听回环�
 
 ## Source Documents
 
-- [项目 Release Roadmap](../../plans/project-release-roadmap.md)
-- [R1-01 单机运行与数据边界验收](../../plans/r1-01-local-runtime-data-boundary.md)
+- [独立发行版路线](../../fork/roadmap.md)
+- [独立发行版 Sprint 记录](../../fork/history.md)（R1-01，原验收记录见 Git 历史）
 - [作者与 Agent 的协作合同](../product/author-agent-collaboration.md)
 - [数据库 Schema 与迁移漂移](../debugging/database-migration-drift.md)

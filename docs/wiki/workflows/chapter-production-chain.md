@@ -197,11 +197,6 @@
 - `client/src/pages/novels/components/chapterEditor/chapterEditorSessionState.ts`
 - `server/src/services/novel/chapterEditor/ChapterEditorWorkspaceService.ts`
 
-### Source Documents
-
-- [S2-02 专业章节辅助区域按需展开](../../plans/s2-02-professional-chapter-assist-panels.md)
-- [Sprint 2 实施卡](../../plans/agent-collaboration-sprint-2.md)
-
 ## 示例
 
 推荐做法：

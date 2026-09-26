@@ -4,7 +4,7 @@
 
 世界样本与本书世界已经有结构化内容、同步、快照、深化问答和一致性检查，但这些入口尚未共享统一的内容版本、提交身份与恢复协议。部分旧入口只写扁平字段，部分归一化会过滤悬空引用，一致性检查也会替换旧观察。若直接在此基础上增加“AI 修正并采用”，容易覆盖作者刚保存的内容，或在响应丢失、刷新和服务重启后重复应用同一修改。
 
-本页记录已经签认的长期设计边界。它是后续 S3/S4 实施的约束；已接入的保存路径包括 `updateWorld`、`updateAxioms` 和手动结构保存，不能把这些路径理解为全量 maintenance schema、API、Prompt、worker 或 UI 已经上线。完整评审证据见 [S1-06 合同](../../plans/s1-06-world-maintenance-recovery-contract.md)。
+本页记录已经签认的长期设计边界。它是后续 S3/S4 实施的约束；已接入的保存路径包括 `updateWorld`、`updateAxioms` 和手动结构保存，不能把这些路径理解为全量 maintenance schema、API、Prompt、worker 或 UI 已经上线。完整评审证据已汇总进[独立发行版 Sprint 记录](../../fork/history.md)，原合同见 Git 历史。
 
 ## 决策
 
@@ -88,7 +88,7 @@ R1-S2G 的首批生产接线只覆盖 `WorldService.updateWorld` 的既有 HTTP/
 
 ### AI 结构补全的生成事实与费用边界
 
-手动结构 PUT 的 operation/receipt 只能证明内容提交，不能证明 AI 已调用或找回生成结果。当前 `POST /worlds/:id/structure/backfill` 仍是模型输出后直接更新 `World` 的旧路径，尚未接入以下合同；不能把隔离原型或通用模型 attempt 记录解释为生产幂等保证。后续生产接线须以 [S3-02b3s Spike 决策](../../plans/s3-02b3s-structure-backfill-idempotency-spike.md) 和独立实施卡验收。
+手动结构 PUT 的 operation/receipt 只能证明内容提交，不能证明 AI 已调用或找回生成结果。当前 `POST /worlds/:id/structure/backfill` 仍是模型输出后直接更新 `World` 的旧路径，尚未接入以下合同；不能把隔离原型或通用模型 attempt 记录解释为生产幂等保证。后续生产接线须以 S3-02b3s Spike 决策（见[独立发行版 Sprint 记录](../../fork/history.md)）和独立实施卡验收。
 
 一次 AI 补全意图由来源页生成稳定 `operationId`，请求身份绑定世界、基线 `contentRevision`、来源内容 digest、Prompt ID/版本、有效 provider/model 与生成策略版本；相同 operation 搭配不同意图必须在模型调用与世界写入前拒绝。只有持久化 claim 的唯一 owner 能在供应商调用前推进 `model_not_called → model_in_flight`。从进入 `model_in_flight` 起，进程重启、超时和 lease 到期都不能证明供应商未调用；未知结果进入 `model_unknown`，同一 operation 禁止自动再次发起付费调用。这里限制的是本系统对同一 operation 的发起次数，不承诺第三方 exactly-once 计费。
 
@@ -114,6 +114,8 @@ S3-02b3c1 的运行门面 `runBackfill` 按 operation 的持久状态决定 outc
 
 失败类别 `failureCategory` 是机器可读事实：只接受与结构化输出类别双向类型对齐的白名单加本地类别，不保存错误消息或原始输出；它与 `failed_terminal`/`model_unknown` 转换在同一条件更新内写入，已落定的行不被覆盖，重放和并发落败方都返回库中已存类别。面向新手的原因说明由来源页负责。
 
+提交后的派生结果（PO 已定，由 S3-02b3c2 实现）：快照只在 `committed` 路径上同步、best-effort 生成一份，receipt 记录其 id，重放可补缺但不产生第二份；RAG 不在请求内执行，只复用既有索引任务自动入队（同一 owner 已排队或运行时去重），由后台 worker 消费。快照或入队失败都不回滚 World 与 receipt，只在结果中标出待补；冲突、失败和结果不明的 operation 零快照、零入队。
+
 零修复解析失败归为 `malformed_json` 只在单次模式生效。其他零修复生产 Prompt 仍按原路径归为 `schema_mismatch`，因为策略循环只在 `prompt_json` 的 `schema_mismatch` 处提前停止；若对它们改判，每次调用会从 1 次升为 3 次。凡是改动共享解析分类，都须先列出全部零修复调用方。
 
 本机 SQLite runtime migration 是安全提交可运行的必要条件；PostgreSQL apply 属 Release gate，在发布组合验证时单独执行，不把发布环境尚未 apply 混同为本地提交合同失败。两套 schema 仍须保持可验证的一致性，且任何迁移演练都只使用隔离数据库。
@@ -130,6 +132,8 @@ commit 成功后内容已经保存；AI 复核和索引失败都不得回滚内�
 - `indexDebt`：资料索引未完成；独立恢复，不伪装成语义复核完成。
 
 每个可执行 run 使用 `leaseOwner + leaseEpoch + leaseExpiresAt` fencing。阶段推进、证据和终态写入必须匹配有效 lease；旧 worker 的晚到结果只能进入调用遥测，不能写 proposal、问题、验证结果或世界内容。
+
+proposal 自身的状态固定为：`proposal_drafting` → `proposal_ready`，之后只能走向 `rejected`（作者拒绝）、`stale`（依据的 revision 或评估已变化）或经 `accept` 进入 `commit_claimed`；CAS、保护或引用校验失败为 `conflicted`，事务成功为 `committed_pending_verification`，再进入上述复核状态；生成失败为 `proposal_failed`，保留输入，可用同一操作身份有界重试。除事务成功外，这些状态都是零内容写入。确定性的 schema、引用和保护校验必须在 commit 前完成；AI 一致性判断只属于 commit 后的复核，没有回滚权。拒绝提案、标记“不是问题”、保存刻意留白与复核通过是不同事件，不能互相冒充。
 
 恢复只续未完成工作：commit receipt 已存在时不再应用 patch，verification 只重跑缺失检查，索引只重试债务项。后台扫描不得越过作者等待、拒绝、冲突或过期 proposal。
 
@@ -175,8 +179,8 @@ UI 不自行判断 proposal 是否仍可提交，也不把本地 pending 当作�
 
 ## 相关模块与来源
 
-- [S1-06 完整合同与审阅记录](../../plans/s1-06-world-maintenance-recovery-contract.md)
-- [S3-02b1 世界编辑与公理保存 CAS 合同](../../plans/s3-02b1-world-edit-axiom-cas-contract.md)
+- [独立发行版 Sprint 记录](../../fork/history.md)（S1-06、S3-02 系列合同原文见 Git 历史）
+- [后续补全接线待办](../../fork/backlog.md)
 - [世界上下文门面](../architecture/world-context-gateway.md)
 - [Prompt Registry 与结构化输出](../prompts/prompt-registry-and-structured-output.md)
 - [运行记录产品边界](../product/task-center-role.md)

@@ -129,7 +129,3 @@
 
 - [模块边界与文档治理](./module-boundaries.md)
 - [项目协作规则](../../../AGENTS.md)
-- [S2-04a 模型选择来源与有效参数完成证据](../../plans/s2-04a-model-selection-provenance.md)
-- [S2-04b0 实际模型调用尝试证据合同](../../plans/s2-04b-model-attempt-evidence-contract.md)
-- [S2-04b1 通用 attempt store 完成证据](../../plans/s2-04b1-model-attempt-store.md)
-- [S2-04b4 首批身份归因与内部读投影合同](../../plans/s2-04b4-attribution-read-projection-contract.md)

@@ -53,9 +53,4 @@
 
 ## 来源文档
 
-- [S2-01a 完成证据](../../plans/s2-01a-single-book-application-facade.md)
-- [S2-01b 完成证据](../../plans/s2-01b-single-book-presentation.md)
-- [S2-03a0 单书展示事实与动作权威合同](../../plans/s2-03a-single-book-display-authority-contract.md)
-- [S2-03b 来源现场动作完成证据](../../plans/s2-03b-source-action-feedback.md)
-- [R1-S2A Sprint 承诺](../../plans/r1-s2a-sprint-commitment.md)
-- [Agent Sprint 2 实施卡](../../plans/agent-collaboration-sprint-2.md)
+- [独立发行版 Sprint 记录](../../fork/history.md)（S2-01a/b、S2-03a0、S2-03b，原合同见 Git 历史）

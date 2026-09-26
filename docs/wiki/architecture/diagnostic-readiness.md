@@ -93,7 +93,4 @@
 
 ## Source Documents
 
-- [S1-00 诊断共享接线与存储契约门](../../plans/s1-00-diagnostics-contract.md)
-- [S1-02a 完成证据](../../plans/s1-02a-diagnostic-readiness-backend.md)
-- [S1-02b 完成证据](../../plans/s1-02b-diagnostic-readiness-ui.md)
-- [Sprint 1 实施卡](../../plans/agent-collaboration-sprint-1.md)
+- [独立发行版 Sprint 记录](../../fork/history.md)（S1-00、S1-02a/b，原合同见 Git 历史）

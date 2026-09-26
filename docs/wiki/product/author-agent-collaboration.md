@@ -85,13 +85,9 @@ Release 2的协作作品以中心MySQL为权威事实源；不得通过复制SQL
 
 ## 相关模块与来源
 
-- [Sprint路线图](../../plans/agent-collaboration-sprints.md)
-- [Sprint 1实施卡](../../plans/agent-collaboration-sprint-1.md)
-- [真人多人协作实施卡](../../plans/human-collaboration-sprints.md)
-- [本地管理员与MFA实施卡](../../plans/local-auth-bootstrap-sprints.md)
-- [MySQL中央主库存储实施卡](../../plans/mysql-primary-storage-sprints.md)
-- [项目Release Roadmap](../../plans/project-release-roadmap.md)
-- [Agent敏捷开发规范](../workflows/agent-agile-delivery.md)
+- [独立发行版路线](../../fork/roadmap.md)（含 Release 2 多人协作、认证与 MySQL 的关键决定）
+- [独立发行版 Backlog](../../fork/backlog.md)
+- [Agent 分级交付流程](../workflows/agent-agile-delivery.md)
 - [新手优先原则](./beginner-first-novel-completion.md)
 - [简易创作权限](./simple-creation-mode.md)
 - [工作台状态合同](./workspace-status-expression.md)

@@ -18,7 +18,7 @@
   - Prompt 加载表保留两侧全部资产；同一资产版本冲突时，以该资产源文件中的 `version` 为准，并检查引用该键的测试，禁止出现重复键。
   - wiki 规则取并集，去掉重复表述。
   - 测试文件冲突时保留两侧用例，不删除任一侧断言。
-  - 桌面身份字段（`desktop/package.json` 的 version/productName、builder 的 appId/productName 与发布 owner/repo、更新配置 owner/repo、数据目录名）一律保留本发行版的值，不接受上游值；以 `r1-03-static-gate-audit.cjs --strict` 的 fork 身份 finding 不为 `BLOCKED` 作为合入 `beta` 的前提，见 [R1-G02 合同](../../plans/r1-g02-fork-desktop-identity-contract.md)。
+  - 桌面身份字段（`desktop/package.json` 的 version/productName、builder 的 appId/productName 与发布 owner/repo、更新配置 owner/repo、数据目录名）一律保留本发行版的值，不接受上游值；以 `r1-03-static-gate-audit.cjs --strict` 的 fork 身份 finding 不为 `BLOCKED` 作为合入 `beta` 的前提，取值见[独立发行版路线](../../fork/roadmap.md#桌面身份与版本线r1-g02)，发行版规则见 [AGENTS-fork](../../fork/AGENTS-fork.md)。
   - 发布与更新目标同属必须保留的本发行版值：四处 owner/repo 保持 `shown1985/AI-Novel-Writing-Assistant`，beta workflow 保持只验证、不上传，发布脚本默认 remote 保持 `fork`。同步验证清单要求 `--strict` 下 `FORK-VERSION-LINE` 不为 `BLOCKED`、`FORK-PUBLISH-TARGET` 为 `PASS`；上游 owner 出现在白名单以外、超出规定命中数，或非 `publish-release` job 获得写权限、发布步骤或令牌时，同步分支不能合入 `beta`，应保留本发行版值，而不是扩大白名单。
   - 合并后核对 `desktop/package.json` 的 `version` 与合并前完全相等。审计器的 `FORK-VERSION-LINE` 只会在 major 为 0 时报 `REVIEW`，同为 major ≥ 1 的上游版本覆盖不会被它发现，因此这一项必须在同步验证清单中逐次比对。
 - 迁移时间戳交错（上游新迁移早于本地已有迁移）时：

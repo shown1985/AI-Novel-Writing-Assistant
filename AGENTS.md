@@ -1,5 +1,7 @@
 # Safety Rules
 
+Fork 专属规则：见 docs/fork/AGENTS-fork.md；与本文件冲突时以 fork 规则为准。
+
 ## Data Protection (Highest Priority)
 
 - Never execute any destructive data operation without a verified backup first.
@@ -178,19 +180,6 @@ These areas have the highest priority for wiki accumulation:
 5. Creative Hub boundaries: what it can create, when it should hand off to auto-director, and when it should avoid becoming general chat.
 6. RAG and context assembly rules for worldbuilding, characters, chapters, style, and continuity.
 7. Beginner-first product decisions that reduce cognitive load and help users complete a full novel.
-
-## Agile Agent Development Rules (Highest Priority)
-
-- All feature, bug, architecture, migration, and release work must belong to the hierarchy `Roadmap -> Release -> Epic -> Sprint -> Story -> Task` defined in `docs/wiki/workflows/agent-agile-delivery.md`.
-- Before implementation, every Story must have a stable ID, Release assignment, user value, scope and non-scope, dependencies, acceptance criteria, owner/file boundaries, and the narrowest sufficient verification. Work that does not satisfy the Definition of Ready remains in refinement or a time-boxed Spike.
-- Implementation Stories must be at most 5 relative points. Larger work must be split into independently verifiable vertical Stories; a Spike is normally at most 3 points and produces a decision and evidence, not pretend production capability.
-- A Sprint is a 1-2 week or equivalent acceptance window with one Sprint Goal. Until two completed Sprints establish actual velocity, committed capacity must not exceed 25 points. Stretch work is not part of the commitment.
-- One Agent may have at most one Story in progress. Shared schemas, migrations, registries, shared types, route mounting, root task/roadmap files, README, release notes, and Wiki integration must have a single integration owner.
-- Scope discovered during a Sprint goes to the Backlog unless the PO/root integrator explicitly swaps it into the Sprint. Agents must not expand a Story by quietly editing its non-scope or by bundling adjacent cleanup.
-- Story state must follow `Backlog -> Refinement -> Ready -> In Progress -> In Review -> User Acceptance -> Done`, with explicit Blocked/Returned-to-Backlog handling. Partial implementation is not Done, and unfinished work is re-refined rather than automatically carried forward at its original estimate.
-- Definition of Done requires behavior-level acceptance evidence, proportional failure/retry/concurrency/recovery checks, documentation decisions, a scoped phase commit, and explicit UI acceptance status. Typecheck, build success, mocks, hidden buttons, or documentation alone cannot establish business Done.
-- Each Sprint ends with Review and Retrospective evidence: Sprint Goal result, committed/completed points, carryover and causes, escaped defects or rework, and at most 1-2 concrete process improvements.
-- `TASK.md` is the active Sprint board; `docs/plans/project-release-roadmap.md` owns Release order; detailed plan documents own Story contracts. Do not duplicate Story IDs or points across these layers.
 
 ## Agent Collaboration Rules
 
