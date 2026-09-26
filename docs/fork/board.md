@@ -26,6 +26,12 @@ Release 1 的硬化工作（R1-S3L 之后的 backfill、发布审计等）暂停
 
 无。等待试跑结果。
 
+试跑环境（2026-09-26 准备，尚未开始试跑）：
+
+- 数据使用桌面库副本 `server/tmp/desktop-copy/dev.db`（含世界“源质遗产”与模型配置，已用 runtime 迁移升级到 beta 结构；原桌面库未改动）。
+- 启动：`DATABASE_URL="file:$(pwd)/server/tmp/desktop-copy/dev.db" PORT=3000 pnpm dev`，访问 `http://127.0.0.1:5173`。
+- 开始前先在设置里确认当前模型可用（见 backlog TRIAL-02）。
+
 ## 相关文档
 
 - 路线与范围：[roadmap.md](./roadmap.md)
