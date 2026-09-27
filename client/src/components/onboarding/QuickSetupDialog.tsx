@@ -338,14 +338,14 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
                   )}
                   onClick={() => chooseProvider(provider)}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
+                  <div className="flex min-w-0 items-start justify-between gap-3">
+                    <div className="min-w-0">
                       <div className="font-semibold">{provider.name}</div>
                       <div className="mt-1 text-xs leading-5 text-muted-foreground">{providerDescription(provider)}</div>
                     </div>
                     {form.provider === provider.id
-                      ? <Badge>已选择</Badge>
-                      : provider.configured ? <Badge variant="outline">已有配置</Badge> : null}
+                      ? <Badge className="shrink-0 whitespace-nowrap">已选择</Badge>
+                      : provider.configured ? <Badge className="shrink-0 whitespace-nowrap" variant="outline">已有配置</Badge> : null}
                   </div>
                 <div className="mt-3 text-xs text-muted-foreground">推荐模型：{provider.currentModel || provider.defaultModel}</div>
               </button>
