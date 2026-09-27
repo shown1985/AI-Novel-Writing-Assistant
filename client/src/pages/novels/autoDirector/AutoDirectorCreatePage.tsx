@@ -8,12 +8,11 @@ import {
   type ReactNode,
 } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import type { UnifiedTaskDetail } from "@ai-novel/shared/types/task";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { flattenGenreTreeOptions, getGenreTree } from "@/api/genre";
 import { flattenStoryModeTreeOptions, getStoryModeTree } from "@/api/storyMode";
-import { bootstrapNovelWorkflow } from "@/api/novelWorkflow";
+import { getNovelWorkflowTaskDetail } from "@/api/novelWorkflow";
 import { setNovelCreationExperience } from "@/api/novel";
 import { queryKeys } from "@/api/queryKeys";
 import { getWorldList } from "@/api/world";
@@ -73,16 +72,6 @@ const TRANSFERABLE_BOOK_ANALYSIS_SECTIONS = [
   "market_highlights",
 ] as const;
 
-function buildAutoDirectorCreateLink(taskId?: string, marketBriefId?: string): string {
-  if (!taskId && !marketBriefId) {
-    return "/novels/auto-director";
-  }
-  const searchParams = new URLSearchParams();
-  if (taskId) searchParams.set("taskId", taskId);
-  if (marketBriefId) searchParams.set("marketBriefId", marketBriefId);
-  return `/novels/auto-director?${searchParams.toString()}`;
-}
-
 function completedThrough(stage: AutoDirectorCreateStageKey): Set<AutoDirectorCreateStageKey> {
   const index = STAGE_ORDER.indexOf(stage);
   return new Set(STAGE_ORDER.slice(0, Math.max(0, index + 1)));
@@ -138,13 +127,13 @@ function AutoDirectorCreatePage() {
     initialDraft?.basicForm ?? {},
   ));
   const [referenceStartOpen, setReferenceStartOpen] = useState(searchParams.get("start") === "reference");
-  const [restoredWorkflowTask, setRestoredWorkflowTask] = useState<UnifiedTaskDetail | null>(null);
   const [activeStage, setActiveStage] = useState<AutoDirectorCreateStageKey>(
     initialDraft?.activeStage ?? "idea",
   );
   const [completedStages, setCompletedStages] = useState<Set<AutoDirectorCreateStageKey>>(
     () => new Set(initialDraft?.completedStages ?? []),
   );
+  const [missingTaskDraftHydrationPending, setMissingTaskDraftHydrationPending] = useState(false);
   const restoreHandledRef = useRef<string | null>(null);
   const marketBriefFormAppliedRef = useRef<string | null>(null);
   const marketBriefIdeaAppliedRef = useRef<string | null>(null);
@@ -166,6 +155,13 @@ function AutoDirectorCreatePage() {
     queryKey: queryKeys.marketRadar.brief(marketBriefId || "none"),
     queryFn: () => getMarketCreativeBrief(marketBriefId),
     enabled: Boolean(marketBriefId),
+  });
+  const restoreWorkflowQuery = useQuery({
+    queryKey: queryKeys.tasks.detail("novel_workflow", normalizedTaskId || "none"),
+    queryFn: () => getNovelWorkflowTaskDetail(normalizedTaskId),
+    enabled: Boolean(normalizedTaskId) && !hasLegacyParams,
+    retry: false,
+    refetchOnMount: "always",
   });
   const referenceStyleProfileQuery = useQuery({
     queryKey: [
@@ -257,8 +253,17 @@ function AutoDirectorCreatePage() {
     if (!hasLegacyParams) {
       return;
     }
-    navigate(buildAutoDirectorCreateLink(normalizedTaskId, marketBriefId), { replace: true });
-  }, [hasLegacyParams, marketBriefId, navigate, normalizedTaskId]);
+    const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.delete("workflowTaskId");
+    nextSearchParams.delete("mode");
+    if (normalizedTaskId) {
+      nextSearchParams.set("taskId", normalizedTaskId);
+    } else {
+      nextSearchParams.delete("taskId");
+    }
+    const nextSearch = nextSearchParams.toString();
+    navigate(`/novels/auto-director${nextSearch ? `?${nextSearch}` : ""}`, { replace: true });
+  }, [hasLegacyParams, navigate, normalizedTaskId, searchParams]);
 
   const replaceTaskId = (taskId: string) => {
     const storage = getDraftStorage();
@@ -272,44 +277,10 @@ function AutoDirectorCreatePage() {
     navigate(`/novels/auto-director?${nextSearchParams.toString()}`, { replace: true });
   };
 
-  const restoreWorkflowMutation = useMutation({
-    mutationFn: () => bootstrapNovelWorkflow({
-      workflowTaskId: normalizedTaskId || undefined,
-      lane: "auto_director",
-    }),
-    onSuccess: (response) => {
-      const task = response.data ?? null;
-      setRestoredWorkflowTask(task);
-      if (!task) {
-        return;
-      }
-      const seedPayload = (task.meta.seedPayload ?? null) as { basicForm?: Partial<NovelBasicFormState> } | null;
-      if (seedPayload?.basicForm) {
-        setBasicForm((prev) => patchNovelBasicForm(prev, seedPayload.basicForm ?? {}));
-      }
-      if (task.id && task.id !== normalizedTaskId) {
-        replaceTaskId(task.id);
-      }
-      if (task.id && restoreHandledRef.current !== task.id) {
-        restoreHandledRef.current = task.id;
-        setCompletedStages(completedThrough("model_run"));
-        setActiveStage("candidates");
-      }
-    },
-    onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "恢复自动导演任务失败。");
-    },
-  });
-
-  useEffect(() => {
-    if (!normalizedTaskId || hasLegacyParams) {
-      if (!normalizedTaskId) {
-        setRestoredWorkflowTask(null);
-      }
-      return;
-    }
-    restoreWorkflowMutation.mutate();
-  }, [hasLegacyParams, normalizedTaskId]);
+  const restoreTask = restoreWorkflowQuery.isFetchedAfterMount
+    ? restoreWorkflowQuery.data?.data ?? null
+    : null;
+  const restoredWorkflowTask = restoreTask?.meta.lane === "auto_director" ? restoreTask : null;
 
   const controller = useAutoDirectorCreateController({
     marketBriefId,
@@ -325,6 +296,91 @@ function AutoDirectorCreatePage() {
     onBasicFormChange: (patch) => setBasicForm((prev) => patchNovelBasicForm(prev, patch)),
   });
   useEffect(() => {
+    if (!normalizedTaskId || hasLegacyParams) {
+      return;
+    }
+    if (restoreWorkflowQuery.isError && restoreHandledRef.current !== `error:${normalizedTaskId}`) {
+      restoreHandledRef.current = `error:${normalizedTaskId}`;
+      toast.error(restoreWorkflowQuery.error instanceof Error
+        ? restoreWorkflowQuery.error.message
+        : "读取自动导演任务失败，请稍后重试。");
+      return;
+    }
+    if (!restoreWorkflowQuery.isFetchedAfterMount || restoreWorkflowQuery.isFetching) {
+      return;
+    }
+
+    if (restoreTask) {
+      if (restoreTask.meta.lane !== "auto_director") {
+        if (restoreHandledRef.current !== `lane:${restoreTask.id}`) {
+          restoreHandledRef.current = `lane:${restoreTask.id}`;
+          toast.error("这条任务不属于自动导演开书流程。");
+        }
+        return;
+      }
+      if (restoreHandledRef.current === restoreTask.id) {
+        return;
+      }
+      restoreHandledRef.current = restoreTask.id;
+      const storage = getDraftStorage();
+      if (storage) {
+        clearAutoDirectorCreateDraft(storage, draftScopeKey);
+      }
+      const seedPayload = (restoreTask.meta.seedPayload ?? null) as { basicForm?: Partial<NovelBasicFormState> } | null;
+      if (seedPayload?.basicForm) {
+        setBasicForm((prev) => patchNovelBasicForm(prev, seedPayload.basicForm ?? {}));
+      }
+      setCompletedStages(completedThrough("model_run"));
+      setActiveStage("candidates");
+      return;
+    }
+
+    if (restoreHandledRef.current === `missing:${normalizedTaskId}`) {
+      return;
+    }
+    restoreHandledRef.current = `missing:${normalizedTaskId}`;
+    setMissingTaskDraftHydrationPending(true);
+    const storage = getDraftStorage();
+    const draft = storage ? loadAutoDirectorCreateDraft(storage, draftScopeKey) : null;
+    if (draft) {
+      setBasicForm((current) => patchNovelBasicForm(current, draft.basicForm ?? {}));
+      setCompletedStages(new Set(draft.completedStages ?? []));
+      setActiveStage(draft.activeStage ?? "idea");
+      controller.setIdea(draft.idea);
+      controller.setRunMode(draft.runMode);
+      controller.setWorldSetupMode(draft.worldSetupMode);
+      controller.setSelectedStyleProfileId(initialStyleProfileId || draft.selectedStyleProfileId);
+    }
+    toast.info("找不到这条自动导演任务。你可以从这里重新开始，系统会自动恢复你的开书草稿。");
+    const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.delete("taskId");
+    nextSearchParams.delete("workflowTaskId");
+    const nextSearch = nextSearchParams.toString();
+    navigate(`/novels/auto-director${nextSearch ? `?${nextSearch}` : ""}`, { replace: true });
+  }, [
+    controller.setIdea,
+    controller.setRunMode,
+    controller.setSelectedStyleProfileId,
+    controller.setWorldSetupMode,
+    draftScopeKey,
+    hasLegacyParams,
+    initialStyleProfileId,
+    navigate,
+    normalizedTaskId,
+    restoreTask,
+    restoreWorkflowQuery.error,
+    restoreWorkflowQuery.isError,
+    restoreWorkflowQuery.isFetchedAfterMount,
+    restoreWorkflowQuery.isFetching,
+    searchParams,
+  ]);
+  useEffect(() => {
+    if (!missingTaskDraftHydrationPending || normalizedTaskId || controller.workflowTaskId) {
+      return;
+    }
+    setMissingTaskDraftHydrationPending(false);
+  }, [controller.workflowTaskId, missingTaskDraftHydrationPending, normalizedTaskId]);
+  useEffect(() => {
     const seed = marketBriefQuery.data?.data?.creativeSeed;
     if (!marketBriefId || !seed || marketBriefIdeaAppliedRef.current === marketBriefId) {
       return;
@@ -337,8 +393,13 @@ function AutoDirectorCreatePage() {
     if (!storage) {
       return;
     }
-    if (normalizedTaskId || controller.workflowTaskId) {
-      clearAutoDirectorCreateDraft(storage, draftScopeKey);
+    if (missingTaskDraftHydrationPending || controller.workflowTaskId) {
+      return;
+    }
+    if (normalizedTaskId) {
+      if (restoredWorkflowTask?.id === normalizedTaskId) {
+        clearAutoDirectorCreateDraft(storage, draftScopeKey);
+      }
       return;
     }
     saveAutoDirectorCreateDraft(storage, draftScopeKey, {
@@ -360,7 +421,9 @@ function AutoDirectorCreatePage() {
     controller.workflowTaskId,
     controller.worldSetupMode,
     draftScopeKey,
+    missingTaskDraftHydrationPending,
     normalizedTaskId,
+    restoredWorkflowTask?.id,
   ]);
   const createdNovelId = controller.directorTask?.resumeTarget?.novelId?.trim() ?? "";
   const enterSimpleMutation = useMutation({
@@ -640,7 +703,7 @@ function AutoDirectorCreatePage() {
         </div>
       ) : null}
 
-      {restoreWorkflowMutation.isPending && normalizedTaskId ? (
+      {restoreWorkflowQuery.isPending && normalizedTaskId ? (
         <div className="rounded-lg bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
           正在恢复自动导演现场。
         </div>

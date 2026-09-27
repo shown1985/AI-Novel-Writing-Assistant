@@ -96,6 +96,27 @@ router.post("/bootstrap", validate({ body: bootstrapSchema }), async (req, res, 
   }
 });
 
+router.get("/:id", validate({ params: continueParamsSchema }), async (req, res, next) => {
+  try {
+    const { id } = req.params as z.infer<typeof continueParamsSchema>;
+    const data = await workflowAdapter.detail(id, { heal: false });
+    if (!data) {
+      res.status(404).json({
+        success: false,
+        error: "Workflow task not found.",
+      } satisfies ApiResponse<null>);
+      return;
+    }
+    res.status(200).json({
+      success: true,
+      data,
+      message: "Workflow task loaded.",
+    } satisfies ApiResponse<typeof data>);
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get("/novels/:novelId/auto-director", validate({ params: novelParamsSchema }), async (req, res, next) => {
   try {
     const { novelId } = req.params as z.infer<typeof novelParamsSchema>;

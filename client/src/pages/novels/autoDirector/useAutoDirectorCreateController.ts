@@ -18,7 +18,7 @@ import {
   type DirectorRunMode,
   type DirectorWorldSetupMode,
 } from "@ai-novel/shared/types/novelDirector";
-import { bootstrapNovelWorkflow, continueNovelWorkflow } from "@/api/novelWorkflow";
+import { bootstrapNovelWorkflow, continueNovelWorkflow, getNovelWorkflowTaskDetail } from "@/api/novelWorkflow";
 import {
   composeDirectorIdeaConstellation,
   confirmDirectorCandidate,
@@ -28,7 +28,6 @@ import {
 import { queryKeys } from "@/api/queryKeys";
 import { getStyleProfiles } from "@/api/styleEngine";
 import { getAutoDirectorIssuePolicy } from "@/api/settings";
-import { getTaskDetail } from "@/api/tasks";
 import { toast } from "@/components/ui/toast";
 import { isChapterTitleDiversitySummary } from "@/lib/directorTaskNotice";
 import { useLLMStore } from "@/store/llmStore";
@@ -150,10 +149,11 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
   }, [issuePolicyQuery.data?.data]);
 
   useEffect(() => {
-    if (!workflowTaskIdProp || workflowTaskIdProp === workflowTaskId) {
+    const nextWorkflowTaskId = workflowTaskIdProp ?? "";
+    if (nextWorkflowTaskId === workflowTaskId) {
       return;
     }
-    setWorkflowTaskId(workflowTaskIdProp);
+    setWorkflowTaskId(nextWorkflowTaskId);
   }, [workflowTaskId, workflowTaskIdProp]);
 
   useEffect(() => {
@@ -163,7 +163,7 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
   }, [initialStyleProfileId]);
 
   useEffect(() => {
-    if (!restoredTask) {
+    if (!restoredTask || restoredTask.meta.lane !== "auto_director") {
       return;
     }
     const seedPayload = extractDirectorTaskSeedPayloadFromMeta(restoredTask.meta);
@@ -294,9 +294,10 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
 
   const directorTaskQuery = useQuery({
     queryKey: queryKeys.tasks.detail("novel_workflow", workflowTaskId || "none"),
-    queryFn: () => getTaskDetail("novel_workflow", workflowTaskId),
+    queryFn: () => getNovelWorkflowTaskDetail(workflowTaskId),
     enabled: Boolean(workflowTaskId),
     retry: false,
+    refetchOnMount: "always",
     refetchInterval: (query) => {
       const task = query.state.data?.data;
       return task && ACTIVE_DIRECTOR_TASK_STATUSES.has(task.status) ? 2000 : false;
@@ -306,12 +307,16 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
   const latestBatch = batches.at(-1) ?? null;
   const requestIdea = idea.trim() || resolveIdeaFromCandidateBatches(batches);
   const directorTask = useMemo(() => {
-    const loadedTask = directorTaskQuery.data?.data ?? null;
-    if (loadedTask) {
+    const loadedTask = directorTaskQuery.isFetchedAfterMount
+      ? directorTaskQuery.data?.data ?? null
+      : null;
+    if (loadedTask?.meta.lane === "auto_director") {
       return loadedTask;
     }
-    return restoredTask?.id === workflowTaskId ? restoredTask : null;
-  }, [directorTaskQuery.data?.data, restoredTask, workflowTaskId]);
+    return restoredTask?.meta.lane === "auto_director" && restoredTask.id === workflowTaskId
+      ? restoredTask
+      : null;
+  }, [directorTaskQuery.data?.data, directorTaskQuery.isFetchedAfterMount, restoredTask, workflowTaskId]);
 
   useEffect(() => {
     const seedPayload = extractDirectorTaskSeedPayloadFromMeta(directorTask?.meta);
