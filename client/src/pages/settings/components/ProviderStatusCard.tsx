@@ -93,7 +93,10 @@ export default function ProviderStatusCard(props: {
         </div>
         <Badge
           variant={canUseProvider ? "default" : "outline"}
-          className={canUseProvider ? "bg-emerald-600 text-white hover:bg-emerald-600" : ""}
+          className={cn(
+            "shrink-0 whitespace-nowrap",
+            canUseProvider ? "bg-emerald-600 text-white hover:bg-emerald-600" : "",
+          )}
         >
           {canUseProvider ? "可用" : provider.isConfigured ? "已配置" : "未配置"}
         </Badge>
