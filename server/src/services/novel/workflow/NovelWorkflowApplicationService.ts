@@ -33,7 +33,8 @@ export class NovelWorkflowApplicationService {
 
   async bootstrapTask(input: BootstrapWorkflowInput) {
     if (input.workflowTaskId?.trim()) {
-      const existing = await this.workflow.getTaskById(input.workflowTaskId.trim());
+      const taskId = input.workflowTaskId.trim();
+      const existing = await this.workflow.getTaskById(taskId);
       if (existing) {
         if (existing.lane !== input.lane) {
           throw new AppError("Workflow task lane mismatch.", 409, {
@@ -69,6 +70,7 @@ export class NovelWorkflowApplicationService {
         }
         return existing;
       }
+      throw new AppError("Workflow task not found.", 404);
     }
 
     if (input.novelId?.trim() && input.forceNew !== true) {

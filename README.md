@@ -166,6 +166,7 @@ Open-source AI novel writing assistant and long-form production studio.
 #### 修复
 
 - 模型厂商状态标签保持完整显示，避免“已配置”在窄屏布局中断行。
+- 自动导演开书会先读取原任务；找不到时回到开书入口并保留本地草稿和开书来源参数，失效任务链接不会产生空白运行记录。
 
 完整历史更新见 [docs/releases/release-notes.md](./docs/releases/release-notes.md)。
 
