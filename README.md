@@ -171,6 +171,10 @@ Open-source AI novel writing assistant and long-form production studio.
 
 - 对某个方向不满意时，可写下想调整的地方并单独换一个；生成期间只在该方向显示进度，其余方向会保留。确认后，短篇会按最终选中的方向展开创作。
 
+#### 修复
+
+- 在创作工作室生成或调整创作方向时，AI 实况会随操作打开，方便查看生成进度。
+
 完整历史更新见 [docs/releases/release-notes.md](./docs/releases/release-notes.md)。
 
 ## 功能预览

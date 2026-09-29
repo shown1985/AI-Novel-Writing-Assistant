@@ -19,6 +19,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
+import { openLiveExecution } from "@/components/liveExecution/liveExecutionControl";
 import { cn } from "@/lib/utils";
 
 function normalizeTarget(form: NarrativeForm, value: number): number {
@@ -247,7 +248,10 @@ export default function CreationStudioPage() {
               <Button
                 size="lg"
                 className="h-11 rounded-full px-6 shadow-none"
-                onClick={() => interpretMutation.mutate()}
+                onClick={() => {
+                  openLiveExecution();
+                  interpretMutation.mutate();
+                }}
                 disabled={!idea.trim() || interpretMutation.isPending}
               >
                 {interpretMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
@@ -302,7 +306,10 @@ export default function CreationStudioPage() {
               <p className="text-sm text-muted-foreground">作品规模或目标平台变了，先让 AI 重新适配方向。</p>
               <Button
                 variant="outline"
-                onClick={() => regenerateMutation.mutate()}
+                onClick={() => {
+                  openLiveExecution();
+                  regenerateMutation.mutate();
+                }}
                 disabled={regenerateMutation.isPending}
               >
                 <RefreshCw className={cn("mr-2 h-4 w-4", regenerateMutation.isPending && "animate-spin")} />
@@ -322,7 +329,10 @@ export default function CreationStudioPage() {
                 replacing={replacingDirectionId === direction.id}
                 replaceDisabled={replaceMutation.isPending}
                 feedbackClearRevision={feedbackClear.directionId === direction.id ? feedbackClear.revision : 0}
-                onReplace={(feedback) => replaceMutation.mutate({ directionId: direction.id, feedback })}
+                onReplace={(feedback) => {
+                  openLiveExecution();
+                  replaceMutation.mutate({ directionId: direction.id, feedback });
+                }}
               />
             ))}
           </div>
@@ -336,7 +346,10 @@ export default function CreationStudioPage() {
             </div>
             <Button
               size="lg"
-              onClick={() => confirmMutation.mutate()}
+              onClick={() => {
+                openLiveExecution();
+                confirmMutation.mutate();
+              }}
               disabled={!selectedDirection || scaleNeedsRefresh || confirmMutation.isPending || replaceMutation.isPending || regenerateMutation.isPending}
             >
               {confirmMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}

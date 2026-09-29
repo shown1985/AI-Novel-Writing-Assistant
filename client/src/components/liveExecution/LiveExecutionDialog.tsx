@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { LlmSourceSummary } from "@/components/common/LlmSourceSummary";
+import { subscribeToLiveExecutionOpen } from "./liveExecutionControl";
 
 function phaseLabel(phase: string): string {
   const labels: Record<string, string> = {
@@ -126,6 +127,12 @@ export default function LiveExecutionDialog(props: LiveExecutionDialogProps) {
     ? latestSession.preview.slice(-1200)
     : "等待模型开始返回内容…";
   const activeCount = sessions.filter((session) => isActive(session.phase)).length;
+
+  useEffect(() => subscribeToLiveExecutionOpen(() => {
+    followLatestRef.current = true;
+    setFollowingLatest(true);
+    setOpen(true);
+  }), []);
 
   useEffect(() => {
     if (!open || activeCount === 0) {
