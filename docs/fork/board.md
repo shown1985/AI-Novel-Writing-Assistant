@@ -34,7 +34,7 @@ Release 1 的硬化工作（R1-S3L 之后的 backfill、发布审计等）暂停
 - **最窄验证**：共享/服务端/客户端类型检查，创作工作室定向合同测试，独立 QA 检查失败、重试、并发与恢复；界面交互由 Owner 验收。
 - **文件边界**：`shared/types/creationStudio.ts`、创作意图 Prompt、创作工作室服务/API/页面及对应定向测试；稳定规则更新到创作工作室 Wiki。
 
-当前在 `codex/short-story-direction-options` 开发分支实现，完成验证后合入 `beta`。
+代码已合入 `beta`，独立 QA 与定向检查通过；界面交互留给 Owner 验收。
 
 试跑环境（2026-09-26 准备，尚未开始试跑）：
 
