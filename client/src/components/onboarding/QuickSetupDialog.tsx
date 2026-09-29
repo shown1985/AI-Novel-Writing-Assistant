@@ -214,6 +214,18 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
     configurationSucceeded: completeMutation.isSuccess,
     forceConfiguration: props.forceConfiguration === true,
   });
+  const showThinkingSettingsLink = props.forceConfiguration && props.status?.providers.some(
+    (provider) => provider.id === props.status?.selectedProvider && provider.configured,
+  );
+  const thinkingSettingsLink = showThinkingSettingsLink ? (
+    <Link
+      to="/settings/models"
+      className="inline-flex items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline"
+      onClick={() => props.onOpenChange(false)}
+    >
+      调整模型思考设置 <ArrowRight className="h-4 w-4" />
+    </Link>
+  ) : null;
 
   const submit = () => {
     setStep(3);
@@ -327,6 +339,7 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
                   : "先配置一个文本模型即可开始创作；需要时再选择其他厂商。"}
               </p>
             </div>
+            {thinkingSettingsLink}
             <div className="grid gap-3 sm:grid-cols-2">
               {providerChoices.map((provider) => (
                 <button
@@ -387,6 +400,7 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
                 <p className="mt-1 text-xs text-muted-foreground">厂商名称、API 地址和模型将保存为独立配置，不会覆盖已有内置厂商。</p>
               ) : null}
             </div>
+            {thinkingSettingsLink}
             {form.providerKind === "custom" ? (
               <label className="block space-y-1.5">
                 <span className="text-sm font-medium">厂商名称</span>
