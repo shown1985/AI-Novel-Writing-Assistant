@@ -28,7 +28,7 @@ export interface CreationIntentInterpretation {
   writingPlatformConfidence: number;
   writingPlatformReason: string;
   productionFoundation?: NovelCreateResourceRecommendation;
-  directions: [CreationDirection, CreationDirection];
+  directions: CreationDirection[];
 }
 
 export interface CreationStudioInterpretRequest {
@@ -36,6 +36,13 @@ export interface CreationStudioInterpretRequest {
   preferredNarrativeForm?: NarrativeForm;
   targetWordCount?: number;
   writingPlatformPreference?: WritingPlatformPreference;
+  directionCount?: 2 | 4 | 6;
+}
+
+export interface CreationStudioReplaceDirectionRequest {
+  directionId: string;
+  intentVersionId: string;
+  feedback?: string;
 }
 
 export interface CreationStudioRegenerateRequest {
@@ -43,10 +50,12 @@ export interface CreationStudioRegenerateRequest {
   targetWordCount: number;
   feedback?: string;
   writingPlatformPreference?: WritingPlatformPreference;
+  directionCount?: 2 | 4 | 6;
 }
 
 export interface CreationStudioConfirmRequest {
   directionId: string;
+  intentVersionId: string;
   narrativeForm: NarrativeForm;
   targetWordCount: number;
   idempotencyKey: string;
@@ -55,6 +64,7 @@ export interface CreationStudioConfirmRequest {
 
 export interface CreationStudioTaskProjection {
   taskId: string;
+  intentVersionId: string | null;
   status: "queued" | "running" | "waiting_approval" | "succeeded" | "failed" | "cancelled";
   progress: number;
   currentAction: string | null;

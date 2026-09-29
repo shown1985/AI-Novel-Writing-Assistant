@@ -3,6 +3,7 @@ import type {
   CreationStudioConfirmRequest,
   CreationStudioInterpretRequest,
   CreationStudioRegenerateRequest,
+  CreationStudioReplaceDirectionRequest,
   CreationStudioTaskProjection,
   DeriveLongFormResponse,
   ShortStoryProjection,
@@ -31,6 +32,13 @@ export async function regenerateCreationDirections(taskId: string, payload: Crea
   const { data } = await apiClient.post<ApiResponse<CreationStudioTaskProjection>>(
     `/creation-studio/${taskId}/regenerate`,
     payload,
+  );
+  return data;
+}
+
+export async function replaceCreationDirection(taskId: string, payload: CreationStudioReplaceDirectionRequest) {
+  const { data } = await apiClient.post<ApiResponse<CreationStudioTaskProjection>>(
+    `/creation-studio/${taskId}/replace-direction`, payload,
   );
   return data;
 }

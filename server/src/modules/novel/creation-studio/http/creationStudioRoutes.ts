@@ -22,15 +22,23 @@ const interpretSchema = z.object({
   preferredNarrativeForm: z.enum(["short_story", "long_novel"]).optional(),
   targetWordCount: z.number().int().min(3000).max(3_000_000).optional(),
   writingPlatformPreference: writingPlatformPreferenceSchema.optional(),
+  directionCount: z.union([z.literal(2), z.literal(4), z.literal(6)]).optional(),
 });
 const regenerateSchema = z.object({
   narrativeForm: z.enum(["short_story", "long_novel"]),
   targetWordCount: z.number().int().min(3000).max(3_000_000),
   feedback: z.string().trim().max(4000).optional(),
   writingPlatformPreference: writingPlatformPreferenceSchema.optional(),
+  directionCount: z.union([z.literal(2), z.literal(4), z.literal(6)]).optional(),
+});
+const replaceDirectionSchema = z.object({
+  directionId: z.string().trim().min(1).max(80),
+  intentVersionId: z.string().trim().min(1),
+  feedback: z.string().trim().max(4000).optional(),
 });
 const confirmSchema = z.object({
   directionId: z.string().trim().min(1).max(80),
+  intentVersionId: z.string().trim().min(1),
   narrativeForm: z.enum(["short_story", "long_novel"]),
   targetWordCount: z.number().int().min(3000).max(3_000_000),
   idempotencyKey: z.string().trim().min(8).max(160),
@@ -65,6 +73,13 @@ router.post("/:taskId/regenerate", validate({
   } catch (error) {
     next(error);
   }
+});
+
+router.post("/:taskId/replace-direction", validate({ params: taskParamsSchema, body: replaceDirectionSchema }), async (req, res, next) => {
+  try {
+    const data = await creationStudioService.replaceDirection(String(req.params.taskId), req.body);
+    res.json({ success: true, data } satisfies ApiResponse<CreationStudioTaskProjection>);
+  } catch (error) { next(error); }
 });
 
 router.post("/:taskId/confirm", validate({

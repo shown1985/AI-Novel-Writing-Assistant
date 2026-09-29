@@ -18,8 +18,12 @@ export const promptAssetLoaderEntries: PromptAssetLoaderEntry[] = [
     load: () => require("../prompts/novel/writingPlatformRecommendation.prompts").writingPlatformRecommendationPrompt as UnknownPromptAsset,
   },
   {
-    key: "creation.intent.interpret@v2",
+    key: "creation.intent.interpret@v3",
     load: () => require("../prompts/creation/creationIntent.prompts").creationIntentInterpretPrompt as UnknownPromptAsset,
+  },
+  {
+    key: "creation.direction.replace@v1",
+    load: () => require("../prompts/creation/creationIntent.prompts").creationDirectionReplacePrompt as UnknownPromptAsset,
   },
   {
     key: "novel.short_story.plan@v2",
