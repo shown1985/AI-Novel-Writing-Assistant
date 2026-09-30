@@ -33,6 +33,7 @@ import {
   shouldInitializeProviderSelection,
   shouldShowFirstNovelHandoff,
 } from "./creationSetupState";
+import CurrentModelReasoningSettings from "./CurrentModelReasoningSettings";
 
 interface QuickSetupDialogProps {
   open: boolean;
@@ -77,10 +78,12 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
   const [customModels, setCustomModels] = useState<string[]>([]);
   const [customModelsMessage, setCustomModelsMessage] = useState("");
   const [showAllProviderChoices, setShowAllProviderChoices] = useState(false);
+  const [showConnectionWizard, setShowConnectionWizard] = useState(false);
 
   useEffect(() => {
     if (props.open && props.forceConfiguration) {
       setStep(1);
+      setShowConnectionWizard(false);
     }
   }, [props.forceConfiguration, props.open]);
 
@@ -214,18 +217,15 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
     configurationSucceeded: completeMutation.isSuccess,
     forceConfiguration: props.forceConfiguration === true,
   });
-  const showThinkingSettingsLink = props.forceConfiguration && props.status?.providers.some(
-    (provider) => provider.id === props.status?.selectedProvider && provider.configured,
+  const currentProvider = llmStore.hasHydratedSelection && llmStore.provider
+    ? llmStore.provider : props.status?.selectedProvider ?? null;
+  const currentModel = llmStore.hasHydratedSelection && llmStore.model
+    ? llmStore.model : props.status?.selectedModel ?? null;
+  const showCurrentSettings = Boolean(
+    props.forceConfiguration
+    && !showConnectionWizard
+    && props.status?.providers.some((provider) => provider.id === currentProvider && provider.configured),
   );
-  const thinkingSettingsLink = showThinkingSettingsLink ? (
-    <Link
-      to="/settings/models"
-      className="inline-flex items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline"
-      onClick={() => props.onOpenChange(false)}
-    >
-      调整模型思考设置 <ArrowRight className="h-4 w-4" />
-    </Link>
-  ) : null;
 
   const submit = () => {
     setStep(3);
@@ -239,7 +239,7 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
     });
   };
 
-  const footer = props.loading || props.error || (props.status?.readyForCreation && !props.forceConfiguration)
+  const footer = props.loading || props.error || showCurrentSettings || (props.status?.readyForCreation && !props.forceConfiguration)
     ? null
     : step === 1
       ? (
@@ -280,12 +280,12 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <AppDialogContent
         className="max-w-3xl"
-        title="让 AI 创作环境先跑起来"
-        description="只配置一个文本模型，系统会自动准备规划、正文、审校和修复所需的任务路由。"
+        title={showCurrentSettings ? "模型设置" : "让 AI 创作环境先跑起来"}
+        description={showCurrentSettings ? "查看当前模型，调整这个模型连接的推理强度。" : "只配置一个文本模型，系统会自动准备规划、正文、审校和修复所需的任务路由。"}
         footer={footer}
         footerClassName="gap-2"
       >
-        <div className="mb-6 grid grid-cols-3 gap-2">
+        {!showCurrentSettings ? <div className="mb-6 grid grid-cols-3 gap-2">
           {[
             { index: 1, label: "选择厂商" },
             { index: 2, label: "连接模型" },
@@ -303,7 +303,7 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
               </div>
             </div>
           ))}
-        </div>
+        </div> : null}
 
         {props.loading ? (
           <div className="flex min-h-56 items-center justify-center text-sm text-muted-foreground">
@@ -318,6 +318,13 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
             </div>
             <Button variant="outline" onClick={props.onRetry}>重新加载</Button>
           </div>
+        ) : showCurrentSettings ? (
+          <CurrentModelReasoningSettings
+            key={currentProvider}
+            provider={currentProvider}
+            selectedModel={currentModel}
+            onReconfigure={() => { setStep(1); setShowConnectionWizard(true); }}
+          />
         ) : props.status?.readyForCreation && !props.forceConfiguration && !completeMutation.isSuccess ? (
           <div className="flex min-h-56 flex-col items-center justify-center gap-4 text-center">
             <CheckCircle2 className="h-10 w-10 text-emerald-600" />
@@ -339,7 +346,6 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
                   : "先配置一个文本模型即可开始创作；需要时再选择其他厂商。"}
               </p>
             </div>
-            {thinkingSettingsLink}
             <div className="grid gap-3 sm:grid-cols-2">
               {providerChoices.map((provider) => (
                 <button
@@ -400,7 +406,6 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
                 <p className="mt-1 text-xs text-muted-foreground">厂商名称、API 地址和模型将保存为独立配置，不会覆盖已有内置厂商。</p>
               ) : null}
             </div>
-            {thinkingSettingsLink}
             {form.providerKind === "custom" ? (
               <label className="block space-y-1.5">
                 <span className="text-sm font-medium">厂商名称</span>

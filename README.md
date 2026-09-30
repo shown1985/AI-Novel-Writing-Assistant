@@ -165,7 +165,7 @@ Open-source AI novel writing assistant and long-form production studio.
 
 #### 优化
 
-- 从顶部“模型设置”可进入模型与厂商页面，调整支持该功能的模型的思考深度。
+- 顶部“模型设置”可直接用滑块调整推理强度，支持低、高、最大档位或思考开关；松开后自动保存，用于后续创作。
 
 #### 修复
 
