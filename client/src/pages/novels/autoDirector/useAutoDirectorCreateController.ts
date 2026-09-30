@@ -198,6 +198,19 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
     }),
     [basicForm],
   );
+  const currentWorldIdRef = useRef(directorBasicForm.worldId);
+  const worldGenerationRef = useRef(0);
+  const previousWorldIdRef = useRef(directorBasicForm.worldId);
+  if (currentWorldIdRef.current !== directorBasicForm.worldId) {
+    currentWorldIdRef.current = directorBasicForm.worldId;
+    worldGenerationRef.current += 1;
+  }
+  useEffect(() => {
+    if (previousWorldIdRef.current === directorBasicForm.worldId) return;
+    previousWorldIdRef.current = directorBasicForm.worldId;
+    setIdeaInspirations([]);
+    setIdeaConstellationOptions([]);
+  }, [directorBasicForm.worldId]);
 
   useEffect(() => {
     if (idea.trim()) {
@@ -263,8 +276,9 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
   };
 
   const ideaInspirationMutation = useMutation({
-    mutationFn: () => generateDirectorIdeaInspirations(buildIdeaContextPayload()),
-    onSuccess: (response) => {
+    mutationFn: ({ payload }: { generation: number; payload: ReturnType<typeof buildIdeaContextPayload> }) => generateDirectorIdeaInspirations(payload),
+    onSuccess: (response, variables) => {
+      if (variables.generation !== worldGenerationRef.current) return;
       setIdeaInspirations(response.data?.ideas ?? []);
     },
     onError: (error) => {
@@ -273,8 +287,9 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
   });
 
   const ideaConstellationOptionsMutation = useMutation({
-    mutationFn: () => generateDirectorIdeaConstellationOptions(buildIdeaContextPayload()),
-    onSuccess: (response) => {
+    mutationFn: ({ payload }: { generation: number; payload: ReturnType<typeof buildIdeaContextPayload> }) => generateDirectorIdeaConstellationOptions(payload),
+    onSuccess: (response, variables) => {
+      if (variables.generation !== worldGenerationRef.current) return;
       setIdeaConstellationOptions(response.data?.options ?? []);
     },
     onError: (error) => {
@@ -681,13 +696,15 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
     setIdea,
     ideaInspirations,
     isGeneratingIdeaInspirations: ideaInspirationMutation.isPending,
-    generateIdeaInspirations: () => ideaInspirationMutation.mutate(),
+    generateIdeaInspirations: () => ideaInspirationMutation.mutate({ generation: worldGenerationRef.current, payload: buildIdeaContextPayload() }),
     ideaConstellationOptions,
     isGeneratingIdeaConstellationOptions: ideaConstellationOptionsMutation.isPending,
-    generateIdeaConstellationOptions: () => ideaConstellationOptionsMutation.mutate(),
+    generateIdeaConstellationOptions: () => ideaConstellationOptionsMutation.mutate({ generation: worldGenerationRef.current, payload: buildIdeaContextPayload() }),
     isComposingIdeaConstellation: ideaConstellationComposeMutation.isPending,
     composeIdeaConstellation: async (selectedOptions: DirectorIdeaConstellationSelection[]) => {
+      const requestedGeneration = worldGenerationRef.current;
       const response = await ideaConstellationComposeMutation.mutateAsync(selectedOptions);
+      if (requestedGeneration !== worldGenerationRef.current) return "";
       return response.data?.idea ?? "";
     },
     runMode,

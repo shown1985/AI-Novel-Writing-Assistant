@@ -189,12 +189,12 @@ test("idea inspirations bound creative sampling and retry with the original cont
   assert.match(service, /Math\.min\(0\.8, Math\.max\(0\.55/);
   assert.match(service, /maxTokens: IDEA_INSPIRATION_MAX_TOKENS/);
   assert.match(context, /error instanceof StructuredOutputError && error\.category !== "transport_error"/);
-  assert.match(service, /runIdeaInspirationPrompt\(input, IDEA_INSPIRATION_RETRY_TEMPERATURE\)/);
-  assert.match(prompt, /version: "v3"/);
+  assert.match(service, /runIdeaInspirationPrompt\(input, IDEA_INSPIRATION_RETRY_TEMPERATURE, contextSummary\)/);
+  assert.match(prompt, /version: "v4"/);
   assert.match(prompt, /maxAttempts: 0/);
   assert.match(prompt, /structuredOutputHint/);
   assert.match(schema, /z\.enum\(directorIdeaInspirationAngles\)/);
-  assert.match(loaders, /novel\.director\.idea_inspiration@v3/);
+  assert.match(loaders, /novel\.director\.idea_inspiration@v4/);
 });
 
 test("idea constellation generates seven concrete web-novel material categories through AI", () => {
@@ -216,12 +216,12 @@ test("idea constellation generates seven concrete web-novel material categories 
   assert.match(route, /categories\.size !== input\.selectedOptions\.length/);
   assert.match(prompt, /advantage 金手指或核心优势/);
   assert.match(prompt, /严禁输出“所有人活在谎言里/);
-  assert.match(service, /buildDirectorIdeaContextSummary/);
+  assert.match(service, /resolveDirectorIdeaContext/);
   assert.match(service, /CONSTELLATION_OPTIONS_MAX_TOKENS = 5_000/);
   assert.match(service, /CONSTELLATION_RETRY_TEMPERATURE/);
-  assert.match(loaders, /novel\.director\.idea_constellation_options@v3/);
-  assert.match(loaders, /novel\.director\.idea_constellation_compose@v2/);
-  assert.match(controller, /generateDirectorIdeaConstellationOptions\(buildIdeaContextPayload\(\)\)/);
+  assert.match(loaders, /novel\.director\.idea_constellation_options@v4/);
+  assert.match(loaders, /novel\.director\.idea_constellation_compose@v3/);
+  assert.match(controller, /generateDirectorIdeaConstellationOptions\(payload\)/);
   assert.doesNotMatch(controller, /buildStaticIdeaConstellationOptions/);
   assert.match(dialog, /const plotOptions = orderedOptions/);
   assert.match(dialog, /selected\.length}\/7 类开书素材/);

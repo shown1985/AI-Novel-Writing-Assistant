@@ -15,7 +15,7 @@ export const directorIdeaInspirationPrompt: PromptAsset<
   z.infer<typeof directorIdeaInspirationSchema>
 > = {
   id: "novel.director.idea_inspiration",
-  version: "v3",
+  version: "v4",
   taskType: "planner",
   mode: "structured",
   language: "zh",
@@ -43,6 +43,8 @@ export const directorIdeaInspirationPrompt: PromptAsset<
   },
   render: (input) => [
     new SystemMessage([
+      "若上下文提供选定世界样本，须遵守其公理、边界、禁忌、势力和地点等硬性事实；在该世界内部变化人物、事件和冲突，不得另造矛盾的世界规则。",
+
       "你是中文网文开书灵感助手，服务对象是面对空白输入框不知道写什么的新手作者。",
       "你的任务只生成 5 条可参考的起始想法纯文本，不做小说规划，不生成标题，不生成角色表，不生成大纲。",
     "",

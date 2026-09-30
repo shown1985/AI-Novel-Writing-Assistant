@@ -6,6 +6,7 @@ import type {
 } from "@ai-novel/shared/types/novelDirector";
 import type { NovelResourceRecommendationSource } from "@ai-novel/shared/types/novelResourceRecommendation";
 import { motion, useReducedMotion } from "framer-motion";
+import { Link } from "react-router-dom";
 import { ArrowRight, Layers3, Route, Sparkles, X } from "lucide-react";
 import { flattenGenreTreeOptions, type GenreTreeNode } from "@/api/genre";
 import { flattenStoryModeTreeOptions, type StoryModeTreeNode } from "@/api/storyMode";
@@ -18,6 +19,13 @@ import StoryConstellationDialog from "./ideaConstellation/StoryConstellationDial
 import type { FoundationConstellationOption } from "./ideaConstellation/ideaConstellationState";
 
 interface StageIdeaProps {
+  selectedWorld: { id: string; name: string } | null;
+  selectedWorldId: string;
+  worldSelectionLoading: boolean;
+  worldSelectionUnavailable: boolean;
+  onRetryWorlds: () => void;
+  onClearWorld: () => void;
+  onChangeWorld: () => void;
   idea: string;
   onIdeaChange: (value: string) => void;
   ideaInspirations: DirectorIdeaInspiration[];
@@ -79,6 +87,13 @@ function buildFoundationCloudOptions(
 }
 
 export default function StageIdea({
+  selectedWorld,
+  selectedWorldId,
+  worldSelectionLoading,
+  worldSelectionUnavailable,
+  onRetryWorlds,
+  onClearWorld,
+  onChangeWorld,
   idea,
   onIdeaChange,
   ideaInspirations,
@@ -175,11 +190,13 @@ export default function StageIdea({
   };
 
   const useConstellationIdea = (text: string) => {
+    if (!text.trim()) return;
     fillIdea(text);
     window.requestAnimationFrame(() => textareaRef.current?.focus());
   };
 
   const handleOpenConstellation = () => {
+    if (worldSelectionLoading || worldSelectionUnavailable) return;
     setConstellationDialogOpen(true);
     if (ideaConstellationOptions.length === 0 && !isGeneratingIdeaConstellationOptions) {
       onGenerateIdeaConstellationOptions();
@@ -187,6 +204,7 @@ export default function StageIdea({
   };
 
   const handleShowInspirations = () => {
+    if (worldSelectionLoading || worldSelectionUnavailable) return;
     setShowInspirations(true);
     if (ideaInspirations.length === 0 && !isGeneratingIdeaInspirations) {
       onGenerateIdeaInspirations();
@@ -208,6 +226,28 @@ export default function StageIdea({
           写下你想看的故事，AI 会先帮你整理成可选择的整本书方向。
         </p>
       </motion.div>
+
+      {selectedWorldId ? (
+        <div className={`mt-6 w-full rounded-xl px-4 py-3 text-sm ${worldSelectionUnavailable ? "bg-destructive/5 text-destructive" : "bg-primary/5"}`}>
+          {worldSelectionLoading ? (
+            <p>正在读取所选世界，稍后即可让 AI 提供想法。</p>
+          ) : worldSelectionUnavailable ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <span>所选世界暂时无法读取。请重试或清除选择后继续。</span>
+              <Button type="button" size="sm" variant="outline" onClick={onRetryWorlds}>重新读取</Button>
+              <Button type="button" size="sm" variant="ghost" onClick={onClearWorld}>清除选择</Button>
+              <Button asChild size="sm" variant="ghost"><Link to="/worlds">选择其他世界</Link></Button>
+            </div>
+          ) : selectedWorld ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <span>创作世界：<strong className="font-semibold">{selectedWorld.name}</strong></span>
+              <Button asChild size="sm" variant="ghost"><Link to={`/worlds/${encodeURIComponent(selectedWorld.id)}/workspace`}>查看世界手册</Link></Button>
+              <Button type="button" size="sm" variant="ghost" onClick={onClearWorld}>清除选择</Button>
+              <Button type="button" size="sm" variant="ghost" onClick={onChangeWorld}>更换世界</Button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="mt-6 w-full">
         <OnboardingTip
@@ -306,19 +346,21 @@ export default function StageIdea({
               size="sm"
               variant="outline"
               onClick={handleOpenConstellation}
-              disabled={isGenerating || isComposingIdeaConstellation}
+              disabled={isGenerating || isComposingIdeaConstellation || worldSelectionLoading || worldSelectionUnavailable}
             >
               <Sparkles className="h-4 w-4" />
               打开故事星图
             </Button>
-            <button
+            {selectedWorldId && !worldSelectionUnavailable ? <Button type="button" size="sm" onClick={handleShowInspirations} disabled={isGeneratingIdeaInspirations || worldSelectionLoading}>
+              {isGeneratingIdeaInspirations ? "正在准备几个想法..." : "基于这个世界给我几个想法"}
+            </Button> : <button
               type="button"
               className="text-sm text-muted-foreground transition hover:text-foreground disabled:opacity-50"
               onClick={handleShowInspirations}
-              disabled={isGeneratingIdeaInspirations}
+              disabled={isGeneratingIdeaInspirations || worldSelectionLoading || worldSelectionUnavailable}
             >
               {isGeneratingIdeaInspirations ? "正在准备几个想法..." : "直接给我几个想法"}
-            </button>
+            </button>}
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <button

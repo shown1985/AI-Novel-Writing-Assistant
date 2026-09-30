@@ -50,6 +50,7 @@ import {
   buildAutoDirectorCreateDraftScope,
   clearAutoDirectorCreateDraft,
   loadAutoDirectorCreateDraft,
+  resolveInitialWorldId,
   saveAutoDirectorCreateDraft,
 } from "./draft/autoDirectorCreateDraft";
 import { useAutoDirectorCreateController } from "./useAutoDirectorCreateController";
@@ -85,7 +86,7 @@ function getDraftStorage(): Storage | null {
   }
 }
 
-function AutoDirectorCreatePage() {
+function AutoDirectorCreatePageContent() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const reducedMotion = useReducedMotion();
@@ -102,8 +103,10 @@ function AutoDirectorCreatePage() {
   const referenceDocumentId = searchParams.get("sourceDocumentId")?.trim() ?? "";
   const referenceTitle = searchParams.get("referenceTitle")?.trim() ?? "";
   const initialStyleProfileId = searchParams.get("styleProfileId")?.trim() ?? "";
+  const sourceWorldId = searchParams.get("worldId")?.trim() ?? "";
   const hasLegacyParams = Boolean(legacyTaskIdFromQuery || searchParams.get("mode"));
   const draftScopeKey = useMemo(() => buildAutoDirectorCreateDraftScope({
+    sourceWorldId,
     marketBriefId,
     referenceMode,
     referenceBookAnalysisId,
@@ -115,6 +118,7 @@ function AutoDirectorCreatePage() {
     referenceBookAnalysisId,
     referenceDocumentId,
     referenceMode,
+    sourceWorldId,
   ]);
   const initialDraft = useMemo(() => {
     const storage = getDraftStorage();
@@ -124,7 +128,10 @@ function AutoDirectorCreatePage() {
   }, [draftScopeKey, normalizedTaskId]);
   const [basicForm, setBasicForm] = useState(() => patchNovelBasicForm(
     createDefaultNovelBasicFormState(),
-    initialDraft?.basicForm ?? {},
+    {
+      ...(initialDraft?.basicForm ?? {}),
+      worldId: resolveInitialWorldId(sourceWorldId, initialDraft?.basicForm.worldId, Boolean(initialDraft), Boolean(normalizedTaskId)),
+    },
   ));
   const [referenceStartOpen, setReferenceStartOpen] = useState(searchParams.get("start") === "reference");
   const [activeStage, setActiveStage] = useState<AutoDirectorCreateStageKey>(
@@ -134,6 +141,11 @@ function AutoDirectorCreatePage() {
     () => new Set(initialDraft?.completedStages ?? []),
   );
   const [missingTaskDraftHydrationPending, setMissingTaskDraftHydrationPending] = useState(false);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
   const restoreHandledRef = useRef<string | null>(null);
   const marketBriefFormAppliedRef = useRef<string | null>(null);
   const marketBriefIdeaAppliedRef = useRef<string | null>(null);
@@ -201,6 +213,11 @@ function AutoDirectorCreatePage() {
   const genreOptions = flattenGenreTreeOptions(genreTree);
   const storyModeOptions = flattenStoryModeTreeOptions(storyModeTree);
   const worldOptions = worldListQuery.data?.data ?? [];
+  const selectedWorldId = basicForm.worldId.trim();
+  const selectedWorld = worldOptions.find((world) => world.id === selectedWorldId) ?? null;
+  const worldSelectionUnavailable = Boolean(selectedWorldId) && (worldListQuery.isError || (!worldListQuery.isPending && !selectedWorld));
+  const worldSelectionLoading = Boolean(selectedWorldId) && worldListQuery.isPending;
+  const worldSelectionBlocked = worldSelectionUnavailable || worldSelectionLoading;
 
   useEffect(() => {
     const referenceKey = `${referenceMode}:${referenceBookAnalysisId}:${referenceDocumentId}`;
@@ -266,6 +283,7 @@ function AutoDirectorCreatePage() {
   }, [hasLegacyParams, navigate, normalizedTaskId, searchParams]);
 
   const replaceTaskId = (taskId: string) => {
+    if (!mountedRef.current) return;
     const storage = getDraftStorage();
     if (storage) {
       clearAutoDirectorCreateDraft(storage, draftScopeKey);
@@ -350,6 +368,8 @@ function AutoDirectorCreatePage() {
       controller.setRunMode(draft.runMode);
       controller.setWorldSetupMode(draft.worldSetupMode);
       controller.setSelectedStyleProfileId(initialStyleProfileId || draft.selectedStyleProfileId);
+    } else if (sourceWorldId) {
+      setBasicForm((current) => patchNovelBasicForm(current, { worldId: sourceWorldId }));
     }
     toast.info("找不到这条自动导演任务。你可以从这里重新开始，系统会自动恢复你的开书草稿。");
     const nextSearchParams = new URLSearchParams(searchParams);
@@ -373,6 +393,7 @@ function AutoDirectorCreatePage() {
     restoreWorkflowQuery.isFetchedAfterMount,
     restoreWorkflowQuery.isFetching,
     searchParams,
+    sourceWorldId,
   ]);
   useEffect(() => {
     if (!missingTaskDraftHydrationPending || normalizedTaskId || controller.workflowTaskId) {
@@ -508,7 +529,7 @@ function AutoDirectorCreatePage() {
   };
 
   const startGenerate = () => {
-    if (!controller.canGenerate) {
+    if (!controller.canGenerate || worldSelectionBlocked) {
       return;
     }
     setCompletedStages(completedThrough("model_run"));
@@ -524,18 +545,32 @@ function AutoDirectorCreatePage() {
           onIdeaChange={controller.setIdea}
           ideaInspirations={controller.ideaInspirations}
           isGeneratingIdeaInspirations={controller.isGeneratingIdeaInspirations}
-          onGenerateIdeaInspirations={controller.generateIdeaInspirations}
+          onGenerateIdeaInspirations={() => {
+            if (!worldSelectionBlocked) controller.generateIdeaInspirations();
+          }}
           ideaConstellationOptions={controller.ideaConstellationOptions}
           isGeneratingIdeaConstellationOptions={controller.isGeneratingIdeaConstellationOptions}
           isComposingIdeaConstellation={controller.isComposingIdeaConstellation}
-          onGenerateIdeaConstellationOptions={controller.generateIdeaConstellationOptions}
-          onComposeIdeaConstellation={controller.composeIdeaConstellation}
+          onGenerateIdeaConstellationOptions={() => {
+            if (!worldSelectionBlocked) controller.generateIdeaConstellationOptions();
+          }}
+          onComposeIdeaConstellation={async (selected) => {
+            if (worldSelectionBlocked) return "";
+            return controller.composeIdeaConstellation(selected);
+          }}
+          selectedWorld={selectedWorld ? { id: selectedWorld.id, name: selectedWorld.name } : null}
+          selectedWorldId={selectedWorldId}
+          worldSelectionLoading={worldSelectionLoading}
+          worldSelectionUnavailable={worldSelectionUnavailable}
+          onRetryWorlds={() => void worldListQuery.refetch()}
+          onClearWorld={() => setBasicForm((current) => patchNovelBasicForm(current, { worldId: "" }))}
+          onChangeWorld={() => setActiveStage("world_style")}
           onContinue={() => {
             markStageCompleted("idea");
             setActiveStage("basic");
           }}
           onQuickGenerate={startGenerate}
-          canContinue={controller.idea.trim().length > 0}
+          canContinue={controller.idea.trim().length > 0 && !worldSelectionBlocked}
           isGenerating={controller.generateMutation.isPending}
           genreTree={genreTree}
           storyModeTree={storyModeTree}
@@ -606,7 +641,7 @@ function AutoDirectorCreatePage() {
         <StageModelRun
           basicForm={controller.directorBasicForm}
           onBasicFormChange={controller.onBasicFormChange}
-          canGenerate={controller.canGenerate}
+          canGenerate={controller.canGenerate && !worldSelectionBlocked}
           isGenerating={controller.generateMutation.isPending}
           onBack={() => setActiveStage("world_style")}
           onGenerate={startGenerate}
@@ -615,6 +650,9 @@ function AutoDirectorCreatePage() {
           onIssuePolicyChange={controller.setIssuePolicy}
         />
       );
+    }
+    if (worldSelectionBlocked && !createdNovelId && controller.dialogMode === "candidate_selection") {
+      return <div className="rounded-xl bg-muted/30 px-4 py-3 text-sm text-muted-foreground">读取所选世界后，才能继续生成方向。</div>;
     }
     return (
       <StageCandidates
@@ -706,6 +744,17 @@ function AutoDirectorCreatePage() {
       {restoreWorkflowQuery.isPending && normalizedTaskId ? (
         <div className="rounded-lg bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
           正在恢复自动导演现场。
+        </div>
+      ) : null}
+
+      {activeStage !== "idea" && worldSelectionBlocked && !createdNovelId && controller.dialogMode === "candidate_selection" ? (
+        <div className="rounded-xl bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          {worldSelectionLoading ? "正在读取所选世界，请稍后继续。" : "所选世界暂时无法读取，请重试或清除选择后继续。"}
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button type="button" size="sm" variant="outline" onClick={() => void worldListQuery.refetch()}>重新读取</Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setBasicForm((current) => patchNovelBasicForm(current, { worldId: "" }))}>清除选择</Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setActiveStage("idea")}>返回起始想法</Button>
+          </div>
         </div>
       ) : null}
 
@@ -860,9 +909,11 @@ class AutoDirectorCreateErrorBoundary extends Component<
 }
 
 export default function AutoDirectorCreateRoute() {
+  const [searchParams] = useSearchParams();
+  const sourceWorldId = searchParams.get("worldId")?.trim() ?? "";
   return (
     <AutoDirectorCreateErrorBoundary>
-      <AutoDirectorCreatePage />
+      <AutoDirectorCreatePageContent key={sourceWorldId} />
     </AutoDirectorCreateErrorBoundary>
   );
 }

@@ -1,5 +1,7 @@
 import type { DirectorIdeaContextRequest } from "@ai-novel/shared/types/novelDirector";
+import { WorldService } from "../../../world/WorldService";
 import { StructuredOutputError } from "../../../../llm/structuredOutput";
+import { marketRadarService } from "../../../../modules/marketRadar/application/MarketRadarService";
 import { buildBookFramingSummary } from "../../bookFraming";
 
 function compactText(value: string | null | undefined): string {
@@ -26,7 +28,13 @@ function readerChannelPreferenceLabel(value: DirectorIdeaContextRequest["readerC
   }
 }
 
-export function buildDirectorIdeaContextSummary(input: DirectorIdeaContextRequest, marketBriefPrompt = ""): string {
+export async function resolveDirectorIdeaContext(input: DirectorIdeaContextRequest): Promise<string> {
+  const marketBriefPrompt = await marketRadarService.getBriefPromptBlock(input.marketBriefId);
+  const worldReference = input.worldId?.trim() ? await new WorldService().getPlanningReference(input.worldId.trim()) : "";
+  return buildDirectorIdeaContextSummary(input, marketBriefPrompt, worldReference);
+}
+
+export function buildDirectorIdeaContextSummary(input: DirectorIdeaContextRequest, marketBriefPrompt = "", worldReference = ""): string {
   const framing = buildBookFramingSummary({
     targetAudience: input.targetAudience,
     bookSellingPoint: input.bookSellingPoint,
@@ -45,6 +53,7 @@ export function buildDirectorIdeaContextSummary(input: DirectorIdeaContextReques
     line("副推进模式", input.secondaryStoryModeLabel ?? input.secondaryStoryModeId),
     line("副推进说明", input.secondaryStoryModeDescription),
     line("世界观", input.worldName ?? input.worldId),
+    worldReference ? `选定世界样本：\n${worldReference}` : "",
     marketBriefPrompt.trim() ? `开书市场简报：\n${marketBriefPrompt.trim()}` : "",
     line("读者频道倾向", readerChannelPreferenceLabel(input.readerChannelPreference)),
     input.powerSystemPreference ? `战力体系偏好：${input.powerSystemPreference}` : "",

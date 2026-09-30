@@ -5,6 +5,7 @@ import {
   buildAutoDirectorCreateDraftScope,
   clearAutoDirectorCreateDraft,
   loadAutoDirectorCreateDraft,
+  resolveInitialWorldId,
   saveAutoDirectorCreateDraft,
 } from "./autoDirectorCreateDraft.ts";
 
@@ -49,6 +50,34 @@ test("creation draft restores the pre-task idea and last safe stage", () => {
     selectedStyleProfileId: "style-1",
     savedAt: loadAutoDirectorCreateDraft(storage, scopeKey)?.savedAt,
   });
+});
+
+test("world sources isolate drafts while the plain legacy key remains stable", () => {
+  const storage = createMemoryStorage();
+  const plainScope = buildAutoDirectorCreateDraftScope({});
+  const worldA = buildAutoDirectorCreateDraftScope({ sourceWorldId: "world-A" });
+  const worldB = buildAutoDirectorCreateDraftScope({ sourceWorldId: "world-B" });
+  assert.equal(plainScope, "none|none|none|none|none");
+  assert.notEqual(worldA, worldB);
+  saveAutoDirectorCreateDraft(storage, worldA, {
+    idea: "世界 A 的想法",
+    basicForm: { ...basicForm, worldId: "" },
+    activeStage: "idea",
+    completedStages: [],
+    runMode: "auto_to_ready",
+    worldSetupMode: "auto_generate",
+    selectedStyleProfileId: "",
+  });
+  assert.equal(loadAutoDirectorCreateDraft(storage, worldB), null);
+  assert.equal(loadAutoDirectorCreateDraft(storage, plainScope), null);
+  assert.equal(loadAutoDirectorCreateDraft(storage, worldA)?.basicForm.worldId, "");
+});
+
+test("task and scoped draft choices outrank the source query, including a cleared world", () => {
+  assert.equal(resolveInitialWorldId("world-A", undefined, false, false), "world-A");
+  assert.equal(resolveInitialWorldId("world-A", "", true, false), "");
+  assert.equal(resolveInitialWorldId("world-A", "world-B", true, false), "world-B");
+  assert.equal(resolveInitialWorldId("world-A", undefined, false, true), "");
 });
 
 test("candidate stage falls back to the last pre-task stage", () => {
