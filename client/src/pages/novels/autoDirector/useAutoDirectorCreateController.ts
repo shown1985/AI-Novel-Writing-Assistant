@@ -59,6 +59,7 @@ import {
 import { useNovelAutoDirectorCandidateMutations } from "../components/useNovelAutoDirectorCandidateMutations";
 import { hasCreationFoundationChanged } from "./creationFoundationPickerState";
 import type { AutoDirectorCreateDraft } from "./draft/autoDirectorCreateDraft";
+import { ideaInspirationContextKey, isCurrentIdeaInspirationRequest } from "./ideaInspiration";
 
 interface UseAutoDirectorCreateControllerInput {
   marketBriefId?: string;
@@ -130,6 +131,7 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
     initialStyleProfileId || initialDraft?.selectedStyleProfileId || "",
   );
   const [ideaInspirations, setIdeaInspirations] = useState<DirectorIdeaInspiration[]>([]);
+  const ideaInspirationRequestIdRef = useRef(0);
   const [ideaConstellationOptions, setIdeaConstellationOptions] = useState<DirectorIdeaConstellationOption[]>([]);
   const [candidatePatchFeedbacks, setCandidatePatchFeedbacks] = useState<Record<string, string>>({});
   const [titlePatchFeedbacks, setTitlePatchFeedbacks] = useState<Record<string, string>>({});
@@ -208,7 +210,6 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
   useEffect(() => {
     if (previousWorldIdRef.current === directorBasicForm.worldId) return;
     previousWorldIdRef.current = directorBasicForm.worldId;
-    setIdeaInspirations([]);
     setIdeaConstellationOptions([]);
   }, [directorBasicForm.worldId]);
 
@@ -275,16 +276,59 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
     };
   };
 
+  const ideaInspirationContext = ideaInspirationContextKey({
+    idea,
+    worldId: directorBasicForm.worldId,
+    genreId: directorBasicForm.genreId,
+    primaryStoryModeId: directorBasicForm.primaryStoryModeId,
+    secondaryStoryModeId: directorBasicForm.secondaryStoryModeId,
+  });
+  const currentIdeaInspirationContextRef = useRef(ideaInspirationContext);
+  if (currentIdeaInspirationContextRef.current !== ideaInspirationContext) {
+    currentIdeaInspirationContextRef.current = ideaInspirationContext;
+    ideaInspirationRequestIdRef.current += 1;
+  }
   const ideaInspirationMutation = useMutation({
-    mutationFn: ({ payload }: { generation: number; payload: ReturnType<typeof buildIdeaContextPayload> }) => generateDirectorIdeaInspirations(payload),
+    mutationFn: ({ payload }: {
+      requestId: number;
+      context: string;
+      payload: ReturnType<typeof buildIdeaContextPayload>;
+    }) => generateDirectorIdeaInspirations(payload),
     onSuccess: (response, variables) => {
-      if (variables.generation !== worldGenerationRef.current) return;
+      if (!isCurrentIdeaInspirationRequest(variables.requestId, ideaInspirationRequestIdRef.current, variables.context, currentIdeaInspirationContextRef.current)) return;
       setIdeaInspirations(response.data?.ideas ?? []);
     },
-    onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "生成起始想法失败，请稍后重试。");
-    },
   });
+  useEffect(() => {
+    setIdeaInspirations([]);
+    ideaInspirationMutation.reset();
+    // The request id is invalidated during render so even A → B → A cannot accept an old response.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ideaInspirationContext]);
+
+  const generateIdeaInspirations = () => {
+    const requestId = ++ideaInspirationRequestIdRef.current;
+    setIdeaInspirations([]);
+    ideaInspirationMutation.mutate({
+      requestId,
+      context: ideaInspirationContext,
+      payload: buildIdeaContextPayload(),
+    });
+  };
+  const visibleIdeaInspirationRequest = ideaInspirationMutation.variables;
+  const ideaInspirationRequestIsCurrent = visibleIdeaInspirationRequest
+    && isCurrentIdeaInspirationRequest(
+      visibleIdeaInspirationRequest.requestId,
+      ideaInspirationRequestIdRef.current,
+      visibleIdeaInspirationRequest.context,
+      ideaInspirationContext,
+    );
+  const isGeneratingIdeaInspirations = Boolean(ideaInspirationRequestIsCurrent && ideaInspirationMutation.isPending);
+  const ideaInspirationError = ideaInspirationRequestIsCurrent && ideaInspirationMutation.isError
+    ? ideaInspirationMutation.error instanceof Error
+      ? ideaInspirationMutation.error.message
+      : "生成开局想法失败，请重试。"
+    : "";
 
   const ideaConstellationOptionsMutation = useMutation({
     mutationFn: ({ payload }: { generation: number; payload: ReturnType<typeof buildIdeaContextPayload> }) => generateDirectorIdeaConstellationOptions(payload),
@@ -695,8 +739,9 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
     idea,
     setIdea,
     ideaInspirations,
-    isGeneratingIdeaInspirations: ideaInspirationMutation.isPending,
-    generateIdeaInspirations: () => ideaInspirationMutation.mutate({ generation: worldGenerationRef.current, payload: buildIdeaContextPayload() }),
+    isGeneratingIdeaInspirations,
+    ideaInspirationError,
+    generateIdeaInspirations,
     ideaConstellationOptions,
     isGeneratingIdeaConstellationOptions: ideaConstellationOptionsMutation.isPending,
     generateIdeaConstellationOptions: () => ideaConstellationOptionsMutation.mutate({ generation: worldGenerationRef.current, payload: buildIdeaContextPayload() }),

@@ -190,11 +190,11 @@ test("idea inspirations bound creative sampling and retry with the original cont
   assert.match(service, /maxTokens: IDEA_INSPIRATION_MAX_TOKENS/);
   assert.match(context, /error instanceof StructuredOutputError && error\.category !== "transport_error"/);
   assert.match(service, /runIdeaInspirationPrompt\(input, IDEA_INSPIRATION_RETRY_TEMPERATURE, contextSummary\)/);
-  assert.match(prompt, /version: "v4"/);
+  assert.match(prompt, /version: "v5"/);
   assert.match(prompt, /maxAttempts: 0/);
   assert.match(prompt, /structuredOutputHint/);
   assert.match(schema, /z\.enum\(directorIdeaInspirationAngles\)/);
-  assert.match(loaders, /novel\.director\.idea_inspiration@v4/);
+  assert.match(loaders, /novel\.director\.idea_inspiration@v5/);
 });
 
 test("idea constellation generates seven concrete web-novel material categories through AI", () => {

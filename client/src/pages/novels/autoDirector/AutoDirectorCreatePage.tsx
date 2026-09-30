@@ -545,6 +545,7 @@ function AutoDirectorCreatePageContent() {
           onIdeaChange={controller.setIdea}
           ideaInspirations={controller.ideaInspirations}
           isGeneratingIdeaInspirations={controller.isGeneratingIdeaInspirations}
+          ideaInspirationError={controller.ideaInspirationError}
           onGenerateIdeaInspirations={() => {
             if (!worldSelectionBlocked) controller.generateIdeaInspirations();
           }}

@@ -174,6 +174,7 @@ Open-source AI novel writing assistant and long-form production studio.
 #### 修复
 
 - 重新配置已有模型连接时，会保留此前选择的思考开关和深度。
+- 修改起始想法后点击生成，会结合本次输入与所选世界寻找新开局；想法在弹窗中展示完整内容、生成状态和使用入口，便于直接比较选择。
 
 完整历史更新见 [docs/releases/release-notes.md](./docs/releases/release-notes.md)。
 
