@@ -218,11 +218,11 @@ export const promptAssetLoaderEntries: PromptAssetLoaderEntry[] = [
     load: () => require("../prompts/rag/contextualChunk.prompts").ragContextualChunkPrompt as UnknownPromptAsset,
   },
   {
-    key: "novel.director.candidates@v2",
+    key: "novel.director.candidates@v3",
     load: () => require("../prompts/novel/directorPlanning.prompts").directorCandidatePrompt as UnknownPromptAsset,
   },
   {
-    key: "novel.director.candidate_patch@v1",
+    key: "novel.director.candidate_patch@v2",
     load: () => require("../prompts/novel/directorPlanning.prompts").directorCandidatePatchPrompt as UnknownPromptAsset,
   },
   {
@@ -494,15 +494,15 @@ export const promptAssetLoaderEntries: PromptAssetLoaderEntry[] = [
     load: () => require("../prompts/novel/completion/compactBook.prompts").compactBookEndingAuditPrompt as UnknownPromptAsset,
   },
   {
-    key: "novel.director.idea_inspiration@v3",
+    key: "novel.director.idea_inspiration@v4",
     load: () => require("../prompts/novel/ideaInspiration.prompts").directorIdeaInspirationPrompt as UnknownPromptAsset,
   },
   {
-    key: "novel.director.idea_constellation_options@v3",
+    key: "novel.director.idea_constellation_options@v4",
     load: () => require("../prompts/novel/ideaConstellation/ideaConstellation.prompts").directorIdeaConstellationOptionsPrompt as UnknownPromptAsset,
   },
   {
-    key: "novel.director.idea_constellation_compose@v2",
+    key: "novel.director.idea_constellation_compose@v3",
     load: () => require("../prompts/novel/ideaConstellation/ideaConstellation.prompts").directorIdeaConstellationComposePrompt as UnknownPromptAsset,
   },
   {

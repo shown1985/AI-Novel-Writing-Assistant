@@ -42,7 +42,8 @@ test("quick setup applies a verified model to every core creative route without 
       model: input.model ?? null,
       baseURL: input.baseURL ?? null,
       isActive: true,
-      reasoningEnabled: true,
+      reasoningEnabled: input.reasoningEnabled,
+      reasoningEffort: input.reasoningEffort,
       concurrencyLimit: 0,
       requestIntervalMs: 0,
       createdAt: new Date(),
@@ -113,7 +114,24 @@ test("quick setup applies a verified model to every core creative route without 
     assert.equal(result.status.routeCoverage.configured, result.status.routeCoverage.total);
     assert.equal(savedRoutes.size, result.status.routeCoverage.total);
     assert.equal(result.provider, "deepseek");
+    assert.equal(savedProvider.reasoningEnabled, true);
+    assert.equal(savedProvider.reasoningEffort, "high");
     assert.equal(JSON.stringify(result).includes("secret-test-key"), false);
+
+    secretStore.getProvider = async () => ({
+      provider: "deepseek",
+      key: "secret-test-key",
+      baseURL: "https://api.deepseek.com/v1",
+      reasoningEnabled: false,
+      reasoningEffort: "low",
+    });
+    await quickSetup.completeQuickSetup({
+      providerKind: "builtin",
+      provider: "deepseek",
+      model: "deepseek-chat",
+    });
+    assert.equal(savedProvider.reasoningEnabled, false);
+    assert.equal(savedProvider.reasoningEffort, "low");
   } finally {
     restore(secretStore, secretOriginals);
     llmConnectivityService.testConnection = connectivityOriginal;

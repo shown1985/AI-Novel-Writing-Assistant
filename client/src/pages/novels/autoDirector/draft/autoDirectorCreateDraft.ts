@@ -19,6 +19,7 @@ interface StorageLike {
 }
 
 export interface AutoDirectorCreateDraftScopeInput {
+  sourceWorldId?: string;
   marketBriefId?: string;
   referenceMode?: string;
   referenceBookAnalysisId?: string;
@@ -62,13 +63,21 @@ function draftStorageKey(scopeKey: string): string {
 }
 
 export function buildAutoDirectorCreateDraftScope(input: AutoDirectorCreateDraftScopeInput): string {
-  return [
+  const legacyScope = [
     input.marketBriefId,
     input.referenceMode,
     input.referenceBookAnalysisId,
     input.referenceDocumentId,
     input.initialStyleProfileId,
   ].map((value) => encodeURIComponent(value?.trim() || "none")).join("|");
+  return input.sourceWorldId?.trim()
+    ? `${legacyScope}|world:${encodeURIComponent(input.sourceWorldId.trim())}`
+    : legacyScope;
+}
+
+export function resolveInitialWorldId(sourceWorldId: string, savedWorldId: string | undefined, hasDraft: boolean, hasTask: boolean): string {
+  if (hasTask || hasDraft) return savedWorldId ?? "";
+  return sourceWorldId;
 }
 
 export function toRecoverableAutoDirectorCreateStage(

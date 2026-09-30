@@ -270,7 +270,7 @@ export default function WorldList() {
         </summary>
         <div className="mt-3 grid gap-3 border-t border-border/30 pt-3 text-sm leading-6 text-muted-foreground md:grid-cols-3">
           <div><span className="mr-2 font-medium text-foreground">1</span>整理可复用的世界规则、势力、地点和张力。</div>
-          <div><span className="mr-2 font-medium text-foreground">2</span>从小说基础信息页导入，小说会建立自己的世界副本。</div>
+          <div><span className="mr-2 font-medium text-foreground">2</span>点击“基于这个世界创作”，让 AI 提供开局想法；确认方向后会为小说建立世界副本。已有小说也可从基础信息页导入。</div>
           <div><span className="mr-2 font-medium text-foreground">3</span>样本和本书世界有差异时，再决定推送或拉取。</div>
         </div>
       </details>
@@ -377,6 +377,12 @@ export default function WorldList() {
 
                 <div className="mt-auto flex flex-wrap items-center gap-1 border-t border-border/30 pt-4">
                   <Button asChild size="sm" className="rounded-full">
+                    <Link to={`/novels/auto-director?worldId=${encodeURIComponent(world.id)}`}>
+                      <Sparkles className="mr-1 h-4 w-4" aria-hidden="true" />
+                      基于这个世界创作
+                    </Link>
+                  </Button>
+                  <Button asChild size="sm" variant="secondary" className="rounded-full">
                     <Link to={`/worlds/${world.id}/workspace`}>
                       <Compass className="mr-1 h-4 w-4" aria-hidden="true" />
                       查看世界手册

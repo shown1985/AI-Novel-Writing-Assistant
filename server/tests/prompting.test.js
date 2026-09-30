@@ -152,8 +152,8 @@ test("prompt registry exposes versioned planning assets", () => {
     "agent.runtime.setup_guidance@v1",
     "agent.runtime.setup_ideation@v1",
     "planner.chapter.plan@v1",
-    "novel.director.candidates@v2",
-    "novel.director.candidate_patch@v1",
+    "novel.director.candidates@v3",
+    "novel.director.candidate_patch@v2",
     "novel.director.blueprint@v1",
     "novel.character.castOptions@v3",
     "novel.character.castOptions.repair@v1",
@@ -669,8 +669,8 @@ test("chapter writer prompt does not expose scene contract controls", () => {
 
 test("novel main-chain prompt assets declare explicit non-zero context budgets", () => {
   const expectedBudgets = new Map([
-    ["novel.director.candidates@v2", NOVEL_PROMPT_BUDGETS.directorCandidates],
-    ["novel.director.candidate_patch@v1", NOVEL_PROMPT_BUDGETS.directorCandidatePatch],
+    ["novel.director.candidates@v3", NOVEL_PROMPT_BUDGETS.directorCandidates],
+    ["novel.director.candidate_patch@v2", NOVEL_PROMPT_BUDGETS.directorCandidatePatch],
     ["novel.director.blueprint@v1", NOVEL_PROMPT_BUDGETS.directorBlueprint],
     ["novel.story_macro.decomposition@v1", NOVEL_PROMPT_BUDGETS.storyMacroDecomposition],
     ["novel.story_macro.field_regeneration@v1", NOVEL_PROMPT_BUDGETS.storyMacroFieldRegeneration],

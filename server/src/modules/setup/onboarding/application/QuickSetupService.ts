@@ -172,6 +172,9 @@ async function resolveProviderInput(input: CompleteQuickSetupRequest): Promise<{
   displayName?: string;
   existingKey?: string;
   existingBaseURL?: string;
+  existingReasoningEnabled?: boolean | null;
+  existingReasoningEffort?: string | null;
+  hasExistingProvider: boolean;
 }> {
   if (input.providerKind === "builtin") {
     if (!input.provider || !isBuiltInProvider(input.provider)) {
@@ -182,6 +185,9 @@ async function resolveProviderInput(input: CompleteQuickSetupRequest): Promise<{
       provider: input.provider,
       existingKey: normalizeOptionalText(existing?.key) ?? getProviderEnvApiKey(input.provider),
       existingBaseURL: normalizeOptionalText(existing?.baseURL) ?? getProviderEnvBaseUrl(input.provider),
+      existingReasoningEnabled: existing?.reasoningEnabled,
+      existingReasoningEffort: existing?.reasoningEffort,
+      hasExistingProvider: Boolean(existing),
     };
   }
   const displayName = normalizeOptionalText(input.customProviderName);
@@ -197,6 +203,9 @@ async function resolveProviderInput(input: CompleteQuickSetupRequest): Promise<{
     displayName,
     existingKey: normalizeOptionalText(existing?.key),
     existingBaseURL: normalizeOptionalText(existing?.baseURL),
+    existingReasoningEnabled: existing?.reasoningEnabled,
+    existingReasoningEffort: existing?.reasoningEffort,
+    hasExistingProvider: Boolean(existing),
   };
 }
 
@@ -243,8 +252,15 @@ export async function completeQuickSetup(
     model,
     baseURL,
     isActive: true,
-    reasoningEnabled: true,
-    reasoningEffort: "high",
+    ...(resolvedInput.hasExistingProvider
+      ? {
+          ...(resolvedInput.existingReasoningEnabled !== null
+            && resolvedInput.existingReasoningEnabled !== undefined
+            ? { reasoningEnabled: resolvedInput.existingReasoningEnabled }
+            : {}),
+          reasoningEffort: resolvedInput.existingReasoningEffort ?? null,
+        }
+      : { reasoningEnabled: true, reasoningEffort: "high" }),
     hiddenModels: "[]",
   });
   setProviderSecretCache(provider, {

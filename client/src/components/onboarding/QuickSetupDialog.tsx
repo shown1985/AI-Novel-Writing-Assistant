@@ -33,6 +33,7 @@ import {
   shouldInitializeProviderSelection,
   shouldShowFirstNovelHandoff,
 } from "./creationSetupState";
+import CurrentModelReasoningSettings from "./CurrentModelReasoningSettings";
 
 interface QuickSetupDialogProps {
   open: boolean;
@@ -77,10 +78,12 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
   const [customModels, setCustomModels] = useState<string[]>([]);
   const [customModelsMessage, setCustomModelsMessage] = useState("");
   const [showAllProviderChoices, setShowAllProviderChoices] = useState(false);
+  const [showConnectionWizard, setShowConnectionWizard] = useState(false);
 
   useEffect(() => {
     if (props.open && props.forceConfiguration) {
       setStep(1);
+      setShowConnectionWizard(false);
     }
   }, [props.forceConfiguration, props.open]);
 
@@ -214,6 +217,15 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
     configurationSucceeded: completeMutation.isSuccess,
     forceConfiguration: props.forceConfiguration === true,
   });
+  const currentProvider = llmStore.hasHydratedSelection && llmStore.provider
+    ? llmStore.provider : props.status?.selectedProvider ?? null;
+  const currentModel = llmStore.hasHydratedSelection && llmStore.model
+    ? llmStore.model : props.status?.selectedModel ?? null;
+  const showCurrentSettings = Boolean(
+    props.forceConfiguration
+    && !showConnectionWizard
+    && props.status?.providers.some((provider) => provider.id === currentProvider && provider.configured),
+  );
 
   const submit = () => {
     setStep(3);
@@ -227,7 +239,7 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
     });
   };
 
-  const footer = props.loading || props.error || (props.status?.readyForCreation && !props.forceConfiguration)
+  const footer = props.loading || props.error || showCurrentSettings || (props.status?.readyForCreation && !props.forceConfiguration)
     ? null
     : step === 1
       ? (
@@ -268,12 +280,12 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <AppDialogContent
         className="max-w-3xl"
-        title="让 AI 创作环境先跑起来"
-        description="只配置一个文本模型，系统会自动准备规划、正文、审校和修复所需的任务路由。"
+        title={showCurrentSettings ? "模型设置" : "让 AI 创作环境先跑起来"}
+        description={showCurrentSettings ? "查看当前模型，调整这个模型连接的推理强度。" : "只配置一个文本模型，系统会自动准备规划、正文、审校和修复所需的任务路由。"}
         footer={footer}
         footerClassName="gap-2"
       >
-        <div className="mb-6 grid grid-cols-3 gap-2">
+        {!showCurrentSettings ? <div className="mb-6 grid grid-cols-3 gap-2">
           {[
             { index: 1, label: "选择厂商" },
             { index: 2, label: "连接模型" },
@@ -291,7 +303,7 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
               </div>
             </div>
           ))}
-        </div>
+        </div> : null}
 
         {props.loading ? (
           <div className="flex min-h-56 items-center justify-center text-sm text-muted-foreground">
@@ -306,6 +318,13 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
             </div>
             <Button variant="outline" onClick={props.onRetry}>重新加载</Button>
           </div>
+        ) : showCurrentSettings ? (
+          <CurrentModelReasoningSettings
+            key={currentProvider}
+            provider={currentProvider}
+            selectedModel={currentModel}
+            onReconfigure={() => { setStep(1); setShowConnectionWizard(true); }}
+          />
         ) : props.status?.readyForCreation && !props.forceConfiguration && !completeMutation.isSuccess ? (
           <div className="flex min-h-56 flex-col items-center justify-center gap-4 text-center">
             <CheckCircle2 className="h-10 w-10 text-emerald-600" />

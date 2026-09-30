@@ -1,3 +1,4 @@
+import { WorldService } from "../../../world/WorldService";
 import { randomUUID } from "node:crypto";
 import {
   DIRECTOR_CANDIDATE_SETUP_STEPS,
@@ -77,6 +78,7 @@ function buildTargetedTitleBrief(input: {
   idea: string;
   context: DirectorProjectContextInput;
   feedback: string;
+  worldReference?: string;
 }): string {
   const currentTitleGroup = [
     input.candidate.workingTitle,
@@ -88,6 +90,7 @@ function buildTargetedTitleBrief(input: {
 
   return [
     `故事灵感：${input.idea.trim()}`,
+    input.worldReference ? `选定世界样本：\n${input.worldReference}` : "",
     `当前方案：${input.candidate.workingTitle}`,
     `作品定位：${input.candidate.positioning}`,
     `核心卖点：${input.candidate.sellingPoint}`,
@@ -182,6 +185,7 @@ export class NovelDirectorCandidateStageService {
   private async generateBatch(context: CandidateGenerationContext & {
     workflowTaskId?: string;
     productionFoundation?: NovelCreateResourceRecommendation;
+    worldReference?: string;
   }): Promise<{ batch: DirectorCandidateBatch }> {
     await this.markCandidateProgress(
       context.workflowTaskId,
@@ -206,6 +210,7 @@ export class NovelDirectorCandidateStageService {
         latestBatch: context.batches.at(-1),
         presets: context.presets,
         feedback: context.feedback,
+        worldReference: context.worldReference,
       }),
       options: {
         provider: context.options.provider,
@@ -268,6 +273,7 @@ export class NovelDirectorCandidateStageService {
   }
 
   async generateCandidates(input: DirectorCandidatesRequest): Promise<DirectorCandidatesResponse> {
+    const worldReference = input.worldId?.trim() ? await new WorldService().getPlanningReference(input.worldId.trim()) : "";
     const marketBriefPrompt = await marketRadarService.getBriefPromptBlock(input.marketBriefId);
     const { novelReferenceService } = await import("../../NovelReferenceService");
     const referenceAnalysisPrompt = await novelReferenceService.buildReferenceFromAnalysisId(
@@ -352,6 +358,7 @@ export class NovelDirectorCandidateStageService {
       options: resolvedInput,
       workflowTaskId: resolvedInput.workflowTaskId,
       productionFoundation: foundation.recommendation,
+      worldReference,
     });
     if (!resolvedInput.workflowTaskId?.trim()) {
       return result;
@@ -386,6 +393,7 @@ export class NovelDirectorCandidateStageService {
   }
 
   async refineCandidates(input: DirectorRefinementRequest): Promise<DirectorRefineResponse> {
+    const worldReference = input.worldId?.trim() ? await new WorldService().getPlanningReference(input.worldId.trim()) : "";
     if (input.workflowTaskId?.trim()) {
       await this.workflowService.bootstrapTask({
         workflowTaskId: input.workflowTaskId,
@@ -424,6 +432,7 @@ export class NovelDirectorCandidateStageService {
       request: input,
       options: input,
       workflowTaskId: input.workflowTaskId,
+      worldReference,
     });
     if (!input.workflowTaskId?.trim()) {
       return result;
@@ -461,6 +470,7 @@ export class NovelDirectorCandidateStageService {
   }
 
   async patchCandidate(input: DirectorCandidatePatchRequest): Promise<DirectorCandidatePatchResponse> {
+    const worldReference = input.worldId?.trim() ? await new WorldService().getPlanningReference(input.worldId.trim()) : "";
     if (input.workflowTaskId?.trim()) {
       await this.workflowService.bootstrapTask({
         workflowTaskId: input.workflowTaskId,
@@ -511,6 +521,7 @@ export class NovelDirectorCandidateStageService {
         latestBatch: input.previousBatches.at(-1),
         presets: input.presets ?? [],
         feedback: input.feedback,
+        worldReference,
       }),
       options: {
         provider: input.provider,
@@ -593,6 +604,7 @@ export class NovelDirectorCandidateStageService {
   }
 
   async refineCandidateTitleOptions(input: DirectorCandidateTitleRefineRequest): Promise<DirectorCandidateTitleRefineResponse> {
+    const worldReference = input.worldId?.trim() ? await new WorldService().getPlanningReference(input.worldId.trim()) : "";
     if (input.workflowTaskId?.trim()) {
       await this.workflowService.bootstrapTask({
         workflowTaskId: input.workflowTaskId,
@@ -627,6 +639,7 @@ export class NovelDirectorCandidateStageService {
         idea: input.idea,
         context: input,
         feedback: input.feedback,
+        worldReference,
       }),
       genreId: input.genreId ?? null,
       count: 4,

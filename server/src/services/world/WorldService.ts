@@ -10,6 +10,7 @@ import type {
   WorldVisualizationPayload,
 } from "@ai-novel/shared/types/world";
 import { prisma } from "../../db/prisma";
+import { AppError } from "../../middleware/errorHandler";
 import { runStructuredPrompt } from "../../prompting/core/promptRunner";
 import { worldAxiomSuggestionPrompt } from "../../prompting/prompts/world/world.prompts";
 import { getTemplateByKey, LAYER_FIELD_MAP, WORLD_LAYER_ORDER, WORLD_TEMPLATES } from "./worldTemplates";
@@ -272,6 +273,42 @@ function hasReliableStructuredLayerSource(parsed: {
 }
 
 export class WorldService {
+  /** A bounded, read-only snapshot for planning in an existing world. */
+  async getPlanningReference(worldId: string): Promise<string> {
+    const world = await prisma.world.findUnique({ where: { id: worldId } });
+    if (!world) throw new AppError("所选世界样本不存在，请重新选择世界。", 404);
+    const clip = (value: string | null | undefined, limit = 360) =>
+      value?.replace(/\s+/g, " ").trim().slice(0, limit) ?? "";
+    const parsed = parseWorldStructurePayload(world.structureJson, world.bindingSupportJson);
+    const lines = [`世界：${clip(world.name, 120)}`];
+    if (parsed.hasStructuredData) {
+      const { structure, bindingSupport } = parsed;
+      lines.push(
+        `概要：${clip(structure.profile.summary || world.description)}`,
+        `核心冲突：${clip(structure.profile.coreConflict)}`,
+        `世界规则：${clip(structure.rules.summary)}`,
+        ...structure.rules.axioms.slice(0, 8).map((rule) =>
+          `硬规则：${clip([rule.name, rule.summary, rule.boundary, rule.cost].filter(Boolean).join("；"), 260)}`),
+        ...structure.rules.taboo.slice(0, 5).map((rule) => `禁忌：${clip(rule, 200)}`),
+        ...structure.forces.slice(0, 8).map((force) =>
+          `势力：${clip([force.name, force.summary, force.currentObjective, force.pressure].filter(Boolean).join("；"), 260)}`),
+        ...structure.locations.slice(0, 8).map((location) =>
+          `地点：${clip([location.name, location.summary, location.narrativeFunction, location.risk].filter(Boolean).join("；"), 260)}`),
+        ...bindingSupport.compatibleConflicts.slice(0, 5).map((conflict) => `可用冲突：${clip(conflict, 200)}`),
+        ...bindingSupport.forbiddenCombinations.slice(0, 5).map((rule) => `禁用组合：${clip(rule, 200)}`),
+      );
+    } else {
+      for (const [label, value] of [
+        ["概要", world.description], ["公理", world.axioms], ["背景", world.background],
+        ["地理", world.geography], ["力量体系", world.magicSystem], ["政治", world.politics],
+        ["势力", world.factions], ["冲突", world.conflicts],
+      ] as const) {
+        if (value?.trim()) lines.push(`${label}：${clip(value, 650)}`);
+      }
+    }
+    return lines.filter((line) => !line.endsWith("：")).join("\n").slice(0, 9_000);
+  }
+
   async listWorlds() {
     return prisma.world.findMany({
       orderBy: { updatedAt: "desc" },

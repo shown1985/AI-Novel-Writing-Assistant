@@ -140,6 +140,7 @@ export function buildDirectorCandidateContextBlocks(input: {
   latestBatch?: DirectorCandidateBatch;
   presets: string[];
   feedback?: string;
+  worldReference?: string;
 }): PromptContextBlock[] {
   return [
     createContextBlock({
@@ -155,6 +156,14 @@ export function buildDirectorCandidateContextBlocks(input: {
       priority: 90,
       content: `Project context:\n${formatProjectContext(input.context) || "none"}`,
     }),
+    ...(input.worldReference ? [createContextBlock({
+      id: "selected_world_reference",
+      group: "selected_world_reference",
+      priority: 98,
+      required: true,
+      allowSummary: false,
+      content: `Selected world sample:\n${input.worldReference}`,
+    })] : []),
     createContextBlock({
       id: "latest_batch",
       group: "latest_batch",
