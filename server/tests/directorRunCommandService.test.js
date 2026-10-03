@@ -256,7 +256,11 @@ function createHarness(task = createTask(), currentLlmSelection = null, pipeline
     return { count };
   };
   prisma.novelWorkflowTask.findUnique = async ({ where }) => where.id === task.id
-    ? { novelId: task.novelId, seedPayloadJson: task.seedPayloadJson ?? null }
+    ? {
+      novelId: task.novelId,
+      pendingManualRecovery: task.pendingManualRecovery,
+      seedPayloadJson: task.seedPayloadJson ?? null,
+    }
     : null;
   prisma.novelWorkflowTask.updateMany = async (args) => {
     taskUpdates.push(args);
@@ -969,28 +973,41 @@ test("director command stale recovery preserves a linked pipeline manual pause",
 });
 
 test("director command stale recovery never clears an existing task manual pause", async () => {
-  const harness = createHarness(createTask({
-    status: "running",
-    pendingManualRecovery: false,
-    lastError: null,
-  }));
-  try {
-    await harness.service.enqueueContinueCommand("task-1");
-    harness.commands[0].status = "running";
-    harness.commands[0].leaseOwner = "worker-a";
-    harness.commands[0].attempt = 1;
-    harness.commands[0].leaseExpiresAt = new Date("2026-04-29T12:00:00.000Z");
-    harness.task.pendingManualRecovery = true;
-    harness.task.lastError = "质量优先策略等待人工恢复。";
+  for (const pipelineJobId of [null, "missing-job"]) {
+    const harness = createHarness(createTask({
+      status: "running",
+      pendingManualRecovery: false,
+      lastError: null,
+      ...(pipelineJobId ? {
+        seedPayloadJson: JSON.stringify({
+          issueGovernanceVersion: 1,
+          issuePolicy: { maxAutomaticRetries: 1, issueActions: {} },
+          issuePolicySource: "global",
+          runMode: "full_book_autopilot",
+          autoExecution: { pipelineJobId },
+        }),
+      } : {}),
+    }));
+    try {
+      await harness.service.enqueueContinueCommand("task-1");
+      harness.commands[0].status = "running";
+      harness.commands[0].leaseOwner = "worker-a";
+      harness.commands[0].attempt = 1;
+      harness.commands[0].leaseExpiresAt = new Date("2026-04-29T12:00:00.000Z");
+      harness.task.pendingManualRecovery = true;
+      harness.task.lastError = "质量优先策略等待人工恢复。";
 
-    await harness.service.recoverStaleLeases(new Date("2026-04-29T12:01:00.000Z"));
+      await harness.service.recoverStaleLeases(new Date("2026-04-29T12:01:00.000Z"));
 
-    assert.equal(harness.commands[0].status, "stale");
-    assert.equal(harness.task.pendingManualRecovery, true);
-    assert.equal(harness.task.lastError, "质量优先策略等待人工恢复。");
-    assert.equal(harness.requeued.length, 0);
-  } finally {
-    harness.restore();
+      assert.equal(harness.commands[0].status, "stale");
+      assert.equal(harness.commands[0].leaseOwner, null);
+      assert.equal(harness.commands[0].attempt, 1);
+      assert.equal(harness.task.pendingManualRecovery, true);
+      assert.equal(harness.task.lastError, "质量优先策略等待人工恢复。");
+      assert.equal(harness.requeued.length, 0);
+    } finally {
+      harness.restore();
+    }
   }
 });
 

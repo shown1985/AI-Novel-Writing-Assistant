@@ -44,6 +44,8 @@ function createFileFixture() {
   const tempDir = fs.mkdtempSync("/tmp/ai-novel-s3-02b3b2b-");
   const databasePath = path.join(tempDir, "fixture.db");
   const rawDatabase = new Database(databasePath);
+  // Match production SQLite journaling before concurrent connections bootstrap.
+  assert.equal(rawDatabase.pragma("journal_mode = WAL", { simple: true }), "wal");
   applyRuntimeMigrationsToDatabase(rawDatabase, sqliteMigrationsDir);
   rawDatabase.close();
   return {
@@ -635,11 +637,19 @@ function arriveAtBarrier(view, slot) {
 /** Main thread: run one service instance on its own connection in a worker thread. */
 function runConcurrentWorker(workerData) {
   return new Promise((resolve, reject) => {
-    const worker = new Worker(__filename, { workerData });
-    worker.once("message", resolve);
+    const worker = new Worker(__filename, {
+      workerData,
+      // Factory imports initialize global Prisma before runWorker starts.
+      // Keep those imports on the owned fixture, never the inherited app database.
+      env: { ...process.env, DATABASE_URL: `file:${workerData.databasePath}` },
+    });
+    let report;
+    worker.once("message", (value) => { report = value; });
     worker.once("error", reject);
     worker.once("exit", (code) => {
       if (code !== 0) reject(new Error(`worker exited with code ${code}`));
+      else if (!report) reject(new Error("worker exited without a report"));
+      else resolve(report); // Both Prisma connections have disconnected before fixture cleanup.
     });
   });
 }
@@ -648,6 +658,7 @@ function runConcurrentWorker(workerData) {
 async function runWorker({ databasePath, worldId, operationId, barrier }) {
   const view = new Int32Array(barrier);
   const client = createPrisma(databasePath);
+  const bootstrapClient = require("../dist/db/prisma.js").prisma;
   const base = createWorldStructureBackfillStore(client);
   let start = null;
   const store = wrapStore(base, {
@@ -673,6 +684,11 @@ async function runWorker({ databasePath, worldId, operationId, barrier }) {
     return jsonStream(validOutput());
   });
   try {
+    const databases = await bootstrapClient.$queryRawUnsafe("PRAGMA database_list");
+    const bootstrapDatabasePath = databases.find((database) => database.name === "main")?.file;
+    assert.ok(bootstrapDatabasePath);
+    assert.equal(fs.realpathSync(bootstrapDatabasePath), fs.realpathSync(databasePath),
+      "worker bootstrap Prisma must use the isolated fixture");
     const outcome = await service(client, { store }).generatePersistedResult(input(worldId, operationId));
     parentPort.postMessage({
       ok: true,
@@ -686,6 +702,7 @@ async function runWorker({ databasePath, worldId, operationId, barrier }) {
   } finally {
     harness.restore();
     await client.$disconnect();
+    await bootstrapClient.$disconnect();
   }
 }
 

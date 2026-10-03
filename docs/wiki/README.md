@@ -38,6 +38,7 @@ Wiki 不记录单次提交改了什么，也不替代 release notes。它只记�
 - [Creative Hub 边界](./workflows/creative-hub-boundary.md)
 - [桌面客户端分平台构建边界](./workflows/desktop-cross-platform-build.md)
 - [上游同步流程](./workflows/upstream-sync.md)
+- [分叉开发成果的整合边界](./workflows/fork-branch-integration.md)
 - [容器化热更开发环境](./workflows/docker-dev-environment.md)
 
 ### Prompts

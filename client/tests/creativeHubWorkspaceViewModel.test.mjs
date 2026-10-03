@@ -72,10 +72,12 @@ test("workspace recommendation prioritizes interrupt and running state", () => {
   assert.equal(running.recommendation.action, "view_activity");
 });
 
-test("structured recovery, setup and next-suggestion states keep their priority", () => {
+test("failure diagnosis takes priority while setup guidance keeps its structured action", () => {
   const recovery = resolveCreativeHubWorkspacePresentation({
     isRunning: false,
     diagnostics: { failureSummary: "任务失败", recoveryHint: "从检查点恢复" },
+    novelSetup: { title: "新书", stage: "setup_in_progress", recommendedAction: "继续补齐主角目标" },
+    latestTurnSummary: { nextSuggestion: "先写第一章" },
   });
   const setup = resolveCreativeHubWorkspacePresentation({
     isRunning: false,
@@ -87,11 +89,16 @@ test("structured recovery, setup and next-suggestion states keep their priority"
     },
     latestTurnSummary: { nextSuggestion: "先写第一章" },
   });
-  assert.equal(recovery.recommendation.prompt, "从检查点恢复");
+  assert.equal(recovery.recommendation.tone, "danger");
+  assert.equal(recovery.recommendation.action, "send_prompt");
+  assert.equal(recovery.recommendation.actionLabel, "查看失败原因");
+  assert.match(recovery.recommendation.prompt, /^请解释失败原因、执行记录和正式处理入口：/);
+  assert.match(recovery.recommendation.prompt, /从检查点恢复$/);
+  assert.notEqual(recovery.recommendation.prompt, "从检查点恢复", "diagnosis must explain the formal entry instead of issuing a recovery command");
   assert.equal(setup.recommendation.prompt, "继续补齐主角目标");
 });
 
-test("structured thread and turn failures remain recovery actions", () => {
+test("structured thread and turn failures recommend diagnosis through the formal entry", () => {
   const failedTurn = resolveCreativeHubWorkspacePresentation({
     isRunning: false,
     thread: { status: "error", latestError: "模型连接已中断" },
@@ -104,7 +111,10 @@ test("structured thread and turn failures remain recovery actions", () => {
   });
   assert.equal(failedTurn.recommendation.tone, "danger");
   assert.equal(failedTurn.recommendation.action, "send_prompt");
-  assert.equal(failedTurn.recommendation.prompt, "检查模型配置后重试");
+  assert.equal(failedTurn.recommendation.actionLabel, "查看失败原因");
+  assert.match(failedTurn.recommendation.prompt, /^请解释失败原因、执行记录和正式处理入口：/);
+  assert.match(failedTurn.recommendation.prompt, /检查模型配置后重试$/);
+  assert.notEqual(failedTurn.recommendation.prompt, "检查模型配置后重试", "a failed turn recommendation must not submit a raw retry command");
   assert.match(failedTurn.recommendation.description, /模型连接已中断/);
 });
 

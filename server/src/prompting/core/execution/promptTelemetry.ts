@@ -208,7 +208,7 @@ export function recordPromptFailure(input: {
   });
 }
 
-function buildPromptRunResult<T>(input: {
+export function buildPromptRunResult<T>(input: {
   asset: PromptAsset<unknown, unknown, unknown>;
   output: T;
   context: PromptRenderContext;

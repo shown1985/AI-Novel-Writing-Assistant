@@ -60,6 +60,8 @@ import { useNovelAutoDirectorCandidateMutations } from "../components/useNovelAu
 import { hasCreationFoundationChanged } from "./creationFoundationPickerState";
 import type { AutoDirectorCreateDraft } from "./draft/autoDirectorCreateDraft";
 import { ideaInspirationContextKey, isCurrentIdeaInspirationRequest } from "./ideaInspiration";
+import type { CreativeCarryoverContract } from "@ai-novel/shared/types/creativeCarryoverContract";
+import { parseCreativeCarryoverContract } from "@ai-novel/shared/types/creativeCarryoverContract";
 
 interface UseAutoDirectorCreateControllerInput {
   marketBriefId?: string;
@@ -81,6 +83,9 @@ interface UseAutoDirectorCreateControllerInput {
   initialDraft?: AutoDirectorCreateDraft | null;
   workflowTaskId?: string;
   restoredTask?: UnifiedTaskDetail | null;
+  creativeCarryoverContract?: CreativeCarryoverContract | null;
+  requireCreativeCarryoverAdopted?: boolean;
+  onCreativeCarryoverContractChange?: (contract: CreativeCarryoverContract | null) => void;
   onWorkflowTaskChange?: (workflowTaskId: string) => void;
   onBasicFormChange: (patch: Partial<NovelBasicFormState>) => void;
 }
@@ -107,6 +112,9 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
     initialDraft,
     workflowTaskId: workflowTaskIdProp,
     restoredTask,
+    creativeCarryoverContract,
+    requireCreativeCarryoverAdopted = false,
+    onCreativeCarryoverContractChange,
     onWorkflowTaskChange,
     onBasicFormChange,
     marketBriefId,
@@ -144,6 +152,7 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
   });
   const [issuePolicy, setIssuePolicy] = useState<DirectorIssuePolicy | null>(null);
   const confirmSubmitLockedRef = useRef(false);
+  const restoredTaskHydrationIdRef = useRef<string | null>(null);
   const autoApprovalDraft = useDirectorAutoApprovalDraft(true);
   const { applySnapshot: applyAutoApprovalSnapshot } = autoApprovalDraft;
 
@@ -166,9 +175,11 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
   }, [initialStyleProfileId]);
 
   useEffect(() => {
-    if (!restoredTask || restoredTask.meta.lane !== "auto_director") {
+    if (!restoredTask || restoredTask.meta.lane !== "auto_director"
+      || restoredTaskHydrationIdRef.current === restoredTask.id) {
       return;
     }
+    restoredTaskHydrationIdRef.current = restoredTask.id;
     const seedPayload = extractDirectorTaskSeedPayloadFromMeta(restoredTask.meta);
     if (restoredTask.id && restoredTask.id !== workflowTaskId) {
       setWorkflowTaskId(restoredTask.id);
@@ -192,8 +203,12 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
     if (typeof seedPayload?.styleProfileId === "string") {
       setSelectedStyleProfileId(seedPayload.styleProfileId);
     }
+    const restoredContract = parseCreativeCarryoverContract(seedPayload?.creativeCarryoverContract);
+    if (restoredContract) {
+      onCreativeCarryoverContractChange?.(restoredContract);
+    }
     setWorldSetupMode("auto_generate");
-  }, [applyAutoApprovalSnapshot, restoredTask, workflowTaskId]);
+  }, [applyAutoApprovalSnapshot, onCreativeCarryoverContractChange, restoredTask, workflowTaskId]);
 
   const directorBasicForm = useMemo(
     () => patchNovelBasicForm(basicForm, {
@@ -445,7 +460,14 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
     }
   }, [directorTask, executionRequested]);
 
+  const assertCreativeCarryoverAdopted = () => {
+    if (requireCreativeCarryoverAdopted && !creativeCarryoverContract?.adopted) {
+      throw new Error("请先采用创作承接方案，再生成或确认书级方向。");
+    }
+  };
+
   const ensureWorkflowTask = async () => {
+    assertCreativeCarryoverAdopted();
     const nextIdea = requestIdea;
     if (!nextIdea) {
       throw new Error("请先补充起始想法，再继续生成或确认书级方向。");
@@ -474,6 +496,7 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
         issueGovernanceVersion: issuePolicy ? 1 : undefined,
         issuePolicy: issuePolicy ?? undefined,
         issuePolicySource: "global",
+        creativeCarryoverContract: creativeCarryoverContract ?? null,
       },
     });
     const taskId = response.data?.id ?? "";
@@ -497,6 +520,7 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
   };
 
   const buildCandidateRequestPayload = (currentWorkflowTaskId: string) => {
+    assertCreativeCarryoverAdopted();
     if (!requestIdea) {
       throw new Error("请先补充起始想法，再继续生成或确认书级方向。");
     }
@@ -537,6 +561,7 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
 
   const confirmMutation = useMutation({
     mutationFn: async (payload: { candidate: DirectorCandidate; workflowTaskId?: string }) => {
+      assertCreativeCarryoverAdopted();
       const currentWorkflowTaskId = payload.workflowTaskId || await ensureWorkflowTask();
       if (!requestIdea) {
         throw new Error("请先补充起始想法，再继续生成或确认书级方向。");
@@ -649,7 +674,9 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
     setBatches((prev) => applyDirectorCandidateTitleOption(prev, batchId, candidateId, option));
   };
 
-  const canGenerate = idea.trim().length > 0 && !generateMutation.isPending;
+  const canGenerate = idea.trim().length > 0
+    && !generateMutation.isPending
+    && (!requireCreativeCarryoverAdopted || Boolean(creativeCarryoverContract?.adopted));
 
   const updateProductionFoundation = async (patch: Partial<{
     genreId: string;

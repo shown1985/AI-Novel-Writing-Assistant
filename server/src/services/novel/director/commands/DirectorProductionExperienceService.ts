@@ -27,15 +27,13 @@ export function buildProductionExperienceSeed(
   if (!directorInput) {
     throw new AppError("自动导演任务缺少继续生产所需的上下文。", 409);
   }
-  // A chapter range chosen at takeover is the user's stopping point. Keep it when prose starts;
-  // full-book autopilot treats it as the rolling stop boundary instead of writing the whole book.
-  const takeoverRange = directorInput.autoExecutionPlan?.mode === "chapter_range"
-    ? directorInput.autoExecutionPlan
-    : null;
+  // The production interface changes presentation, not the selected range or quality policy.
+  // Apply the shared run-mode contract to the selected plan before filling missing defaults.
+  const selectedPlan = directorInput.autoExecutionPlan ?? seed.autoExecutionPlan;
   const nextInput = applyDirectorRunModeContract({
     ...directorInput,
     runMode: "full_book_autopilot" as const,
-    autoExecutionPlan: takeoverRange ?? buildFullBookAutopilotExecutionPlan(),
+    autoExecutionPlan: selectedPlan ?? buildFullBookAutopilotExecutionPlan(),
     autoApproval: buildFullDirectorAutoApprovalConfig(),
   });
   return {

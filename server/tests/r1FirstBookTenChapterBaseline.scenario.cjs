@@ -43,6 +43,7 @@ async function main() {
     CHAPTER_ARTIFACT_BOUNDARY_TYPE,
   } = fromDist("services", "novel", "runtime", "artifactSync", "index.js");
   const { WorldService } = fromDist("services", "world", "WorldService.js");
+  const { buildWorldStructureFromLegacySource } = fromDist("services", "world", "worldStructure.js");
   const { NovelExportService } = fromDist("modules", "export", "novelExport.service.js");
 
   const originalRagUpsert = ragServices.ragIndexService.enqueueUpsert;
@@ -320,7 +321,15 @@ async function main() {
     const debtChapter = chapters.find((chapter) => chapter.order === fixture.qualityDebt.chapterOrder);
 
     const worldService = new WorldService();
-    await worldService.updateWorld(world.id, { [fixture.worldUpdate.field]: fixture.worldUpdate.value });
+    await worldService.updateWorld(world.id, {
+      [fixture.worldUpdate.field]: fixture.worldUpdate.value,
+      structure: buildWorldStructureFromLegacySource({
+        ...world,
+        [fixture.worldUpdate.field]: fixture.worldUpdate.value,
+      }),
+      operationId: `${fixture.fixtureId}:world-update:${world.id}`,
+      expectedContentRevision: world.contentRevision,
+    });
     await characterService.updateCharacter(novel.id, character.id, {
       currentState: fixture.characterUpdate.currentState,
       currentGoal: fixture.characterUpdate.currentGoal,

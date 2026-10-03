@@ -3,6 +3,10 @@ import {
   type DirectorRunMode,
   type DirectorWorldSetupMode,
 } from "@ai-novel/shared/types/novelDirector";
+import {
+  parseCreativeCarryoverContract,
+  type CreativeCarryoverContract,
+} from "@ai-novel/shared/types/creativeCarryoverContract";
 import type { NovelBasicFormState } from "../../novelBasicInfo.shared";
 import type { AutoDirectorCreateStageKey } from "../directorCreateStages";
 
@@ -37,6 +41,7 @@ export interface AutoDirectorCreateDraft {
   runMode: DirectorRunMode;
   worldSetupMode: DirectorWorldSetupMode;
   selectedStyleProfileId: string;
+  creativeCarryoverContract?: CreativeCarryoverContract | null;
   savedAt: string;
 }
 
@@ -48,6 +53,7 @@ export interface AutoDirectorCreateDraftInput {
   runMode: DirectorRunMode;
   worldSetupMode: DirectorWorldSetupMode;
   selectedStyleProfileId: string;
+  creativeCarryoverContract?: CreativeCarryoverContract | null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -105,6 +111,9 @@ export function saveAutoDirectorCreateDraft(
     runMode: input.runMode,
     worldSetupMode: input.worldSetupMode,
     selectedStyleProfileId: input.selectedStyleProfileId,
+    ...(input.creativeCarryoverContract === undefined ? {} : {
+      creativeCarryoverContract: input.creativeCarryoverContract,
+    }),
     savedAt: new Date().toISOString(),
   };
 
@@ -153,6 +162,9 @@ export function loadAutoDirectorCreateDraft(
       runMode: value.runMode as DirectorRunMode,
       worldSetupMode: value.worldSetupMode,
       selectedStyleProfileId: value.selectedStyleProfileId,
+      ...(value.creativeCarryoverContract === undefined ? {} : {
+        creativeCarryoverContract: parseCreativeCarryoverContract(value.creativeCarryoverContract),
+      }),
       savedAt: value.savedAt,
     };
   } catch {

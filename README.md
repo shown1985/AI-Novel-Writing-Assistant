@@ -166,6 +166,10 @@ Open-source AI novel writing assistant and long-form production studio.
 #### 修复
 
 - 开局想法弹窗保持合适的宽高与屏幕留白；生成期间可直接查看动态等待、耗时和本次 AI 实况。
+- 使用官方 GLM 模型进行创作时，思考开关与结构化生成按模型支持的方式生效；连接失败可保留明确的错误原因。
+- 切换自动导演生产界面时，保留所选章节范围及审校、修复开关。
+- 自动导演等待人工恢复时，保留原暂停原因，关联任务缺失不会改变恢复提示。
+- 切换或清除参考拆书后，开书页面使用所选来源；已采用的创作承接方案仅随对应来源保存。
 
 完整历史更新见 [docs/releases/release-notes.md](./docs/releases/release-notes.md)。
 

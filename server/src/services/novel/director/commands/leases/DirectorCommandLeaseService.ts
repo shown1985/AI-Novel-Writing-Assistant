@@ -150,6 +150,11 @@ export class DirectorCommandLeaseService {
       },
     });
     if (!task) return null;
+    // An existing policy pause is authoritative. Linked-job checks must not replace its
+    // recovery reason or make automatic lease recovery act as a user recovery command.
+    if (task.pendingManualRecovery) {
+      return { taskPendingManualRecovery: true, linkedPipelineJob: null };
+    }
     const pipelineJobId = parseLinkedPipelineJobId(task.seedPayloadJson);
     if (!pipelineJobId) {
       return { taskPendingManualRecovery: task.pendingManualRecovery, linkedPipelineJob: null };

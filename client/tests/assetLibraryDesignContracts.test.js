@@ -105,7 +105,9 @@ test("knowledge library presents a document shelf before maintenance controls", 
 
 test("knowledge maintenance keeps recovery obvious and technical detail secondary", () => {
   assert.match(knowledgeOps, /资料检索可用状态/);
-  assert.match(knowledgeOps, /检查检索设置/);
+  assert.match(knowledgeOps, /onClick=\{onOpenSettings\}[\s\S]*?打开检索设置/);
+  assert.match(knowledgeOps, /onClick=\{ragReadinessState === "error" \? onRetryReadiness : onCheckReadiness\}/);
+  assert.match(knowledgeOps, /disabled=\{diagnosticBusy\}/);
   assert.match(knowledgeOps, /资料同步记录/);
   assert.match(knowledgeOps, /任务详情/);
   assert.doesNotMatch(knowledgeOps, /最近失败任务/);

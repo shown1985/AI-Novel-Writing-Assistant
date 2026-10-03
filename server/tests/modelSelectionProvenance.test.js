@@ -63,7 +63,7 @@ test("model route resolution preserves the frozen value and source matrix", asyn
       taskType: "planner",
       row: null,
       expected: {
-        provider: "deepseek", model: "deepseek-v4-flash", temperature: 0.3,
+        provider: "deepseek", model: "deepseek-flash", temperature: 0.3,
         maxTokens: null, routeKey: "planner", routeDegraded: false,
       },
       sources: {
@@ -77,7 +77,7 @@ test("model route resolution preserves the frozen value and source matrix", asyn
       taskType: "planner",
       error: new Error("route store unavailable"),
       expected: {
-        provider: "deepseek", model: "deepseek-v4-flash", temperature: 0.3,
+        provider: "deepseek", model: "deepseek-flash", temperature: 0.3,
         maxTokens: null, routeKey: "planner", routeDegraded: false,
       },
       sources: {
@@ -91,7 +91,7 @@ test("model route resolution preserves the frozen value and source matrix", asyn
       taskType: "critical_review",
       row: null,
       expected: {
-        provider: "deepseek", model: "deepseek-v4-flash", temperature: 0.1,
+        provider: "deepseek", model: "deepseek-flash", temperature: 0.1,
         maxTokens: null, routeKey: "critical_review", routeDegraded: true,
       },
       sources: {
@@ -105,7 +105,7 @@ test("model route resolution preserves the frozen value and source matrix", asyn
       taskType: "critical_review",
       error: new Error("route store unavailable"),
       expected: {
-        provider: "deepseek", model: "deepseek-v4-flash", temperature: 0.1,
+        provider: "deepseek", model: "deepseek-flash", temperature: 0.1,
         maxTokens: null, routeKey: "critical_review", routeDegraded: true,
       },
       sources: {
@@ -492,7 +492,7 @@ test("factory without a task preserves the frozen default-selection matrix", asy
       options: {},
       deepSeekSecret: { key: "test-key" },
       expected: {
-        provider: "deepseek", model: "deepseek-v4-flash", temperature: 0.7,
+        provider: "deepseek", model: "deepseek-flash", temperature: 0.7,
         maxTokens: null, routeKey: null, routeDegraded: false,
       },
       sources: {
