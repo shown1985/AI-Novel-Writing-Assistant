@@ -1,0 +1,119 @@
+name: Windows Desktop Candidate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "codex/windows-installer-*"
+
+permissions:
+  contents: read
+
+jobs:
+  package-windows-x64:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    env:
+      AI_NOVEL_LOCAL_DESKTOP_BUILD: "true"
+      AI_NOVEL_RELEASE_CHANNEL: beta
+      AI_NOVEL_GITHUB_OWNER: shown1985
+      AI_NOVEL_GITHUB_REPO: AI-Novel-Writing-Assistant
+    steps:
+      - name: Verify candidate source
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REPOSITORY -ne 'shown1985/AI-Novel-Writing-Assistant') {
+            throw "Candidate builds are restricted to the fork repository."
+          }
+          if ($env:GITHUB_REF_TYPE -ne 'branch' -or $env:GITHUB_REF_NAME -notlike 'codex/windows-installer-*') {
+            throw "Candidate builds require a codex/windows-installer-* branch."
+          }
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.6.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install desktop icon tooling
+        run: python -m pip install --disable-pip-version-check pillow
+
+      - name: Regenerate desktop icon assets
+        run: python desktop/scripts/generate-desktop-icons.py
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build and stage desktop app
+        run: pnpm stage:desktop
+
+      - name: Verify database migrations with isolated fixtures
+        run: pnpm --filter @ai-novel/server exec node --test tests/prismaMigrationCompleteness.test.js tests/runtimeMigrations.test.js
+
+      - name: Build unsigned NSIS installer
+        run: pnpm dist:desktop:nsis:reuse-stage
+
+      - name: Verify packaged desktop layout
+        run: node desktop/scripts/verify-desktop-package.cjs --platform win32 --arch x64
+
+      - name: Verify isolated install and reinstall
+        run: node desktop/scripts/verify-desktop-installer.cjs
+
+      - name: Prepare candidate download
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dist = 'desktop/build/dist'
+          $output = 'desktop/build/candidate-download'
+          $version = (Get-Content 'desktop/package.json' -Raw | ConvertFrom-Json).version
+          $expectedName = "Biz Novel Studio-$version-setup-x64.exe"
+          $installer = Join-Path $dist $expectedName
+          if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
+            throw "Expected NSIS installer was not found: $expectedName"
+          }
+          New-Item -ItemType Directory -Path $output -Force | Out-Null
+          Copy-Item -LiteralPath $installer -Destination (Join-Path $output $expectedName)
+          $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $expectedName" | Set-Content -LiteralPath (Join-Path $output 'SHA256SUMS.txt') -Encoding ascii
+          $buildInfo = [ordered]@{
+            repository = $env:GITHUB_REPOSITORY
+            branch = $env:GITHUB_REF_NAME
+            commit = $env:GITHUB_SHA
+            version = $version
+            channel = 'beta'
+            localCandidate = $true
+            signed = $false
+            installer = $expectedName
+            installerSha256 = $hash
+          }
+          $buildInfo | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'build-info.json') -Encoding utf8
+
+      - name: Upload Windows x64 candidate
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-x64-${{ github.sha }}
+          path: |
+            desktop/build/candidate-download/*-setup-x64.exe
+            desktop/build/candidate-download/SHA256SUMS.txt
+            desktop/build/candidate-download/build-info.json
+          if-no-files-found: error
+          retention-days: 14

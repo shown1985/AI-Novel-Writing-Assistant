@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const { createRequire } = require("node:module");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
+const { prepareBuilderArgs, isPublishRequested } = require("./packaging/local-build-publish-policy.cjs");
 
 const repoRoot = path.resolve(__dirname, "..", "..");
 const desktopDir = path.resolve(__dirname, "..");
@@ -94,7 +95,7 @@ function firstNonEmpty(...values) {
 function normalizeBuildEnvironment(sourceEnv, args, options) {
   const env = { ...sourceEnv };
   const releaseChannel = firstNonEmpty(env.AI_NOVEL_RELEASE_CHANNEL, "beta").toLowerCase();
-  const isPublishRequested = args.includes("--publish");
+  const publishRequested = isPublishRequested(args);
   const allowUnsignedRelease =
     firstNonEmpty(
       env.AI_NOVEL_ALLOW_UNSIGNED_RELEASE,
@@ -132,12 +133,12 @@ function normalizeBuildEnvironment(sourceEnv, args, options) {
     );
   }
 
-  if (isPublishRequested && !env.GH_TOKEN) {
+  if (publishRequested && !env.GH_TOKEN) {
     throw new Error("GitHub publish requested but no GH_TOKEN/GITHUB_TOKEN was provided.");
   }
 
   console.log(
-    `[dist:desktop] platform=${options.isWindowsBuild ? "windows" : options.isMacBuild ? "mac" : "default"} releaseChannel=${releaseChannel} publish=${isPublishRequested ? "yes" : "no"} signing=${options.isWindowsBuild ? hasSigning ? "configured" : allowUnsignedRelease ? "unsigned-opt-in" : "unsigned-beta" : "platform-managed"}`,
+    `[dist:desktop] platform=${options.isWindowsBuild ? "windows" : options.isMacBuild ? "mac" : "default"} releaseChannel=${releaseChannel} publish=${publishRequested ? "yes" : "no"} signing=${options.isWindowsBuild ? hasSigning ? "configured" : allowUnsignedRelease ? "unsigned-opt-in" : "unsigned-beta" : "platform-managed"}`,
   );
 
   return env;
@@ -185,7 +186,8 @@ function rebuildMacStagedNativeDependencies() {
 }
 
 function main() {
-  const requestedArgs = process.argv.slice(2);
+  const localBuild = firstNonEmpty(process.env.AI_NOVEL_LOCAL_DESKTOP_BUILD).toLowerCase() === "true";
+  const requestedArgs = prepareBuilderArgs(process.argv.slice(2), localBuild);
   const isWindowsBuild = requestedArgs.includes("--win");
   const isMacBuild = requestedArgs.includes("--mac");
   ensurePatchedElectronBuilder({ includeNsis: isWindowsBuild });
