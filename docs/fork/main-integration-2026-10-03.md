@@ -59,6 +59,8 @@
 
 日志目录：`/var/folders/tc/32lgq94j7p1037w4sj3hrdg40000gn/T/ai-novel-main-integration-20261003-k_d66ilr`。
 
+该生成时路径在后续仓库整理中归档，验证日志与临时库保存为私有恢复档案的 `integration-evidence` 条目；路径与恢复说明见 [分支整理记录](./branch-cleanup-2026-10-03.md)。
+
 页面交互与真实模型调用留给 Owner 验收。没有重新打 Windows 安装包；历史候选包只证明其实际来源提交的编译/首次启动/安装结果，新主线的页面与后端输入不复用历史包的验证结论。没有推送、tag 或公开上传。
 
 ## 阶段 Review
