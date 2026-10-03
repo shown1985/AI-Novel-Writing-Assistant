@@ -24,6 +24,7 @@ Docker Desktop 在 macOS 上提供的是 Linux 容器环境，不是 macOS 容�
 - Windows 测试安装包沿用上述原生构建边界，在 `desktop-windows-candidate.yml` 的 Windows runner 构建。专属 `codex/windows-installer-*` 分支推送或手动触发生成 NSIS 安装包，候选身份由源码提交 SHA 标识；不通过改版本或公开 tag 冒充正式发布。
 - 候选构建设置 `AI_NOVEL_LOCAL_DESKTOP_BUILD=true`，使生成包的 `aiNovelLocalBuild` 元数据关闭公开自动更新。运行时数据目录、应用身份和版本源沿用现有桌面能力。用户配置、数据库和小说内容不属于构建输入。
 - 候选 workflow 仅有 `contents: read` 权限，保留通过检查的安装包、SHA-256 校验值与来源信息到短期 Actions artifact。只上传明确的产物白名单，不上传整个 staging、工作区或数据目录；生成测试安装包不调用公开发布脚本。
+- 安装验证失败时可保留安装器用于诊断，来源信息必须携带实际 `installerSmokeOutcome` 和 `readyForAcceptance=false`，不能把 artifact 存在视为可验收。只有构建、结构验证成功且安装验证确实执行后才允许准备产物；上传以准备步骤成功为前提。
 - 持续构建环境中 electron-builder 会推断默认发布模式，不能只依赖候选分支名称或没有令牌。包装入口对本地构建显式强制 `--publish never`，并在启动构建前拒绝冲突或重复的发布参数；正式发布调用继续沿用原有令牌校验。
 - macOS 的最后窗口关闭后应用进程可以继续存活；用户从 Dock 再次激活应用时，应复用已经运行的本地服务并重新创建主窗口。
 - macOS 打包时，宿主 Node 与 Electron 使用不同的原生 ABI：构建包装器先把 staging 中的 `better-sqlite3` 重建为当前 Electron arm64 ABI，electron-builder 在 Mac 目标关闭自动重建，并在签名前把该绑定写入 app bundle；打包结束后再恢复宿主 Node 的绑定。不要把 Electron ABI 的 staging 原生模块直接留给宿主 Node 测试使用。
@@ -37,6 +38,8 @@ Docker Desktop 在 macOS 上提供的是 Linux 容器环境，不是 macOS 容�
 3. 从安装介质复制到独立目录后能够启动本地服务、创建或打开 SQLite 数据库、加载 renderer，并在正常退出后再次启动。
 
 本地运行验收优先使用 `pnpm verify:desktop:runtime:mac`。脚本按每次启动前的日志偏移解析新的健康端口，避免把前一次已关闭服务的端口当作当前实例；它不包含真实模型调用，也不替代首次配置、世界生成和 Dock 点击的人工验收。
+
+Windows 安装验证同样按每次启动前的日志字节偏移读取新增记录；首次安装与重装后启动都必须各自产生窗口显示和后台健康信息，不能用第一次启动的日志证明第二次成功。验证失败时结束该次测试进程，避免影响后续卸载或 runner 退出。
 
 真实 LLM 工作流验证还需要有效的模型连接。没有模型时，桌面构建验收只确认首次配置引导和本地服务，不应伪造世界观生成成功。
 
