@@ -189,7 +189,7 @@ test("idea inspirations bound creative sampling and retry with the original cont
   assert.match(service, /Math\.min\(0\.8, Math\.max\(0\.55/);
   assert.match(service, /maxTokens: IDEA_INSPIRATION_MAX_TOKENS/);
   assert.match(context, /error instanceof StructuredOutputError && error\.category !== "transport_error"/);
-  assert.match(service, /runIdeaInspirationPrompt\(input, IDEA_INSPIRATION_RETRY_TEMPERATURE, contextSummary\)/);
+  assert.match(service, /runIdeaInspirationPrompt\(input, IDEA_INSPIRATION_RETRY_TEMPERATURE, contextSummary, options\.liveItemKey\)/);
   assert.match(prompt, /version: "v5"/);
   assert.match(prompt, /maxAttempts: 0/);
   assert.match(prompt, /structuredOutputHint/);

@@ -544,6 +544,7 @@ function AutoDirectorCreatePageContent() {
           idea={controller.idea}
           onIdeaChange={controller.setIdea}
           ideaInspirations={controller.ideaInspirations}
+          ideaInspirationLiveRequest={controller.ideaInspirationLiveRequest}
           isGeneratingIdeaInspirations={controller.isGeneratingIdeaInspirations}
           ideaInspirationError={controller.ideaInspirationError}
           onGenerateIdeaInspirations={() => {

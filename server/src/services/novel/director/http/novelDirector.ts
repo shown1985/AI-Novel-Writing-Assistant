@@ -356,8 +356,10 @@ router.post("/tasks", validate({ body: createTaskSchema }), async (req, res, nex
 
 router.post("/idea-inspirations", validate({ body: ideaContextRequestSchema }), async (req, res, next) => {
   try {
+    const liveItemKey = z.string().uuid().optional().parse(req.get("X-Idea-Inspiration-Id"));
     const data = await novelDirectorIdeaInspirationService.generate(
       req.body as DirectorIdeaInspirationRequest,
+      { liveItemKey },
     ) as DirectorIdeaInspirationsResponse;
     res.status(200).json(accepted(data, "Director idea inspirations generated."));
   } catch (error) {

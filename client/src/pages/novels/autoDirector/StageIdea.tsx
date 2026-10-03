@@ -29,6 +29,7 @@ interface StageIdeaProps {
   idea: string;
   onIdeaChange: (value: string) => void;
   ideaInspirations: DirectorIdeaInspiration[];
+  ideaInspirationLiveRequest: { key: string; startedAt: number; completedAt?: number } | null;
   isGeneratingIdeaInspirations: boolean;
   ideaInspirationError: string;
   onGenerateIdeaInspirations: () => void;
@@ -98,6 +99,7 @@ export default function StageIdea({
   idea,
   onIdeaChange,
   ideaInspirations,
+  ideaInspirationLiveRequest,
   isGeneratingIdeaInspirations,
   ideaInspirationError,
   onGenerateIdeaInspirations,
@@ -386,6 +388,7 @@ export default function StageIdea({
         onOpenChange={setShowInspirations}
         source={inspirationSource}
         ideas={ideaInspirations}
+        liveRequest={ideaInspirationLiveRequest}
         isGenerating={isGeneratingIdeaInspirations}
         error={ideaInspirationError}
         onGenerate={() => {

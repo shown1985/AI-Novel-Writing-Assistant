@@ -131,6 +131,7 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
     initialStyleProfileId || initialDraft?.selectedStyleProfileId || "",
   );
   const [ideaInspirations, setIdeaInspirations] = useState<DirectorIdeaInspiration[]>([]);
+  const [ideaInspirationCompletion, setIdeaInspirationCompletion] = useState<{ key: string; completedAt: number } | null>(null);
   const ideaInspirationRequestIdRef = useRef(0);
   const [ideaConstellationOptions, setIdeaConstellationOptions] = useState<DirectorIdeaConstellationOption[]>([]);
   const [candidatePatchFeedbacks, setCandidatePatchFeedbacks] = useState<Record<string, string>>({});
@@ -289,14 +290,20 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
     ideaInspirationRequestIdRef.current += 1;
   }
   const ideaInspirationMutation = useMutation({
-    mutationFn: ({ payload }: {
+    mutationFn: ({ payload, liveItemKey }: {
       requestId: number;
       context: string;
       payload: ReturnType<typeof buildIdeaContextPayload>;
-    }) => generateDirectorIdeaInspirations(payload),
+      liveItemKey: string;
+      startedAt: number;
+    }) => generateDirectorIdeaInspirations(payload, liveItemKey),
     onSuccess: (response, variables) => {
       if (!isCurrentIdeaInspirationRequest(variables.requestId, ideaInspirationRequestIdRef.current, variables.context, currentIdeaInspirationContextRef.current)) return;
       setIdeaInspirations(response.data?.ideas ?? []);
+    },
+    onSettled: (_response, _error, variables) => {
+      if (!isCurrentIdeaInspirationRequest(variables.requestId, ideaInspirationRequestIdRef.current, variables.context, currentIdeaInspirationContextRef.current)) return;
+      setIdeaInspirationCompletion({ key: variables.liveItemKey, completedAt: Date.now() });
     },
   });
   useEffect(() => {
@@ -313,6 +320,8 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
       requestId,
       context: ideaInspirationContext,
       payload: buildIdeaContextPayload(),
+      liveItemKey: crypto.randomUUID(),
+      startedAt: Date.now(),
     });
   };
   const visibleIdeaInspirationRequest = ideaInspirationMutation.variables;
@@ -324,6 +333,15 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
       ideaInspirationContext,
     );
   const isGeneratingIdeaInspirations = Boolean(ideaInspirationRequestIsCurrent && ideaInspirationMutation.isPending);
+  const ideaInspirationLiveRequest = ideaInspirationRequestIsCurrent
+    ? {
+      key: visibleIdeaInspirationRequest.liveItemKey,
+      startedAt: visibleIdeaInspirationRequest.startedAt,
+      completedAt: ideaInspirationCompletion?.key === visibleIdeaInspirationRequest.liveItemKey
+        ? ideaInspirationCompletion.completedAt
+        : undefined,
+    }
+    : null;
   const ideaInspirationError = ideaInspirationRequestIsCurrent && ideaInspirationMutation.isError
     ? ideaInspirationMutation.error instanceof Error
       ? ideaInspirationMutation.error.message
@@ -739,6 +757,7 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
     idea,
     setIdea,
     ideaInspirations,
+    ideaInspirationLiveRequest,
     isGeneratingIdeaInspirations,
     ideaInspirationError,
     generateIdeaInspirations,

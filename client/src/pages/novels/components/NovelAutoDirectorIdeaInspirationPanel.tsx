@@ -32,7 +32,6 @@ export default function NovelAutoDirectorIdeaInspirationPanel({
           {isGenerating ? "生成中..." : error ? "重试" : ideas.length > 0 ? "换一组" : "生成灵感"}
         </Button>
       </div>
-      {isGenerating ? <p className="py-8 text-center text-sm text-muted-foreground" role="status">正在结合你的输入准备开局想法...</p> : null}
       {!isGenerating && error ? <p className="py-6 text-sm text-destructive" role="alert">{error}</p> : null}
       {!isGenerating && !error && ideas.length === 0 ? <p className="py-6 text-sm text-muted-foreground">暂时没有生成想法，请重试。</p> : null}
       {!isGenerating && !error && ideas.length > 0 ? (
