@@ -13,6 +13,7 @@ test("director planning stages expose standard node adapter contracts", () => {
     "story_macro",
     "structured_outline",
     "volume_strategy",
+    "world_setup",
   ]);
 
   for (const [stage, adapter] of Object.entries(DIRECTOR_STAGE_NODE_ADAPTERS)) {
@@ -39,6 +40,16 @@ test("structured outline adapter declares chapter task sheet output", () => {
   assert.deepEqual(adapter.writes, ["chapter_task_sheet"]);
   assert.equal(adapter.waitingState.stage, "structured_outline");
   assert.equal(adapter.waitingState.itemKey, "chapter_detail_bundle");
+});
+
+test("world setup adapter writes the world skeleton from book-level planning", () => {
+  const adapter = getDirectorStageNodeAdapter("world_setup");
+
+  assert.equal(adapter.nodeKey, "world_setup_phase");
+  assert.deepEqual(adapter.reads, ["story_macro", "book_contract", "book_seed"]);
+  assert.deepEqual(adapter.writes, ["world_skeleton"]);
+  assert.equal(adapter.waitingState.stage, "world_setup");
+  assert.equal(adapter.waitingState.itemKey, "world_setup");
 });
 
 test("story macro and book contract use independent write contracts", () => {

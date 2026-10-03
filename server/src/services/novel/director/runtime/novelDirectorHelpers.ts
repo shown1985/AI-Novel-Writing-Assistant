@@ -142,9 +142,25 @@ export function applyDirectorRunModeContract<T extends {
     runMode,
     autoExecutionPlan: input.autoExecutionPlan?.mode === "chapter_range"
       ? input.autoExecutionPlan
-      : buildFullBookAutopilotExecutionPlan(),
+      : {
+        ...buildFullBookAutopilotExecutionPlan(),
+        ...resolveExplicitQualityToggles(input.autoExecutionPlan),
+      },
     autoApproval: buildFullDirectorAutoApprovalConfig(),
   };
+}
+
+/**
+ * Full-book autopilot is already AI-led, so an explicit choice to turn off automatic review or
+ * repair is kept instead of being forced back on; review and repair stay on by default.
+ * Repair only runs after review, so turning review off also turns repair off.
+ */
+function resolveExplicitQualityToggles(
+  plan: DirectorAutoExecutionPlan | undefined,
+): Pick<DirectorAutoExecutionPlan, "autoReview" | "autoRepair"> {
+  const autoReview = typeof plan?.autoReview === "boolean" ? plan.autoReview : true;
+  const autoRepair = autoReview && (typeof plan?.autoRepair === "boolean" ? plan.autoRepair : true);
+  return { autoReview, autoRepair };
 }
 
 export function normalizeDirectorTargetChapterCount(value: number | null | undefined, fallback = 80): number {

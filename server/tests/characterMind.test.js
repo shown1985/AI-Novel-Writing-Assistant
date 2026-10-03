@@ -25,14 +25,23 @@ test("character mind persistence archives the old current snapshot before creati
   const service = new CharacterMindService();
   const originalTransaction = prisma.$transaction;
   const archivalCalls = [];
+  const replayDeletes = [];
   const createdRows = [];
+  const operations = [];
   prisma.$transaction = async (callback) => callback({
     characterMindSnapshot: {
+      deleteMany: async (args) => {
+        operations.push("deleteMany");
+        replayDeletes.push(args);
+        return { count: 0 };
+      },
       updateMany: async (args) => {
+        operations.push("updateMany");
         archivalCalls.push(args);
         return { count: 1 };
       },
       create: async (args) => {
+        operations.push("create");
         const row = {
           id: `snapshot-${createdRows.length + 1}`,
           ...args.data,
@@ -53,13 +62,64 @@ test("character mind persistence archives the old current snapshot before creati
       snapshot: createSnapshot(),
     }]);
 
+    // A retried artifact delta for the same source chapter replaces that
+    // chapter's earlier mind snapshot instead of appending a duplicate.
+    assert.deepEqual(replayDeletes, [{
+      where: {
+        novelId: "novel-1",
+        sourceType: "artifact_delta",
+        sourceChapterId: "chapter-8",
+        characterId: { in: ["character-1"] },
+      },
+    }]);
     assert.deepEqual(archivalCalls[0], {
       where: { novelId: "novel-1", characterId: "character-1", isCurrent: true },
       data: { isCurrent: false },
     });
+    assert.deepEqual(operations, ["deleteMany", "updateMany", "create"]);
     assert.equal(createdRows[0].isCurrent, true);
     assert.equal(snapshots[0].sourceType, "artifact_delta");
     assert.deepEqual(snapshots[0].evidence, ["程秩把后门铜钥匙收进袖中。"]);
+  } finally {
+    prisma.$transaction = originalTransaction;
+  }
+});
+
+test("character mind persistence keeps earlier snapshots for non-chapter refreshes", async () => {
+  const service = new CharacterMindService();
+  const originalTransaction = prisma.$transaction;
+  const operations = [];
+  prisma.$transaction = async (callback) => callback({
+    characterMindSnapshot: {
+      deleteMany: async () => {
+        operations.push("deleteMany");
+        return { count: 0 };
+      },
+      updateMany: async () => {
+        operations.push("updateMany");
+        return { count: 1 };
+      },
+      create: async (args) => {
+        operations.push("create");
+        return {
+          id: "snapshot-refresh",
+          ...args.data,
+          createdAt: new Date("2026-07-13T00:00:00.000Z"),
+          updatedAt: new Date("2026-07-13T00:00:00.000Z"),
+        };
+      },
+    },
+  });
+
+  try {
+    await service.persistSnapshots("novel-1", [{
+      characterId: "character-1",
+      sourceChapterId: null,
+      sourceType: "manual_refresh",
+      snapshot: createSnapshot(),
+    }]);
+
+    assert.deepEqual(operations, ["updateMany", "create"]);
   } finally {
     prisma.$transaction = originalTransaction;
   }

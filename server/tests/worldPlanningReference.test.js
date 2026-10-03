@@ -6,7 +6,7 @@ const { resolveDirectorIdeaContext } = require("../dist/services/novel/director/
 const { marketRadarService } = require("../dist/modules/marketRadar/application/MarketRadarService.js");
 const promptRunner = require("../dist/prompting/core/promptRunner.js");
 const { StructuredOutputError } = require("../dist/llm/structuredOutput.js");
-const { NovelDirectorIdeaInspirationService } = require("../dist/services/novel/director/NovelDirectorIdeaInspirationService.js");
+const { NovelDirectorIdeaInspirationService } = require("../dist/services/novel/director/idea/NovelDirectorIdeaInspirationService.js");
 const { directorIdeaInspirationPrompt } = require("../dist/prompting/prompts/novel/ideaInspiration.prompts.js");
 const { NovelDirectorIdeaConstellationService } = require("../dist/services/novel/director/idea/NovelDirectorIdeaConstellationService.js");
 

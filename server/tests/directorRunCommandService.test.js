@@ -538,7 +538,70 @@ test("director command service queues policy updates without directly mutating r
   }
 });
 
-test("director command service applies the full-book autopilot contract before queueing confirmation", async () => {
+test("director command service applies the full-book autopilot contract and keeps explicit quality toggles", async () => {
+  const harness = createHarness(createTask({
+    novelId: null,
+    status: "waiting_approval",
+  }));
+  try {
+    await harness.service.enqueueConfirmCandidateCommand(createConfirmRequest({
+      runMode: "full_book_autopilot",
+      autoExecutionPlan: {
+        mode: "volume",
+        volumeOrder: 1,
+        autoReview: false,
+        autoRepair: false,
+      },
+      autoApproval: {
+        enabled: false,
+        approvalPointCodes: ["candidate_direction_confirmed"],
+      },
+    }));
+
+    const payload = JSON.parse(harness.commands[0].payloadJson);
+    assert.equal(payload.confirmRequest.runMode, "full_book_autopilot");
+    assert.deepEqual(payload.confirmRequest.autoExecutionPlan, {
+      mode: "book",
+      autoReview: false,
+      autoRepair: false,
+    });
+    assert.equal(payload.confirmRequest.autoApproval.enabled, true);
+    assert.ok(payload.confirmRequest.autoApproval.approvalPointCodes.includes("chapter_execution_continue"));
+    assert.ok(payload.confirmRequest.autoApproval.approvalPointCodes.includes("replan_continue"));
+    assert.deepEqual(harness.bootstraps[0].seedPayload.autoExecutionPlan, {
+      mode: "book",
+      autoReview: false,
+      autoRepair: false,
+    });
+    assert.equal(harness.bootstraps[0].seedPayload.autoApproval.enabled, true);
+  } finally {
+    harness.restore();
+  }
+});
+
+
+test("director command service keeps review and repair on by default under the full-book autopilot contract", async () => {
+  const harness = createHarness(createTask({
+    novelId: null,
+    status: "waiting_approval",
+  }));
+  try {
+    await harness.service.enqueueConfirmCandidateCommand(createConfirmRequest({
+      runMode: "full_book_autopilot",
+      autoExecutionPlan: { mode: "volume", volumeOrder: 1 },
+    }));
+
+    const payload = JSON.parse(harness.commands[0].payloadJson);
+    assert.deepEqual(payload.confirmRequest.autoExecutionPlan, {
+      mode: "book",
+      autoReview: true,
+      autoRepair: true,
+    });
+  } finally {
+    harness.restore();
+  }
+});
+test("director command service preserves an explicit chapter range while applying full-book autopilot approval", async () => {
   const harness = createHarness(createTask({
     novelId: null,
     status: "waiting_approval",
@@ -561,18 +624,60 @@ test("director command service applies the full-book autopilot contract before q
     const payload = JSON.parse(harness.commands[0].payloadJson);
     assert.equal(payload.confirmRequest.runMode, "full_book_autopilot");
     assert.deepEqual(payload.confirmRequest.autoExecutionPlan, {
-      mode: "book",
-      autoReview: true,
-      autoRepair: true,
+      mode: "chapter_range",
+      endOrder: 10,
+      autoReview: false,
+      autoRepair: false,
     });
     assert.equal(payload.confirmRequest.autoApproval.enabled, true);
     assert.ok(payload.confirmRequest.autoApproval.approvalPointCodes.includes("chapter_execution_continue"));
     assert.ok(payload.confirmRequest.autoApproval.approvalPointCodes.includes("replan_continue"));
     assert.deepEqual(harness.bootstraps[0].seedPayload.autoExecutionPlan, {
-      mode: "book",
-      autoReview: true,
-      autoRepair: true,
+      mode: "chapter_range",
+      endOrder: 10,
+      autoReview: false,
+      autoRepair: false,
     });
+    assert.equal(harness.bootstraps[0].seedPayload.autoApproval.enabled, true);
+  } finally {
+    harness.restore();
+  }
+});
+
+test("director command service keeps an explicit rolling chapter target under the full-book autopilot contract", async () => {
+  const harness = createHarness(createTask({
+    novelId: null,
+    status: "waiting_approval",
+  }));
+  try {
+    await harness.service.enqueueConfirmCandidateCommand(createConfirmRequest({
+      runMode: "full_book_autopilot",
+      autoExecutionPlan: {
+        mode: "chapter_range",
+        endOrder: 10,
+        autoReview: false,
+        autoRepair: false,
+      },
+      autoApproval: {
+        enabled: false,
+        approvalPointCodes: ["candidate_direction_confirmed"],
+      },
+    }));
+
+    const payload = JSON.parse(harness.commands[0].payloadJson);
+    assert.equal(payload.confirmRequest.runMode, "full_book_autopilot");
+    assert.deepEqual(payload.confirmRequest.autoExecutionPlan, {
+      mode: "chapter_range",
+      endOrder: 10,
+      autoReview: false,
+      autoRepair: false,
+    });
+    assert.equal(payload.confirmRequest.autoApproval.enabled, true);
+    assert.ok(payload.confirmRequest.autoApproval.approvalPointCodes.includes("chapter_execution_continue"));
+    assert.deepEqual(
+      harness.bootstraps[0].seedPayload.autoExecutionPlan,
+      payload.confirmRequest.autoExecutionPlan,
+    );
     assert.equal(harness.bootstraps[0].seedPayload.autoApproval.enabled, true);
   } finally {
     harness.restore();
@@ -743,6 +848,176 @@ test("director command service auto requeues first stale continue lease", async 
     assert.equal(harness.task.status, "queued");
     assert.equal(harness.task.pendingManualRecovery, false);
     assert.equal(harness.task.lastError, null);
+  } finally {
+    harness.restore();
+  }
+});
+
+test("director command stale recovery reattaches to a linked pipeline without spending another command retry", async () => {
+  const task = createTask({
+    status: "running",
+    pendingManualRecovery: false,
+    lastError: null,
+    seedPayloadJson: JSON.stringify({
+      issueGovernanceVersion: 1,
+      issuePolicy: { maxAutomaticRetries: 1, issueActions: {} },
+      issuePolicySource: "global",
+      runMode: "full_book_autopilot",
+      autoExecution: { pipelineJobId: "job-1" },
+    }),
+  });
+  const harness = createHarness(task, null, {
+    id: "job-1",
+    novelId: "novel-1",
+    status: "running",
+    pendingManualRecovery: false,
+    cancelRequestedAt: null,
+    error: null,
+    payload: JSON.stringify({ workflowTaskId: "task-1" }),
+  });
+  try {
+    await harness.service.enqueueContinueCommand("task-1");
+    harness.commands[0].status = "running";
+    harness.commands[0].leaseOwner = "worker-a";
+    harness.commands[0].attempt = 2;
+    harness.commands[0].leaseExpiresAt = new Date("2026-04-29T12:00:00.000Z");
+
+    const count = await harness.service.recoverStaleLeases(new Date("2026-04-29T12:01:00.000Z"));
+
+    assert.equal(count, 1);
+    assert.equal(harness.commands[0].status, "queued");
+    assert.equal(harness.commands[0].attempt, 2);
+    assert.equal(harness.requeued.length, 0);
+    assert.equal(harness.task.pendingManualRecovery, false);
+  } finally {
+    harness.restore();
+  }
+});
+
+test("director command stale recovery pauses when a declared pipeline job is missing", async () => {
+  const task = createTask({
+    status: "running",
+    pendingManualRecovery: false,
+    lastError: null,
+    seedPayloadJson: JSON.stringify({
+      issueGovernanceVersion: 1,
+      issuePolicy: { maxAutomaticRetries: 1, issueActions: {} },
+      issuePolicySource: "global",
+      runMode: "full_book_autopilot",
+      autoExecution: { pipelineJobId: "missing-job" },
+    }),
+  });
+  const harness = createHarness(task);
+  try {
+    await harness.service.enqueueContinueCommand("task-1");
+    harness.commands[0].status = "running";
+    harness.commands[0].leaseOwner = "worker-a";
+    harness.commands[0].attempt = 1;
+    harness.commands[0].leaseExpiresAt = new Date("2026-04-29T12:00:00.000Z");
+
+    await harness.service.recoverStaleLeases(new Date("2026-04-29T12:01:00.000Z"));
+
+    assert.equal(harness.commands[0].status, "stale");
+    assert.equal(harness.commands[0].leaseOwner, null);
+    assert.equal(harness.task.pendingManualRecovery, true);
+    assert.match(harness.task.lastError, /避免重复调用/);
+    assert.equal(harness.requeued.length, 1);
+  } finally {
+    harness.restore();
+  }
+});
+
+test("director command stale recovery preserves a linked pipeline manual pause", async () => {
+  const task = createTask({
+    status: "running",
+    pendingManualRecovery: false,
+    lastError: null,
+    seedPayloadJson: JSON.stringify({
+      issueGovernanceVersion: 1,
+      issuePolicy: { maxAutomaticRetries: 1, issueActions: {} },
+      issuePolicySource: "global",
+      runMode: "full_book_autopilot",
+      autoExecution: { pipelineJobId: "job-1" },
+    }),
+  });
+  const harness = createHarness(task, null, {
+    id: "job-1",
+    novelId: "novel-1",
+    status: "queued",
+    pendingManualRecovery: true,
+    cancelRequestedAt: null,
+    error: "第 7 章需要人工确认。",
+    payload: JSON.stringify({ workflowTaskId: "task-1" }),
+  });
+  try {
+    await harness.service.enqueueContinueCommand("task-1");
+    harness.commands[0].status = "running";
+    harness.commands[0].leaseOwner = "worker-a";
+    harness.commands[0].attempt = 1;
+    harness.commands[0].leaseExpiresAt = new Date("2026-04-29T12:00:00.000Z");
+
+    await harness.service.recoverStaleLeases(new Date("2026-04-29T12:01:00.000Z"));
+
+    assert.equal(harness.commands[0].status, "stale");
+    assert.equal(harness.commands[0].leaseOwner, null);
+    assert.equal(harness.task.pendingManualRecovery, true);
+    assert.equal(harness.task.lastError, "第 7 章需要人工确认。");
+    assert.deepEqual(harness.requeued, [{ taskId: "task-1", message: "第 7 章需要人工确认。" }]);
+  } finally {
+    harness.restore();
+  }
+});
+
+test("director command stale recovery never clears an existing task manual pause", async () => {
+  const harness = createHarness(createTask({
+    status: "running",
+    pendingManualRecovery: false,
+    lastError: null,
+  }));
+  try {
+    await harness.service.enqueueContinueCommand("task-1");
+    harness.commands[0].status = "running";
+    harness.commands[0].leaseOwner = "worker-a";
+    harness.commands[0].attempt = 1;
+    harness.commands[0].leaseExpiresAt = new Date("2026-04-29T12:00:00.000Z");
+    harness.task.pendingManualRecovery = true;
+    harness.task.lastError = "质量优先策略等待人工恢复。";
+
+    await harness.service.recoverStaleLeases(new Date("2026-04-29T12:01:00.000Z"));
+
+    assert.equal(harness.commands[0].status, "stale");
+    assert.equal(harness.task.pendingManualRecovery, true);
+    assert.equal(harness.task.lastError, "质量优先策略等待人工恢复。");
+    assert.equal(harness.requeued.length, 0);
+  } finally {
+    harness.restore();
+  }
+});
+
+test("director command stale recovery pauses when linked pipeline state cannot be verified", async () => {
+  const task = createTask({
+    status: "running",
+    pendingManualRecovery: false,
+    seedPayloadJson: JSON.stringify({
+      issueGovernanceVersion: 1,
+      issuePolicy: { maxAutomaticRetries: 1, issueActions: {} },
+      autoExecution: { pipelineJobId: "job-1" },
+    }),
+  });
+  const harness = createHarness(task);
+  try {
+    await harness.service.enqueueContinueCommand("task-1");
+    harness.commands[0].status = "running";
+    harness.commands[0].leaseOwner = "worker-a";
+    harness.commands[0].attempt = 1;
+    harness.commands[0].leaseExpiresAt = new Date("2026-04-29T12:00:00.000Z");
+    prisma.generationJob.findUnique = async () => { throw new Error("database unavailable"); };
+
+    await harness.service.recoverStaleLeases(new Date("2026-04-29T12:01:00.000Z"));
+
+    assert.equal(harness.commands[0].status, "stale");
+    assert.equal(harness.task.pendingManualRecovery, true);
+    assert.match(harness.task.lastError, /避免重复调用/);
   } finally {
     harness.restore();
   }

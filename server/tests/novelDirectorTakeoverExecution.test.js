@@ -438,7 +438,7 @@ test("continue_existing from chapter records the production handoff without auto
   assert.equal(checkpointInput.seedPayload.directorSession.runMode, "auto_to_ready");
 });
 
-test("continue_existing chapter takeover does not reuse the requested auto execution range", async () => {
+test("continue_existing chapter takeover clamps the requested range to the next actionable chapter without starting execution", async () => {
   let preparedInput = null;
   let bootstrapInput = null;
   let checkpointInput = null;
@@ -492,8 +492,15 @@ test("continue_existing chapter takeover does not reuse the requested auto execu
     cancelReplacedRuns: async () => {},
   });
 
+  // The chapter entry still hands off at production_experience_required instead of preparing execution,
+  // but the seed keeps the user's chapter_range contract (clamped to the next actionable chapter)
+  // rather than dropping it or falling back to an older completed range.
   assert.equal(preparedInput, null);
-  assert.equal(bootstrapInput.seedPayload.autoExecutionPlan, undefined);
+  assert.deepEqual(bootstrapInput.seedPayload.autoExecutionPlan, {
+    mode: "chapter_range",
+    startOrder: 3,
+    endOrder: 10,
+  });
   assert.equal(checkpointInput.checkpointType, "production_experience_required");
 });
 

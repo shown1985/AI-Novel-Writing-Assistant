@@ -305,10 +305,9 @@ test("runDirectorStructuredOutlinePhase persists chapter detail after each compl
       endOrder: 2,
     },
   ]);
-  assert.deepEqual(rebuildCalls, [{
-    novelId: "novel-demo",
-    options: { sourceType: "rebuild_projection" },
-  }]);
+  // Character dynamics projection is deferred enrichment (volume:updated side-effect job /
+  // post-draft enhancement); the structured outline critical path must not rebuild it inline.
+  assert.deepEqual(rebuildCalls, []);
   assert.deepEqual(resetFindManyCalls[0].where.order, { gte: 1, lte: 2 });
   assert.ok(resetDeletions.some(([table]) => table === "stateChangeProposal"));
   assert.ok(resetDeletions.some(([table]) => table === "openConflict"));
@@ -511,8 +510,7 @@ test("runDirectorStructuredOutlinePhase resumes from the next incomplete chapter
     },
   ]);
   assert.deepEqual(resetFindManyCalls[0].where.order, { gte: 1, lte: 2 });
-  assert.deepEqual(rebuildCalls, [{
-    novelId: "novel-demo",
-    options: { sourceType: "rebuild_projection" },
-  }]);
+  // Character dynamics projection is deferred enrichment (volume:updated side-effect job /
+  // post-draft enhancement); the structured outline critical path must not rebuild it inline.
+  assert.deepEqual(rebuildCalls, []);
 });
