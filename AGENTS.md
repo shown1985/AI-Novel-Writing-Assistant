@@ -1,5 +1,7 @@
 # Safety Rules
 
+Fork 专属规则：见 docs/fork/AGENTS-fork.md；与本文件冲突时以 fork 规则为准。
+
 ## Data Protection (Highest Priority)
 
 - Never execute any destructive data operation without a verified backup first.

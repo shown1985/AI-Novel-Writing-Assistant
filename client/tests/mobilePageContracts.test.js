@@ -408,6 +408,11 @@ test("mobile follow-up filters stay in one compact row after generic grid collap
 
   assert.match(autoDirectorFollowUpList, /AUTO_DIRECTOR_MOBILE_CLASSES\.followUpFilterGrid/);
   assert.match(autoDirectorFollowUpList, /AUTO_DIRECTOR_MOBILE_CLASSES\.followUpFilterTrigger/);
+  assert.equal(
+    [...autoDirectorFollowUpList.matchAll(/<SelectTrigger aria-label="按(?:跟进原因|任务状态|批量操作能力)筛选"/g)].length,
+    3,
+    "reason, status and batch capability should share the compact filter row",
+  );
   assert.match(
     css,
     /mobile-route-auto-director-follow-ups \.auto-director-follow-up-filter-grid\.grid[\s\S]+grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/,

@@ -39,6 +39,10 @@ import {
 } from "./DirectorCommandServiceHelpers";
 import { taskDispatcher } from "../../../../workers/TaskDispatcher";
 import { DirectorCommandLeaseService } from "./leases/DirectorCommandLeaseService";
+import {
+  getLLMSelectionSettings,
+  type LLMSelectionSettings,
+} from "../../../settings/LLMSelectionSettingsService";
 
 const ACTIVE_COMMAND_STATUSES: DirectorRunCommandStatus[] = ["queued", "leased", "running"];
 const EXECUTION_COMMAND_TYPES: DirectorRunCommandType[] = [
@@ -179,10 +183,26 @@ function resolveConfirmRequestFromTaskSeed(
 }
 
 export class DirectorCommandService {
-  constructor(private readonly workflowService = new NovelWorkflowService()) {}
+  constructor(
+    private readonly workflowService = new NovelWorkflowService(),
+    private readonly currentLlmSelectionReader: () => Promise<LLMSelectionSettings | null> = getLLMSelectionSettings,
+  ) {}
+
+  private async resolveAuthoritativeLlmOptions(input: Pick<DirectorLLMOptions, "provider" | "model" | "temperature">) {
+    const currentSelection = await this.currentLlmSelectionReader();
+    return {
+      provider: currentSelection?.provider ?? input.provider,
+      model: currentSelection?.model ?? input.model,
+      temperature: input.temperature ?? currentSelection?.temperature,
+    } satisfies Pick<DirectorLLMOptions, "provider" | "model" | "temperature">;
+  }
 
   async enqueueGenerateCandidatesCommand(input: DirectorCandidatesRequest): Promise<DirectorCommandAcceptedResponse> {
-    const task = await this.ensureCandidateTask(input, {
+    const authoritativeInput = {
+      ...input,
+      ...await this.resolveAuthoritativeLlmOptions(input),
+    };
+    const task = await this.ensureCandidateTask(authoritativeInput, {
       mode: "generate",
     });
     return this.enqueueExecutionCommand({
@@ -190,7 +210,7 @@ export class DirectorCommandService {
       commandType: "generate_candidates",
       payload: {
         candidatesRequest: {
-          ...input,
+          ...authoritativeInput,
           workflowTaskId: task.id,
         },
       },
@@ -198,7 +218,11 @@ export class DirectorCommandService {
   }
 
   async enqueueRefineCandidatesCommand(input: DirectorRefinementRequest): Promise<DirectorCommandAcceptedResponse> {
-    const task = await this.ensureCandidateTask(input, {
+    const authoritativeInput = {
+      ...input,
+      ...await this.resolveAuthoritativeLlmOptions(input),
+    };
+    const task = await this.ensureCandidateTask(authoritativeInput, {
       mode: "refine",
       presets: input.presets ?? [],
       feedback: input.feedback ?? null,
@@ -208,7 +232,7 @@ export class DirectorCommandService {
       commandType: "refine_candidates",
       payload: {
         refinementRequest: {
-          ...input,
+          ...authoritativeInput,
           workflowTaskId: task.id,
         },
       },
@@ -216,7 +240,11 @@ export class DirectorCommandService {
   }
 
   async enqueuePatchCandidateCommand(input: DirectorCandidatePatchRequest): Promise<DirectorCommandAcceptedResponse> {
-    const task = await this.ensureCandidateTask(input, {
+    const authoritativeInput = {
+      ...input,
+      ...await this.resolveAuthoritativeLlmOptions(input),
+    };
+    const task = await this.ensureCandidateTask(authoritativeInput, {
       mode: "patch_candidate",
       batchId: input.batchId,
       candidateId: input.candidateId,
@@ -228,7 +256,7 @@ export class DirectorCommandService {
       commandType: "patch_candidate",
       payload: {
         candidatePatchRequest: {
-          ...input,
+          ...authoritativeInput,
           workflowTaskId: task.id,
         },
       },
@@ -236,7 +264,11 @@ export class DirectorCommandService {
   }
 
   async enqueueRefineTitlesCommand(input: DirectorCandidateTitleRefineRequest): Promise<DirectorCommandAcceptedResponse> {
-    const task = await this.ensureCandidateTask(input, {
+    const authoritativeInput = {
+      ...input,
+      ...await this.resolveAuthoritativeLlmOptions(input),
+    };
+    const task = await this.ensureCandidateTask(authoritativeInput, {
       mode: "refine_titles",
       batchId: input.batchId,
       candidateId: input.candidateId,
@@ -247,7 +279,7 @@ export class DirectorCommandService {
       commandType: "refine_titles",
       payload: {
         titleRefineRequest: {
-          ...input,
+          ...authoritativeInput,
           workflowTaskId: task.id,
         },
       },
@@ -255,11 +287,15 @@ export class DirectorCommandService {
   }
 
   async enqueueConfirmCandidateCommand(input: DirectorConfirmRequest): Promise<DirectorCommandAcceptedResponse> {
+    const authoritativeInput = {
+      ...input,
+      ...await this.resolveAuthoritativeLlmOptions(input),
+    };
     const existingTask = input.workflowTaskId?.trim()
       ? await this.workflowService.getTaskByIdWithoutHealing(input.workflowTaskId.trim())
       : null;
     const confirmedInput = applyDirectorRunModeContract(resolveConfirmRequestFromTaskSeed(
-      input,
+      authoritativeInput,
       existingTask?.seedPayloadJson,
     ));
     const runMode = confirmedInput.runMode;
@@ -481,7 +517,10 @@ export class DirectorCommandService {
   }
 
   async enqueueTakeoverCommand(input: DirectorTakeoverRequest): Promise<DirectorCommandAcceptedResponse> {
-    const takeoverInput = applyDirectorRunModeContract(input);
+    const takeoverInput = applyDirectorRunModeContract({
+      ...input,
+      ...await this.resolveAuthoritativeLlmOptions(input),
+    });
     const reusableCommand = await prisma.directorRunCommand.findFirst({
       where: {
         novelId: takeoverInput.novelId,

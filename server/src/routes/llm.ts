@@ -1,5 +1,6 @@
 import { Router } from "express";
 import type { ApiResponse } from "@ai-novel/shared/types/api";
+import type { DiagnosticReadinessReport } from "@ai-novel/shared/types/diagnostics";
 import { PROVIDER_AUTH_MODES } from "@ai-novel/shared/types/llm";
 import { z } from "zod";
 import { prisma } from "../db/prisma";
@@ -12,8 +13,58 @@ import { getProviderEnvApiKey, getProviderEnvModel, isBuiltInProvider, PROVIDERS
 import { authMiddleware } from "../middleware/auth";
 import { AppError } from "../middleware/errorHandler";
 import { validate } from "../middleware/validate";
+import { checkModelRouteReadiness, getModelRouteReadiness } from "../modules/diagnostics";
+import {
+  projectModelAttemptProvenance,
+  readModelAttemptRequest,
+} from "../platform/llm/provenance";
 
 const router = Router();
+
+function projectLegacyConnectivityResponse(report: DiagnosticReadinessReport) {
+  return {
+    testedAt: report.checkedAt ?? new Date().toISOString(),
+    statuses: report.targets.flatMap((target) => {
+      if (target.targetKind !== "model_route" || !target.taskType || !target.provider || !target.model) {
+        return [];
+      }
+      const plain = target.capabilities.find((capability) => capability.capability === "plain") ?? null;
+      const structured = target.capabilities.find((capability) => capability.capability === "structured") ?? null;
+      const top = plain ?? structured;
+      const requestProtocol = top?.requestProtocol ?? target.recommendation?.requestProtocol ?? null;
+      const structuredDetails = structured?.structuredDetails ?? null;
+      return [{
+        taskType: target.taskType,
+        provider: target.provider,
+        model: target.model,
+        ok: top?.checkState === "healthy",
+        latency: top?.latencyMs ?? null,
+        error: top?.errorSummary ?? target.errorSummary,
+        requestProtocol,
+        plain: plain ? {
+          ok: plain.checkState === "healthy",
+          latency: plain.latencyMs,
+          error: plain.errorSummary,
+          requestProtocol: plain.requestProtocol ?? null,
+        } : null,
+        structured: structured ? {
+          ok: structured.checkState === "healthy",
+          latency: structured.latencyMs,
+          error: structured.errorSummary,
+          requestProtocol: structured.requestProtocol ?? null,
+          strategy: structuredDetails?.strategy ?? target.recommendation?.structuredResponseFormat ?? null,
+          reasoningForcedOff: structuredDetails?.reasoningForcedOff ?? false,
+          fallbackAvailable: structuredDetails?.fallbackAvailable ?? false,
+          fallbackUsed: structuredDetails?.fallbackUsed ?? false,
+          errorCategory: structuredDetails?.errorCategory ?? null,
+          nativeJsonObject: structuredDetails?.nativeJsonObject ?? false,
+          nativeJsonSchema: structuredDetails?.nativeJsonSchema ?? false,
+          profileFamily: structuredDetails?.profileFamily ?? null,
+        } : null,
+      }];
+    }),
+  };
+}
 
 const llmTestSchema = z.object({
   provider: llmProviderSchema,
@@ -33,7 +84,39 @@ const structuredFallbackSchema = z.object({
   retryCount: z.number().int().min(0).max(3).optional(),
 });
 
+const attemptRequestProvenanceParamsSchema = z.object({
+  requestId: z.string().trim().min(1).max(128),
+});
+
 router.use(authMiddleware);
+
+router.get("/attempt-requests/provenance", (_req, _res, next) => {
+  next(new AppError("请求参数校验失败。", 400));
+});
+
+router.get(
+  "/attempt-requests/:requestId/provenance",
+  validate({ params: attemptRequestProvenanceParamsSchema }),
+  async (req, res, next) => {
+    try {
+      const { requestId } = attemptRequestProvenanceParamsSchema.parse(req.params);
+      const projection = await readModelAttemptRequest({ requestId });
+      const data = projectModelAttemptProvenance(projection);
+      const message = data.status === "found"
+        ? "本次调用的模型来源已加载。"
+        : data.status === "not_found"
+          ? "暂未找到本次调用的来源记录，无法确认实际采用模型。"
+          : "本次调用的来源记录暂时无法读取，无法确认实际采用模型。";
+      res.status(200).json({
+        success: true,
+        data,
+        message,
+      } satisfies ApiResponse<typeof data>);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 router.get("/providers", async (_req, res, next) => {
   try {
@@ -108,13 +191,27 @@ router.get("/model-routes", async (_req, res, next) => {
   }
 });
 
-router.post("/model-routes/connectivity", async (_req, res, next) => {
+router.get("/model-routes/connectivity", async (_req, res, next) => {
   try {
-    const data = await llmConnectivityService.testModelRoutes();
+    const data = await getModelRouteReadiness();
     res.status(200).json({
       success: true,
       data,
-      message: "模型路由连通性检测完成。",
+      message: "模型路由检测状态已加载。",
+    } satisfies ApiResponse<typeof data>);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/model-routes/connectivity", async (_req, res, next) => {
+  try {
+    const report = await checkModelRouteReadiness();
+    const data = projectLegacyConnectivityResponse(report);
+    res.status(200).json({
+      success: true,
+      data,
+      message: report.pending ? "相同配置正在检测，请稍后查看结果。" : "模型路由连通性检测完成。",
     } satisfies ApiResponse<typeof data>);
   } catch (error) {
     next(error);

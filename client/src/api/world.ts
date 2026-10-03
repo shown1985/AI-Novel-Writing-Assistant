@@ -7,6 +7,7 @@ import type {
   WorldConsistencyReport,
   WorldDeepeningQuestion,
   WorldLayerKey,
+  WorldMaintenanceCommitResult,
   WorldSnapshot,
   WorldStructuredData,
   WorldStructureSectionKey,
@@ -22,6 +23,7 @@ import type {
   WorldReferenceContext,
   WorldReferenceSeedBundle,
   WorldSkeletonGenerationOptions,
+  WorldSkeletonGenerationCheckpointSummary,
   WorldSkeletonGenerationPayload,
 } from "@ai-novel/shared/types/worldWizard";
 import { apiClient } from "./client";
@@ -83,6 +85,16 @@ export interface WorldStructurePayload {
   bindingSupport: WorldBindingSupport;
 }
 
+export type WorldStructureSnapshotStatus = "created" | "failed" | "unknown";
+
+export interface WorldStructureSaveResponse {
+  world: World;
+  structure: WorldStructuredData;
+  bindingSupport: WorldBindingSupport;
+  maintenance?: WorldMaintenanceCommitResult;
+  snapshotStatus: WorldStructureSnapshotStatus;
+}
+
 export interface WorldInspirationAnalysisResult {
   mode: string;
   conceptCard: {
@@ -104,6 +116,15 @@ export interface WorldInspirationAnalysisResult {
 }
 
 export const WORLD_INSPIRATION_ANALYZE_STREAM_PATH = "/worlds/inspiration/analyze/stream";
+
+export interface WorldWriteProtection {
+  operationId: string;
+  expectedContentRevision: number;
+}
+
+export type WorldWriteResponse = World & {
+  maintenance?: WorldMaintenanceCommitResult;
+};
 
 export async function getWorldList() {
   const { data } = await apiClient.get<ApiResponse<World[]>>("/worlds");
@@ -129,9 +150,10 @@ export async function createWorld(
 
 export async function updateWorld(
   id: string,
-  payload: Partial<World> & { structure?: WorldStructuredData; bindingSupport?: WorldBindingSupport },
+  payload: Partial<World> & { structure?: WorldStructuredData; bindingSupport?: WorldBindingSupport }
+    & WorldWriteProtection,
 ) {
-  const { data } = await apiClient.put<ApiResponse<World>>(`/worlds/${id}`, payload);
+  const { data } = await apiClient.put<ApiResponse<WorldWriteResponse>>(`/worlds/${id}`, payload);
   return data;
 }
 
@@ -145,13 +167,9 @@ export async function updateWorldStructure(
   payload: {
     structure: WorldStructuredData;
     bindingSupport?: WorldBindingSupport;
-  },
+  } & WorldWriteProtection,
 ) {
-  const { data } = await apiClient.put<ApiResponse<{
-    world: World;
-    structure: WorldStructuredData;
-    bindingSupport: WorldBindingSupport;
-  }>>(`/worlds/${id}/structure`, payload);
+  const { data } = await apiClient.put<ApiResponse<WorldStructureSaveResponse>>(`/worlds/${id}/structure`, payload);
   return data;
 }
 
@@ -229,10 +247,34 @@ export async function generateWorldSkeleton(payload: {
   options: WorldSkeletonGenerationOptions;
   provider?: LLMProvider;
   model?: string;
+  generationRunId?: string;
 }) {
   const { data } = await apiClient.post<ApiResponse<WorldSkeletonGenerationPayload>>(
     "/worlds/skeleton/generate",
     payload,
+    { timeout: WORLD_SKELETON_GENERATE_TIMEOUT_MS },
+  );
+  return data;
+}
+
+export async function getWorldSkeletonGenerationSummary(runId: string) {
+  const { data } = await apiClient.get<ApiResponse<WorldSkeletonGenerationCheckpointSummary>>(
+    `/worlds/skeleton/generate/${encodeURIComponent(runId)}`,
+  );
+  return data;
+}
+
+export async function getLatestUnfinishedWorldSkeletonGeneration() {
+  const { data } = await apiClient.get<ApiResponse<WorldSkeletonGenerationCheckpointSummary | null>>(
+    "/worlds/skeleton/generate/latest",
+  );
+  return data;
+}
+
+export async function recoverWorldSkeleton(runId: string) {
+  const { data } = await apiClient.post<ApiResponse<WorldSkeletonGenerationPayload>>(
+    `/worlds/skeleton/generate/${encodeURIComponent(runId)}/recover`,
+    {},
     { timeout: WORLD_SKELETON_GENERATE_TIMEOUT_MS },
   );
   return data;
@@ -252,8 +294,15 @@ export async function suggestWorldAxioms(
   };
 }
 
-export async function updateWorldAxioms(id: string, axioms: string[]) {
-  const { data } = await apiClient.put<ApiResponse<World>>(`/worlds/${id}/axioms`, { axioms });
+export async function updateWorldAxioms(
+  id: string,
+  axioms: string[],
+  protection: WorldWriteProtection,
+) {
+  const { data } = await apiClient.put<ApiResponse<WorldWriteResponse>>(`/worlds/${id}/axioms`, {
+    axioms,
+    ...protection,
+  });
   return data;
 }
 

@@ -18,10 +18,15 @@ Wiki 不记录单次提交改了什么，也不替代 release notes。它只记�
 - [模块边界与文档治理](./architecture/module-boundaries.md)
 - [当前模型选择与厂商默认模型边界](./architecture/model-selection.md)
 - [配置项归属与可见性规范](./architecture/configuration-conventions.md)
+- [Release 1 本机运行与数据边界](./architecture/local-runtime-data-boundary.md)
+- [诊断就绪读写边界](./architecture/diagnostic-readiness.md)
 
 ### Workflows
 
+- [Agent 分级交付流程](./workflows/agent-agile-delivery.md)
 - [自动导演 Runtime 与恢复边界](./workflows/auto-director-runtime.md)
+- [自动导演开书任务恢复与创建边界](./workflows/auto-director-task-restore.md)
+- [世界维护提交与恢复边界](./workflows/world-maintenance-recovery.md)
 - [简易创作模式](./product/simple-creation-mode.md)
 - [章节生产链路](./workflows/chapter-production-chain.md)
 - [读者体验合同](./workflows/reader-experience-contract.md)
@@ -31,11 +36,16 @@ Wiki 不记录单次提交改了什么，也不替代 release notes。它只记�
 - [拆书工作流](./workflows/book-analysis-workflow.md)
 - [图片生成确认与统一运行时](./workflows/image-generation-confirmation-runtime.md)
 - [Creative Hub 边界](./workflows/creative-hub-boundary.md)
+- [桌面客户端分平台构建边界](./workflows/desktop-cross-platform-build.md)
+- [上游同步流程](./workflows/upstream-sync.md)
+- [分叉开发成果的整合边界](./workflows/fork-branch-integration.md)
+- [容器化热更开发环境](./workflows/docker-dev-environment.md)
 
 ### Prompts
 
 - [Prompt Registry 与结构化输出](./prompts/prompt-registry-and-structured-output.md)
 - [平台写法配置与正文 Prompt 可编辑合同](./prompts/platform-writing-profiles.md)
+- [写法合同的原作实体脱敏](./prompts/style-source-entity-redaction.md)
 
 ### RAG
 
@@ -50,6 +60,7 @@ Wiki 不记录单次提交改了什么，也不替代 release notes。它只记�
 
 - [新手优先与整本小说完成原则](./product/beginner-first-novel-completion.md)
 - [工作台状态表达与下一步合同](./product/workspace-status-expression.md)
+- [作者与 Agent 的协作合同](./product/author-agent-collaboration.md)
 
 ## 写作边界
 

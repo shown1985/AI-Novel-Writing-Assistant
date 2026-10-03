@@ -14,6 +14,10 @@ function pnpmExecutable() {
 function setupTempSqliteDatabase(tempDir) {
   const databasePath = path.join(tempDir, "p0b-real-chain.db");
   const databaseUrl = `file:${databasePath.replace(/\\/g, "/")}`;
+  // Prisma 7's macOS schema engine cannot create a missing SQLite file during
+  // `db push`; create an empty test file first so the engine only performs the
+  // schema operation. This remains isolated under the test temp directory.
+  fs.closeSync(fs.openSync(databasePath, "a"));
   childProcess.execFileSync(pnpmExecutable(), ["--filter", "@ai-novel/server", "prisma:push"], {
     cwd: repoRoot,
     env: {
@@ -42,6 +46,7 @@ async function main() {
   const { NovelWorldSliceService } = require(path.join(repoRoot, "server", "dist", "services", "novel", "storyWorldSlice", "NovelWorldSliceService.js"));
   const { NovelContinuationService } = require(path.join(repoRoot, "server", "dist", "services", "novel", "NovelContinuationService.js"));
   const { StyleBindingService } = require(path.join(repoRoot, "server", "dist", "services", "styleEngine", "StyleBindingService.js"));
+  const { buildChapterExecutionContractHash } = require(path.join(repoRoot, "server", "dist", "services", "planner", "plannerPersistence.js"));
   const { ragServices } = require(path.join(repoRoot, "server", "dist", "services", "rag", "index.js"));
   const { auditService } = require(path.join(repoRoot, "server", "dist", "services", "audit", "AuditService.js"));
 
@@ -291,6 +296,18 @@ async function main() {
         mustAdvanceJson: JSON.stringify(["建立宫廷压迫", "推进求生动机"]),
         mustPreserveJson: JSON.stringify(["身份反差", "历史阴影"]),
         hookTarget: "结尾留下更大的宫廷威胁",
+        rawPlanJson: JSON.stringify({
+          executionContractHash: buildChapterExecutionContractHash({
+            expectation: "建立身份压迫与第一次求生压力",
+            targetWordCount: 3000,
+            conflictLevel: null,
+            revealLevel: null,
+            mustAvoid: null,
+            taskSheet: "先建立压迫，再埋赵高伏笔。",
+            sceneCards: null,
+            hook: null,
+          }),
+        }),
         scenes: {
           create: [{
             sortOrder: 1,

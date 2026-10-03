@@ -438,7 +438,7 @@ export function buildStructureSectionInstructions(section: WorldStructureSection
 3. 像“社会压力来源”“行业运作规则”“人际网络默认法则”这类世界级机制，应放到 rules，不要写进 factions / forces。`;
     case "locations":
       return `只输出 JSON 数组，元素结构为：
-[{"id":"location-1","name":"...","terrain":"...","summary":"...","narrativeFunction":"...","risk":"...","entryConstraint":"...","exitCost":"...","controllingForceIds":["force-1"]}]`;
+[{"id":"location-1","name":"...","x":50,"y":50,"directionHint":"north","terrain":"...","summary":"...","narrativeFunction":"...","risk":"...","riskLevel":3,"entryConstraint":"...","exitCost":"...","controllingForceIds":["force-1"]}]`;
     case "relations":
       return `只输出 JSON 对象，结构为：
 {

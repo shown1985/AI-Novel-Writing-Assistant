@@ -1,4 +1,5 @@
 const test = require("node:test");
+const { beforeEach, afterEach } = require("node:test");
 const assert = require("node:assert/strict");
 const { z } = require("zod");
 
@@ -6,8 +7,50 @@ const factory = require("../dist/llm/factory.js");
 const structuredFallbackSettings = require("../dist/llm/structuredFallbackSettings.js");
 const { buildStructuredResponseFormat, resolveStructuredOutputProfile } = require("../dist/llm/structuredOutput.js");
 const structuredInvoke = require("../dist/llm/structuredInvoke.js");
+const attempts = require("../dist/platform/llm/provenance/index.js");
 const { plannerOutputSchema } = require("../dist/services/planner/plannerSchemas.js");
 const { normalizePlannerOutput } = require("../dist/services/planner/PlannerService.js");
+
+class TestModelAttemptRepository {
+  constructor() {
+    this.rows = [];
+  }
+
+  async startAttempt(input) {
+    this.rows.push({ ...input, status: "started", finalAdoption: "pending" });
+  }
+
+  async finalizeAttempt(input) {
+    const row = this.rows.find((candidate) => candidate.attemptId === input.attemptId);
+    assert.ok(row, "attempt should have been recorded before finalization");
+    Object.assign(row, input);
+  }
+
+  async findAttempt(attemptId) {
+    return this.rows.find((row) => row.attemptId === attemptId) ?? null;
+  }
+
+  async reconstructRequest(requestId) {
+    const rows = this.rows.filter((row) => row.requestId === requestId);
+    return rows.length ? {
+      requestId,
+      attempts: rows,
+      adoptedAttemptId: rows.find((row) => row.finalAdoption === "adopted")?.attemptId ?? null,
+    } : null;
+  }
+
+  async findByNovelId() {
+    return [];
+  }
+}
+
+beforeEach(() => {
+  attempts.setModelAttemptRepositoryForTests(new TestModelAttemptRepository());
+});
+
+afterEach(() => {
+  attempts.setModelAttemptRepositoryForTests();
+});
 
 test("parseStructuredLlmRawContentDetailed recovers when repair output is truncated but completable", async () => {
   const originalGetLLM = factory.getLLM;
@@ -149,11 +192,60 @@ test("parseStructuredLlmRawContentDetailed rejects empty model output without in
         model: "deepseek-v4-flash",
         executionMode: "structured",
       }),
-    }), /STRUCTURED_OUTPUT:transport_error.*没有返回可用内容/i);
+    }), /STRUCTURED_OUTPUT:empty_content.*没有返回可用内容/i);
     assert.equal(repairInvoked, false);
   } finally {
     factory.getLLM = originalGetLLM;
   }
+});
+
+test("parseStructuredLlmRawContentDetailed classifies reasoning-only budget exhaustion", async () => {
+  await assert.rejects(async () => structuredInvoke.parseStructuredLlmRawContentDetailed({
+    rawContent: "   ",
+    reasoningChars: 1200,
+    tokenUsage: {
+      promptTokens: 900,
+      completionTokens: 6000,
+      totalTokens: 6900,
+    },
+    maxTokens: 6000,
+    schema: z.object({ value: z.string() }),
+    provider: "custom_gateway",
+    model: "glm-5.3-flash",
+    label: "structured.invoke.reasoning-budget",
+    maxRepairAttempts: 1,
+    strategy: "json_object",
+    profile: resolveStructuredOutputProfile({
+      provider: "custom_gateway",
+      model: "glm-5.3-flash",
+      baseURL: "https://open.bigmodel.cn/api/paas/v4",
+      executionMode: "structured",
+    }),
+  }), /STRUCTURED_OUTPUT:reasoning_budget_exhausted.*降低思考深度/i);
+});
+
+test("parseStructuredLlmRawContentDetailed classifies empty output truncated at the budget", async () => {
+  await assert.rejects(async () => structuredInvoke.parseStructuredLlmRawContentDetailed({
+    rawContent: "",
+    tokenUsage: {
+      promptTokens: 900,
+      completionTokens: 6000,
+      totalTokens: 6900,
+    },
+    maxTokens: 6000,
+    schema: z.object({ value: z.string() }),
+    provider: "custom_gateway",
+    model: "glm-5.3-flash",
+    label: "structured.invoke.output-budget",
+    maxRepairAttempts: 0,
+    strategy: "json_object",
+    profile: resolveStructuredOutputProfile({
+      provider: "custom_gateway",
+      model: "glm-5.3-flash",
+      baseURL: "https://open.bigmodel.cn/api/paas/v4",
+      executionMode: "structured",
+    }),
+  }), /STRUCTURED_OUTPUT:output_truncated.*额度上限/i);
 });
 
 test("parseStructuredLlmRawContentDetailed preserves singleton arrays when schema expects a top-level array", async () => {
@@ -603,12 +695,100 @@ test("invokeStructuredLlmDetailed retries transport failures using the configure
   }
 });
 
+test("invokeStructuredLlmDetailed does not retry transport failures when disabled or aborted", async () => {
+  const originalResolveOptions = factory.resolveLLMClientOptions;
+  const originalCreateLLM = factory.createLLMFromResolvedOptions;
+  const originalGetFallbackSettings = structuredFallbackSettings.getStructuredFallbackSettings;
+  const calls = [];
+  let abortController = null;
+
+  factory.resolveLLMClientOptions = async (provider, options = {}) => {
+    const resolvedProvider = provider ?? "openai";
+    const resolvedModel = options.model ?? "gpt-4o-mini";
+    const baseURL = options.baseURL ?? "https://api.openai.com/v1";
+    return {
+      provider: resolvedProvider,
+      providerName: resolvedProvider,
+      model: resolvedModel,
+      temperature: options.temperature ?? 0.3,
+      apiKey: "test-key",
+      baseURL,
+      maxTokens: options.maxTokens,
+      reasoningEnabled: true,
+      modelKwargs: undefined,
+      includeRawResponse: false,
+      executionMode: options.executionMode ?? "plain",
+      structuredProfile: options.executionMode === "structured"
+        ? resolveStructuredOutputProfile({
+          provider: resolvedProvider,
+          model: resolvedModel,
+          baseURL,
+          executionMode: "structured",
+        })
+        : null,
+      structuredStrategy: options.structuredStrategy ?? null,
+      reasoningForcedOff: false,
+      taskType: options.taskType,
+      promptMeta: options.promptMeta,
+    };
+  };
+  factory.createLLMFromResolvedOptions = () => ({
+    stream: async function* () {
+      calls.push("invoke");
+      abortController?.abort();
+      throw new Error("Our servers are currently overloaded. Please try again later.");
+    },
+  });
+
+  const invoke = (signal) => structuredInvoke.invokeStructuredLlmDetailed({
+    provider: "openai",
+    model: "gpt-4o-mini",
+    label: "structured.invoke.compat.transport-no-retry",
+    taskType: "planner",
+    schema: z.object({ value: z.string() }),
+    systemPrompt: "只返回 JSON。",
+    userPrompt: "给我一个 value。",
+    signal,
+  });
+
+  try {
+    structuredFallbackSettings.getStructuredFallbackSettings = async () => ({
+      enabled: false,
+      provider: "deepseek",
+      model: "deepseek-chat",
+      temperature: 0.2,
+      maxTokens: null,
+      retryCount: 0,
+    });
+    await assert.rejects(() => invoke(undefined), /STRUCTURED_OUTPUT:transport_error/);
+    assert.equal(calls.length, 1);
+
+    calls.length = 0;
+    abortController = new AbortController();
+    structuredFallbackSettings.getStructuredFallbackSettings = async () => ({
+      enabled: false,
+      provider: "deepseek",
+      model: "deepseek-chat",
+      temperature: 0.2,
+      maxTokens: null,
+      retryCount: 2,
+    });
+    await assert.rejects(() => invoke(abortController.signal), /aborted/i);
+    assert.equal(calls.length, 1);
+  } finally {
+    factory.resolveLLMClientOptions = originalResolveOptions;
+    factory.createLLMFromResolvedOptions = originalCreateLLM;
+    structuredFallbackSettings.getStructuredFallbackSettings = originalGetFallbackSettings;
+  }
+});
+
 test("invokeStructuredLlmDetailed preserves explicit Anthropic protocol through repair calls", async () => {
   const originalResolveOptions = factory.resolveLLMClientOptions;
   const originalCreateLLM = factory.createLLMFromResolvedOptions;
   const originalGetLLM = factory.getLLM;
   const resolveCalls = [];
   let repairRequestProtocol = null;
+  let repairReasoningEnabled = null;
 
   factory.resolveLLMClientOptions = async (provider, options = {}) => {
     resolveCalls.push({
@@ -616,6 +796,7 @@ test("invokeStructuredLlmDetailed preserves explicit Anthropic protocol through 
       requestProtocol: options.requestProtocol,
       structuredStrategy: options.structuredStrategy,
       executionMode: options.executionMode,
+      reasoningEnabled: options.reasoningEnabled,
     });
     const resolvedProvider = provider ?? "openai";
     const resolvedModel = options.model ?? "claude-sonnet-4-5";
@@ -637,7 +818,7 @@ test("invokeStructuredLlmDetailed preserves explicit Anthropic protocol through 
       baseURL: options.baseURL ?? "https://api.anthropic.com",
       maxTokens: options.maxTokens,
       requestProtocol,
-      reasoningEnabled: true,
+      reasoningEnabled: options.reasoningEnabled ?? true,
       modelKwargs: undefined,
       includeRawResponse: false,
       executionMode: options.executionMode ?? "plain",
@@ -655,6 +836,7 @@ test("invokeStructuredLlmDetailed preserves explicit Anthropic protocol through 
   });
   factory.getLLM = async (_provider, options = {}) => {
     repairRequestProtocol = options.requestProtocol ?? null;
+    repairReasoningEnabled = options.reasoningEnabled ?? null;
     return {
       stream: async function* () {
         yield { content: "{\"value\":\"fixed\"}" };
@@ -674,6 +856,7 @@ test("invokeStructuredLlmDetailed preserves explicit Anthropic protocol through 
       }),
       systemPrompt: "只返回 JSON。",
       userPrompt: "给我一个 value。",
+      reasoningEnabled: false,
       disableFallbackModel: true,
     });
 
@@ -681,7 +864,9 @@ test("invokeStructuredLlmDetailed preserves explicit Anthropic protocol through 
     assert.equal(resolveCalls[0].requestProtocol, "anthropic");
     assert.equal(resolveCalls[1].requestProtocol, "anthropic");
     assert.deepEqual(resolveCalls.map((call) => call.structuredStrategy), [undefined, "prompt_json"]);
+    assert.deepEqual(resolveCalls.map((call) => call.reasoningEnabled), [false, false]);
     assert.equal(repairRequestProtocol, "anthropic");
+    assert.equal(repairReasoningEnabled, false);
   } finally {
     factory.resolveLLMClientOptions = originalResolveOptions;
     factory.createLLMFromResolvedOptions = originalCreateLLM;

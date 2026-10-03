@@ -159,11 +159,9 @@ test("auto director replan notice audit records a reminder instead of an auto-ap
 test("auto director auto-approval audit loads the latest 10 records per novel", async () => {
   const originalFindMany = prisma.autoDirectorAutoApprovalRecord.findMany;
   const calls = [];
-  prisma.autoDirectorAutoApprovalRecord.findMany = async ({ where, orderBy, take }) => {
-    calls.push({ where, orderBy, take });
-    const novelId = where.novelId;
+  const buildRows = (novelId) => {
     const count = novelId === "novel_a" ? 12 : 2;
-    return Array.from({ length: Math.min(count, take) }, (_, index) => ({
+    return Array.from({ length: count }, (_, index) => ({
       id: `${novelId}_${index}`,
       taskId: `task_${novelId}`,
       novelId,
@@ -178,17 +176,30 @@ test("auto director auto-approval audit loads the latest 10 records per novel", 
       createdAt: new Date(`2026-04-22T10:${String(30 - index).padStart(2, "0")}:00.000Z`),
     }));
   };
+  prisma.autoDirectorAutoApprovalRecord.findMany = async ({ where, orderBy, take }) => {
+    calls.push({ where, orderBy, take });
+    // Simulate one batched `novelId IN (...)` query ordered by createdAt desc, id desc.
+    return where.novelId.in
+      .flatMap((novelId) => buildRows(novelId))
+      .sort((left, right) => (
+        right.createdAt.getTime() - left.createdAt.getTime()
+        || right.id.localeCompare(left.id)
+      ));
+  };
 
   try {
     const rows = await loadRecentAutoDirectorAutoApprovalRecords(["novel_a", "novel_b", "novel_a"]);
 
-    assert.deepEqual(calls.map((call) => [call.where, call.take]), [
-      [{ novelId: "novel_a" }, 10],
-      [{ novelId: "novel_b" }, 10],
-    ]);
+    // Read-path boundary: one batched query instead of one query per novel.
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0].where, { novelId: { in: ["novel_a", "novel_b"] } });
     assert.deepEqual(calls[0].orderBy, [{ createdAt: "desc" }, { id: "desc" }]);
     assert.equal(rows.filter((row) => row.novelId === "novel_a").length, 10);
     assert.equal(rows.filter((row) => row.novelId === "novel_b").length, 2);
+    assert.deepEqual(
+      rows.filter((row) => row.novelId === "novel_a").map((row) => row.id),
+      Array.from({ length: 10 }, (_, index) => `novel_a_${index}`),
+    );
     assert.deepEqual(rows.slice(0, 2).map((row) => row.id), ["novel_b_0", "novel_a_0"]);
   } finally {
     prisma.autoDirectorAutoApprovalRecord.findMany = originalFindMany;

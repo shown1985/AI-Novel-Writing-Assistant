@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 
 interface WorldDeepeningTabProps {
   questions: WorldDeepeningQuestion[];
+  integratedQuestionCount: number;
   answerDrafts: Record<string, string>;
   setAnswerDrafts: Dispatch<SetStateAction<Record<string, string>>>;
   llmQuickOptions: Record<string, string[]>;
@@ -16,6 +17,7 @@ interface WorldDeepeningTabProps {
 export default function WorldDeepeningTab(props: WorldDeepeningTabProps) {
   const {
     questions,
+    integratedQuestionCount,
     answerDrafts,
     setAnswerDrafts,
     llmQuickOptions,
@@ -137,8 +139,14 @@ export default function WorldDeepeningTab(props: WorldDeepeningTabProps) {
           </div>
         ) : (
           <div className="flex min-h-48 flex-col items-center justify-center rounded-3xl bg-muted/20 px-6 text-center">
-            <div className="font-medium">等待发现世界中的关键空白</div>
-            <div className="mt-1 text-sm text-muted-foreground">生成问题后，可以逐条选择建议方向或补充自己的设定。</div>
+            <div className="font-medium">
+              {integratedQuestionCount > 0 ? "这一批关键设定已整合" : "等待发现世界中的关键空白"}
+            </div>
+            <div className="mt-1 text-sm text-muted-foreground">
+              {integratedQuestionCount > 0
+                ? `已将 ${integratedQuestionCount} 条回答写入世界手册。你可以到“AI 分层”查看对应设定，或生成下一批问题继续补齐。`
+                : "生成问题后，可以逐条选择建议方向或补充自己的设定。"}
+            </div>
           </div>
         )}
         <div className="flex justify-end">

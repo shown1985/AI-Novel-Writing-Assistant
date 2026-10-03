@@ -15,6 +15,7 @@ interface DesktopUpdaterOptions {
   updateChannel: string;
   isPackaged: boolean;
   isPortable: boolean;
+  isLocalBuild: boolean;
 }
 
 function markUpdaterSnapshot(snapshot: ReturnType<typeof createUpdaterSnapshot>): void {
@@ -27,6 +28,10 @@ function isUpdaterSupported(options: DesktopUpdaterOptions): boolean {
   }
 
   if (options.isPortable) {
+    return false;
+  }
+
+  if (options.isLocalBuild) {
     return false;
   }
 
@@ -44,9 +49,11 @@ export function initializeDesktopUpdater(options: DesktopUpdaterOptions): Deskto
     ? "开发环境不下载安装包，请在正式安装版中检查更新。"
     : options.isPortable
       ? "便携版需要下载新版安装包后手动替换。"
-      : !hasFeedConfig
-        ? "此安装包未配置版本更新通道。"
-        : "桌面版更新已被运行环境关闭。";
+      : options.isLocalBuild
+        ? "本地测试包不检查版本更新。"
+        : !hasFeedConfig
+          ? "此安装包未配置版本更新通道。"
+          : "桌面版更新已被运行环境关闭。";
 
   markUpdaterSnapshot(createUpdaterSnapshot({
     status: supported && hasFeedConfig ? "idle" : "disabled",

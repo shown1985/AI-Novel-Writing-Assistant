@@ -85,10 +85,12 @@ export async function generateDirectorCandidates(payload: DirectorCandidatesRequ
 
 export async function generateDirectorIdeaInspirations(
   payload: DirectorIdeaInspirationRequest,
+  liveItemKey?: string,
 ): Promise<ApiResponse<DirectorIdeaInspirationsResponse>> {
   const { data } = await apiClient.post<ApiResponse<DirectorIdeaInspirationsResponse>>(
     "/novels/director/idea-inspirations",
     payload,
+    liveItemKey ? { headers: { "X-Idea-Inspiration-Id": liveItemKey } } : undefined,
   );
   return data;
 }

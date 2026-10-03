@@ -15,6 +15,7 @@ export async function parseIntentWithLLM(input: PlannerInput): Promise<Structure
     options: {
       provider: input.provider,
       model: input.model,
+      sessionId: input.sessionId,
       temperature: typeof input.temperature === "number" ? Math.min(input.temperature, 0.15) : 0.1,
       maxTokens: input.maxTokens,
     },

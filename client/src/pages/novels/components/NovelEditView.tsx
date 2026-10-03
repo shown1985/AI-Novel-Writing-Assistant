@@ -23,6 +23,7 @@ import OutlineTab from "./OutlineTab";
 import PipelineTab from "./PipelineTab";
 import StoryMacroPlanTab from "./StoryMacroPlanTab";
 import StructuredOutlineTab from "./StructuredOutlineTab";
+import SingleBookPrimaryActionPanel from "./SingleBookPrimaryActionPanel";
 import VersionHistoryTab from "./VersionHistoryTab";
 import BasicInfoTab from "./BasicInfoTab";
 import WorldSetupTab from "./WorldSetupTab";
@@ -66,6 +67,8 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
     characterTab,
     takeover,
     taskDrawer,
+    singleBookDisplay,
+    singleBookPrimaryAction,
     activeStepTakeoverEntry,
     onSwitchToSimpleMode,
     isSwitchingToSimpleMode = false,
@@ -90,7 +93,6 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
   });
 
   const totalChapters = chapterTab.chapters.length;
-  const generatedChapters = chapterTab.chapters.filter((item) => Boolean(item.content?.trim())).length;
   const pendingRepairs = pipelineTab.chapterReports.filter(
     (item) => item.overall < pipelineTab.pipelineForm.qualityThreshold,
   ).length;
@@ -155,13 +157,7 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
   );
   const isTakeoverLoading = takeover?.mode === "loading";
   const hideTakeoverEntry = takeover?.mode === "running" || takeover?.mode === "waiting";
-  const workspaceTone = taskDrawer?.task?.status === "failed"
-    ? "danger"
-    : taskDrawer?.task?.status === "waiting_approval"
-      ? "warning"
-      : taskDrawer?.task?.status === "running" || taskDrawer?.task?.status === "queued"
-        ? "info"
-        : "neutral";
+  const workspaceTone = singleBookDisplay.severity.tone;
 
   const renderActivePanel = () => {
     switch (activeTab) {
@@ -201,9 +197,25 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
             </>
           )}
           title={currentStepLabel}
-          description={showWorkflowRecommendation && workflowStepLabel
-            ? `流程推荐：建议切换到「${workflowStepLabel}」继续推进。`
-            : "按当前步骤整理这本书的生产资产，需要时可以交给 AI 自动导演接管。"}
+          description={(
+            <>
+              <span className="font-medium text-foreground">{singleBookDisplay.severity.title}</span>
+              <span>。{singleBookDisplay.severity.description}</span>
+              {!singleBookDisplay.primaryAction && showWorkflowRecommendation && workflowStepLabel
+                ? <span> 建议切换到「{workflowStepLabel}」继续推进。</span>
+                : null}
+            </>
+          )}
+          meta={(
+            <>
+              <span>{singleBookDisplay.savedProgress.label}</span>
+              <span>{singleBookDisplay.taskProgress.label}</span>
+              <span>{singleBookDisplay.bookTarget.label}</span>
+              {singleBookDisplay.qualityDebtCount > 0 ? (
+                <span>局部质量项 {singleBookDisplay.qualityDebtCount} 条</span>
+              ) : null}
+            </>
+          )}
           actions={(
             <>
             {onSwitchToSimpleMode ? (
@@ -304,7 +316,8 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
                       <CardTitle>章节进度</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p>{generatedChapters} / {Math.max(totalChapters, 1)} 已生成</p>
+                      <p>{singleBookDisplay.savedProgress.label}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{singleBookDisplay.bookTarget.label}</p>
                     </CardContent>
                   </Card>
                   <Card>
@@ -376,6 +389,11 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
           )}
         />
       ) : null}
+
+      <SingleBookPrimaryActionPanel
+        display={singleBookDisplay}
+        control={singleBookPrimaryAction}
+      />
 
       <div className="space-y-4 pt-1">
         {takeover ? (

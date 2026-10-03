@@ -15,6 +15,8 @@ export type LlmLivePhase = (typeof LLM_LIVE_PHASES)[number];
 
 export interface LlmLiveContext {
   interactionId: string;
+  /** Explicit link to the persisted attempt request; null means no evidence scope was provided. */
+  requestId: string | null;
   promptId?: string | null;
   promptVersion?: string | null;
   label: string;

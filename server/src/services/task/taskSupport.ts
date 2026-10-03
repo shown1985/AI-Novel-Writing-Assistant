@@ -59,6 +59,9 @@ export function buildTaskRecoveryHint(kind: TaskKind, status: TaskStatus): strin
     if (kind === "style_extraction") {
       return "建议检查参考文本是否完整、模型是否可用，以及当前保留策略是否适合自动保存后再重试。";
     }
+    if (kind === "world_generation") {
+      return "建议回到世界生成页面，从最近完成的阶段继续；运行记录只展示状态和恢复位置。";
+    }
     return "建议检查提示词、模型配置和目标资源状态后再重试。";
   }
   if (status === "waiting_approval") {

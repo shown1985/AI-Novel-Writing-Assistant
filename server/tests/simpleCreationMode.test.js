@@ -84,44 +84,84 @@ test("production interface selection keeps the same full-book automation", () =>
   }
 });
 
-test("complete-workspace selection starts the same chapter execution", async () => {
+test("production interface selection keeps a takeover chapter range as the stop boundary", () => {
+  const seed = directorSeed();
+  const rangedSeed = {
+    ...seed,
+    directorInput: {
+      ...seed.directorInput,
+      autoExecutionPlan: { mode: "chapter_range", startOrder: 3, endOrder: 10, autoReview: true, autoRepair: true },
+    },
+  };
+  const nextSeed = buildProductionExperienceSeed(rangedSeed, "simple");
+  assert.equal(nextSeed.runMode, "full_book_autopilot");
+  assert.deepEqual(nextSeed.autoExecutionPlan, {
+    mode: "chapter_range",
+    startOrder: 3,
+    endOrder: 10,
+    autoReview: true,
+    autoRepair: true,
+  });
+  assert.deepEqual(nextSeed.directorInput.autoExecutionPlan, nextSeed.autoExecutionPlan);
+  assert.equal(nextSeed.autoApproval.enabled, true);
+});
+
+test("production interface selection persists explicit book and volume quality choices", async () => {
   const originals = {
     findUnique: prisma.novelWorkflowTask.findUnique,
     transaction: prisma.$transaction,
   };
-  let checkpointUpdate = null;
-  let commandInput = null;
-  prisma.novelWorkflowTask.findUnique = async () => ({
-    id: "director-task-1",
-    lane: "auto_director",
-    novelId: "novel-1",
-    status: "waiting_approval",
-    checkpointType: "production_experience_required",
-    seedPayloadJson: JSON.stringify(directorSeed()),
-  });
-  prisma.$transaction = async (operation) => operation({
-    novelWorkflowTask: {
-      updateMany: async (input) => {
-        checkpointUpdate = input;
-        return { count: 1 };
-      },
-    },
-    novel: { update: async () => ({}) },
-  });
-
   try {
-    const service = new DirectorProductionExperienceService({
-      enqueueContinueCommand: async (_taskId, input) => {
-        commandInput = input;
-        return { commandId: "command-1" };
-      },
-    });
-    const result = await service.select("director-task-1", "professional");
-    assert.equal(result.targetRoute, "/novels/novel-1/edit");
-    assert.equal(result.backgroundStarted, true);
-    assert.equal(checkpointUpdate.data.checkpointType, "chapter_batch_ready");
-    assert.equal(JSON.parse(checkpointUpdate.data.seedPayloadJson).runMode, "full_book_autopilot");
-    assert.deepEqual(commandInput, { continuationMode: "auto_execute_range", forceResume: true });
+    for (const experience of ["simple", "professional"]) {
+      for (const mode of ["book", "volume"]) {
+        const seed = directorSeed();
+        seed.directorInput.autoExecutionPlan = {
+          mode,
+          ...(mode === "volume" ? { volumeOrder: 1 } : {}),
+          autoReview: false,
+          autoRepair: false,
+        };
+        let checkpointUpdate = null;
+        let commandInput = null;
+        prisma.novelWorkflowTask.findUnique = async () => ({
+          id: "director-task-1",
+          lane: "auto_director",
+          novelId: "novel-1",
+          status: "waiting_approval",
+          checkpointType: "production_experience_required",
+          seedPayloadJson: JSON.stringify(seed),
+        });
+        prisma.$transaction = async (operation) => operation({
+          novelWorkflowTask: {
+            updateMany: async (input) => {
+              checkpointUpdate = input;
+              return { count: 1 };
+            },
+          },
+          novel: { update: async () => ({}) },
+        });
+        const service = new DirectorProductionExperienceService({
+          enqueueContinueCommand: async (_taskId, input) => {
+            commandInput = input;
+            return { commandId: "command-1" };
+          },
+        });
+        const result = await service.select("director-task-1", experience);
+        assert.equal(result.targetRoute, experience === "simple" ? "/novels/novel-1/simple" : "/novels/novel-1/edit");
+        assert.equal(result.backgroundStarted, true);
+        assert.equal(checkpointUpdate.data.checkpointType, "chapter_batch_ready");
+        const persistedSeed = JSON.parse(checkpointUpdate.data.seedPayloadJson);
+        assert.equal(persistedSeed.runMode, "full_book_autopilot");
+        assert.equal(persistedSeed.productionExperience, experience);
+        assert.deepEqual(persistedSeed.autoExecutionPlan, {
+          mode: "book",
+          autoReview: false,
+          autoRepair: false,
+        });
+        assert.deepEqual(persistedSeed.directorInput.autoExecutionPlan, persistedSeed.autoExecutionPlan);
+        assert.deepEqual(commandInput, { continuationMode: "auto_execute_range", forceResume: true });
+      }
+    }
   } finally {
     prisma.novelWorkflowTask.findUnique = originals.findUnique;
     prisma.$transaction = originals.transaction;

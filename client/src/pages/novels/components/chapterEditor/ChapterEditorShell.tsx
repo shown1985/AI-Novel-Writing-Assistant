@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type {
   ChapterEditorDiagnosticCard,
@@ -11,7 +11,7 @@ import {
   readChapterQualityDebtDetails,
   type ChapterQualityDebtDetails,
 } from "@ai-novel/shared/types/chapterQualityLoop";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle, BookOpenText, Loader2, Save, Sparkles } from "lucide-react";
 import { createNovelSnapshot, previewChapterAiRevision, reviewNovelChapter, updateNovelChapter } from "@/api/novel";
 import { queryKeys } from "@/api/queryKeys";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,13 @@ import type {
   ChapterEditorShellProps,
   SelectionToolbarPosition,
 } from "./chapterEditorTypes";
+import {
+  CLOSED_CHAPTER_EDITOR_PANELS,
+  constrainChapterEditorPanelsForViewport,
+  decideExternalChapterContent,
+  setChapterEditorPanelOpen,
+  toggleChapterEditorPanel,
+} from "./chapterEditorSessionState";
 import {
   CHAPTER_EDITOR_OPERATION_LABELS,
   applyCandidateToContent,
@@ -49,6 +56,24 @@ const EMPTY_SESSION: ChapterEditorSessionState = {
   status: "idle",
   viewMode: "block",
 };
+
+const NARROW_EDITOR_MEDIA_QUERY = "(max-width: 1279px)";
+
+function useIsNarrowEditorViewport(): boolean {
+  const [isNarrow, setIsNarrow] = useState(() => (
+    typeof window === "undefined" ? false : window.matchMedia(NARROW_EDITOR_MEDIA_QUERY).matches
+  ));
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(NARROW_EDITOR_MEDIA_QUERY);
+    const updateViewportState = () => setIsNarrow(mediaQuery.matches);
+    updateViewportState();
+    mediaQuery.addEventListener("change", updateViewportState);
+    return () => mediaQuery.removeEventListener("change", updateViewportState);
+  }, []);
+
+  return isNarrow;
+}
 
 function formatQualityDebtSource(source: string | null): string {
   if (source === "repair_recheck") return "自动修复后的复审";
@@ -96,11 +121,16 @@ export default function ChapterEditorShell(props: ChapterEditorShellProps) {
     workspaceStatus,
     onBack,
     onOpenVersionHistory,
+    onRequestWorkspace,
   } = props;
   const llm = useLLMStore();
   const queryClient = useQueryClient();
+  const referencePanelId = useId();
+  const collaborationPanelId = useId();
+  const isNarrowViewport = useIsNarrowEditorViewport();
   const lastPreviewRequestRef = useRef<ReturnType<typeof buildAiRevisionRequest> | null>(null);
   const normalizedChapterContent = useMemo(() => normalizeChapterContent(chapter?.content ?? ""), [chapter?.content]);
+  const lastIncomingContentRef = useRef(normalizedChapterContent);
   const qualityDebtDetails = useMemo(
     () => readChapterQualityDebtDetails(chapter?.riskFlags),
     [chapter?.riskFlags],
@@ -115,19 +145,54 @@ export default function ChapterEditorShell(props: ChapterEditorShellProps) {
   const [revisionScope, setRevisionScope] = useState<ChapterEditorRevisionScope>("selection");
   const [revisionInstruction, setRevisionInstruction] = useState("");
   const [selectedDiagnosticId, setSelectedDiagnosticId] = useState<string | null>(null);
+  const [panelState, setPanelState] = useState(CLOSED_CHAPTER_EDITOR_PANELS);
+  const [externalConflictContent, setExternalConflictContent] = useState<string | null>(null);
 
   useEffect(() => {
-    const nextContent = normalizedChapterContent;
-    setContentDraft(nextContent);
-    setSavedContent(nextContent);
+    const decision = decideExternalChapterContent({
+      incomingContent: normalizedChapterContent,
+      lastIncomingContent: lastIncomingContentRef.current,
+      draftContent: contentDraft,
+      savedContent,
+      hasPendingRevision: session.status !== "idle"
+        || selection !== null
+        || revisionInstruction.trim().length > 0
+        || selectedDiagnosticId !== null,
+    });
+    if (decision === "unchanged") {
+      return;
+    }
+
+    lastIncomingContentRef.current = normalizedChapterContent;
+    if (decision === "conflict") {
+      setExternalConflictContent(normalizedChapterContent);
+      return;
+    }
+
+    setContentDraft(normalizedChapterContent);
+    setSavedContent(normalizedChapterContent);
     setSaveStatus("idle");
     setSelection(null);
     setSelectionToolbarPosition(null);
     setSession(EMPTY_SESSION);
     setRevisionInstruction("");
     setRevisionScope("selection");
+    setSelectedDiagnosticId(null);
+    setExternalConflictContent(null);
     lastPreviewRequestRef.current = null;
-  }, [chapter?.id, normalizedChapterContent]);
+  }, [
+    contentDraft,
+    normalizedChapterContent,
+    revisionInstruction,
+    savedContent,
+    selectedDiagnosticId,
+    selection,
+    session.status,
+  ]);
+
+  useEffect(() => {
+    setPanelState((current) => constrainChapterEditorPanelsForViewport(current, isNarrowViewport));
+  }, [isNarrowViewport]);
 
   useEffect(() => {
     if (!workspace) {
@@ -368,6 +433,14 @@ export default function ChapterEditorShell(props: ChapterEditorShellProps) {
       return;
     }
 
+    onRequestWorkspace?.();
+    setPanelState((current) => setChapterEditorPanelOpen(
+      current,
+      "collaboration",
+      true,
+      isNarrowViewport,
+    ));
+
     const request = buildAiRevisionRequest({
       source,
       scope,
@@ -398,6 +471,13 @@ export default function ChapterEditorShell(props: ChapterEditorShellProps) {
     if (!lastPreviewRequestRef.current) {
       return;
     }
+    onRequestWorkspace?.();
+    setPanelState((current) => setChapterEditorPanelOpen(
+      current,
+      "collaboration",
+      true,
+      isNarrowViewport,
+    ));
     previewMutation.mutate(lastPreviewRequestRef.current);
   };
 
@@ -457,10 +537,131 @@ export default function ChapterEditorShell(props: ChapterEditorShellProps) {
           : "尚未选中片段";
   const canRunSelectionRevision = Boolean(getSelectionTarget());
   const headerSaveLabel = getSaveStatusLabel(saveStatus, isDirty);
-  const gridClassName = "xl:grid-cols-[320px_minmax(0,1fr)_400px]";
+  const gridClassName = panelState.referenceOpen && panelState.collaborationOpen
+    ? "xl:grid-cols-[320px_minmax(0,1fr)_400px]"
+    : panelState.referenceOpen
+      ? "xl:grid-cols-[320px_minmax(0,1fr)]"
+      : panelState.collaborationOpen
+        ? "xl:grid-cols-[minmax(0,1fr)_400px]"
+        : "xl:grid-cols-1";
+  const narrowAuxiliaryPanelOpen = isNarrowViewport
+    && (panelState.referenceOpen || panelState.collaborationOpen);
+  const saveActionLabel = externalConflictContent
+    ? "先处理正文冲突"
+    : saveMutation.isPending
+      ? "保存中..."
+      : saveStatus === "error"
+        ? "重试保存"
+        : isDirty
+          ? "保存正文"
+          : "正文已保存";
+
+  const handleKeepLocalDraft = () => {
+    if (externalConflictContent === null) {
+      return;
+    }
+    setSavedContent(externalConflictContent);
+    setExternalConflictContent(null);
+    setSaveStatus("idle");
+  };
+
+  const handleLoadExternalContent = () => {
+    if (externalConflictContent === null) {
+      return;
+    }
+    setContentDraft(externalConflictContent);
+    setSavedContent(externalConflictContent);
+    setSaveStatus("idle");
+    setSelection(null);
+    setSelectionToolbarPosition(null);
+    setSession(EMPTY_SESSION);
+    setRevisionInstruction("");
+    setRevisionScope("selection");
+    setSelectedDiagnosticId(null);
+    setExternalConflictContent(null);
+    lastPreviewRequestRef.current = null;
+  };
+
+  const handleTogglePanel = (panel: "reference" | "collaboration") => {
+    const willOpen = panel === "reference"
+      ? !panelState.referenceOpen
+      : !panelState.collaborationOpen;
+    if (willOpen) {
+      onRequestWorkspace?.();
+    }
+    setPanelState((current) => toggleChapterEditorPanel(current, panel, isNarrowViewport));
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-2xl bg-muted/20 px-3 py-2">
+        <div className="min-w-0">
+          <div className="truncate text-sm font-medium text-foreground">
+            第 {chapter.order} 章 · {chapter.title?.trim() || "未命名章节"}
+          </div>
+          <div className="text-xs text-muted-foreground">{wordCount} 字 · {headerSaveLabel}</div>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={panelState.referenceOpen ? "default" : "outline"}
+            aria-controls={referencePanelId}
+            aria-expanded={panelState.referenceOpen}
+            onClick={() => handleTogglePanel("reference")}
+          >
+            <BookOpenText className="h-4 w-4" />
+            章节参考
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={panelState.collaborationOpen ? "default" : "outline"}
+            aria-controls={collaborationPanelId}
+            aria-expanded={panelState.collaborationOpen}
+            onClick={() => handleTogglePanel("collaboration")}
+          >
+            <Sparkles className="h-4 w-4" />
+            AI 协作
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            disabled={!isDirty || saveMutation.isPending || externalConflictContent !== null}
+            onClick={() => saveMutation.mutate(contentDraft)}
+          >
+            {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {saveActionLabel}
+          </Button>
+        </div>
+      </div>
+      {externalConflictContent !== null ? (
+        <div role="alert" className="flex shrink-0 flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <div className="min-w-0 text-sm leading-6">
+              <div className="font-medium">这章在其他位置更新过</div>
+              <div className="text-xs text-amber-900/80">
+                你的草稿和 AI 候选仍保留。继续使用草稿会让下一次保存以当前草稿为准；载入外部正文会清除本章尚未应用的编辑会话。
+              </div>
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="border-amber-300 bg-white/70 hover:bg-white"
+              onClick={handleKeepLocalDraft}
+            >
+              保留我的草稿
+            </Button>
+            <Button type="button" size="sm" onClick={handleLoadExternalContent}>
+              载入外部正文
+            </Button>
+          </div>
+        </div>
+      ) : null}
       {qualityDebtDetails ? (
         <div className="flex shrink-0 flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-start gap-3">
@@ -487,24 +688,35 @@ export default function ChapterEditorShell(props: ChapterEditorShellProps) {
           </Button>
         </div>
       ) : null}
-      <div className={`grid min-h-0 flex-1 gap-4 overflow-hidden ${gridClassName}`}>
-        <ChapterEditorSidebar
-          chapter={chapter}
-          workspace={workspace}
-          workspaceStatus={workspaceStatus}
-          wordCount={wordCount}
-          saveStatusLabel={headerSaveLabel}
-          isDirty={isDirty}
-          isSaving={saveMutation.isPending}
-          selectedDiagnosticId={selectedDiagnosticId}
-          onBack={onBack}
-          onOpenVersionHistory={onOpenVersionHistory}
-          onSave={() => saveMutation.mutate(contentDraft)}
-          onFocusDiagnostic={handleFocusDiagnostic}
-          onRunDiagnostic={handleRunDiagnostic}
-        />
+      <div className={`relative grid min-h-0 flex-1 gap-4 overflow-hidden ${gridClassName}`}>
+        <div
+          id={referencePanelId}
+          aria-hidden={!panelState.referenceOpen}
+          className={`${panelState.referenceOpen ? "absolute inset-0 z-30 xl:static xl:z-auto" : "hidden"} min-h-0 overflow-hidden bg-background`}
+        >
+          <ChapterEditorSidebar
+            chapter={chapter}
+            workspace={workspace}
+            workspaceStatus={workspaceStatus}
+            wordCount={wordCount}
+            saveStatusLabel={headerSaveLabel}
+            isDirty={isDirty}
+            isSaving={saveMutation.isPending}
+            isSaveBlocked={externalConflictContent !== null}
+            selectedDiagnosticId={selectedDiagnosticId}
+            onBack={onBack}
+            onOpenVersionHistory={onOpenVersionHistory}
+            onSave={() => saveMutation.mutate(contentDraft)}
+            onFocusDiagnostic={handleFocusDiagnostic}
+            onRunDiagnostic={handleRunDiagnostic}
+          />
+        </div>
 
-        <div className="relative min-h-0 overflow-hidden">
+        <div
+          className="relative min-h-0 overflow-hidden"
+          aria-hidden={narrowAuxiliaryPanelOpen || undefined}
+          inert={narrowAuxiliaryPanelOpen || undefined}
+        >
           <ChapterTextEditor
             value={contentDraft}
             readOnly={session.status !== "idle"}
@@ -534,7 +746,11 @@ export default function ChapterEditorShell(props: ChapterEditorShellProps) {
           />
         </div>
 
-        <div className="min-h-0 overflow-hidden">
+        <div
+          id={collaborationPanelId}
+          aria-hidden={!panelState.collaborationOpen}
+          className={`${panelState.collaborationOpen ? "absolute inset-0 z-30 xl:static xl:z-auto" : "hidden"} min-h-0 overflow-hidden bg-background`}
+        >
           <ChapterEditorDirectorPanel
             workspace={workspace}
             workspaceStatus={workspaceStatus}

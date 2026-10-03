@@ -12,6 +12,8 @@
 
 `NovelWorld` 是小说内部世界实例。它不是外部 `World` 的直接引用，而是从外部世界库导入、由小说主题生成或手动创建后的本书副本。当前迁移期保留 `Novel.worldId` 与 `Novel.storyWorldSliceJson` 旧字段作为兼容来源，但新的世界上下文门面会把旧字段同步进 `NovelWorld`，后续生成链应逐步只读 `NovelWorld`。
 
+创建小说前，从样本开始的开局灵感与方向候选通过 `WorldService` 的只读规划参考接口消费样本内容，不调用会创建本书副本的 Gateway。确认小说后的生产上下文仍遵循上述唯一门面规则。入口与恢复边界见[从世界样本开始创作](../workflows/fork-world-sample-start.md)。
+
 当前规则：
 
 - 生成链需要世界信息时调用 `WorldContextGateway.getWorldContextBlock(novelId, { purpose })`。
@@ -31,7 +33,7 @@
 - 从小说内新建世界（根据本书生成或自定义空白手册）时，系统必须在同一事务内创建外部 `World` 样本，并把 `Novel.worldId` 与 `NovelWorld.sourceWorldId` 绑定到该样本；不再要求用户额外执行“保存到世界库”。创建完成后默认保留双向同步入口，但后续 `push` / `pull` 仍必须由用户手动确认，系统不得自动覆盖任一侧内容。
 - 小说内世界 UI 应优先调用 `GET /api/novels/:id/novel-world` 展示当前本书世界来源与状态。
 - 从外部世界库导入到小说时调用 `POST /api/novels/:id/novel-world/import`，后端会复制世界结构到 `NovelWorld`，并清空旧的故事切片缓存，等待下一次按本书内容重新裁剪。
-- 当用户没有选择外部世界库样本，或希望让系统先给本书搭建舞台时，调用 `POST /api/novels/:id/novel-world/generate`。该流程必须通过注册 PromptAsset `novel.world.generate_from_theme@v2` 生成结构化世界，不允许用固定关键词或题材分支伪造世界。
+- 当用户没有选择外部世界库样本，或希望让系统先给本书搭建舞台时，调用 `POST /api/novels/:id/novel-world/generate`。该流程必须通过注册 PromptAsset `novel.world.generate_from_theme@v3` 生成结构化世界，不允许用固定关键词或题材分支伪造世界。
 - 小说内“根据本书主题生成”请求必须携带当前工作台选择的 `provider`、`model` 与 `temperature`；服务端不得为该入口硬编码 DeepSeek。未显式指定时由通用模型路由按全局配置处理。
 - 本书主题生成只负责产出可开书的紧凑世界种子，不生成完整百科；必须约束实体数量、文本总量、单次输出预算与完成时限。结构化输出不完整时结束本次请求，用户可在世界手册中继续扩写，而不是对同一大 JSON 重复修复。
 - 编排层如需在生成链准备阶段创建本书世界，应优先调用 `WorldContextGateway.generateWorldFromNovelTheme(novelId, options)`，不要直接依赖 `NovelWorldInstanceService` 的内部方法。HTTP 路由可以通过应用服务保留现有接口，但生成链和工作流编排的抽象入口应是 Gateway。
@@ -67,8 +69,8 @@
 世界模块的产品入口也应保持边界清晰：
 
 - 外部世界库页面是“世界样本库”，用于浏览、生成、整理和维护可复用世界样本。
-- 外部世界库页面必须解释样本的使用方式：先在样本库整理通用世界手册，再从小说基础信息页导入为本书世界副本，最后由用户手动决定样本与副本之间的同步。不要让用户误以为外部样本会直接驱动小说内容。
-- 外部世界库卡片的主动作应进入世界工作台或世界手册，不应把用户导向其他创作入口。
+- 外部世界库页面必须解释样本的使用方式：可基于样本进入自动导演开书，也可从已有小说基础信息页导入为本书世界副本；确认开书或导入后，由用户手动决定样本与副本之间的同步。
+- 外部世界库卡片提供“基于这个世界创作”与世界手册入口。开书入口只带入参考样本，沿用自动导演，不在世界模块另建小说生产链。
 - 外部世界库中已有世界样本的“查看世界手册”入口必须始终可用。生成向导开关只能控制新建/生成入口，不能隐藏已有世界的查看和管理入口。
 - 世界样本创建入口应表现为“创建世界样本”的分步向导：先说明世界，再选择世界骨架，最后确认核心规则。题材、灵感、参考作品、生成偏好、模板骨架和属性勾选都服务于这三步，不应在首屏堆成配置表单。
 - 小说需要使用世界时，从小说基础信息页的“本书世界”卡片导入为小说内部 `NovelWorld` 副本。
@@ -177,6 +179,8 @@
 - 后续新增“地图生成”“势力图谱生成”等资产动作时，应优先放入世界资产子组件或独立资产面板，不要继续塞进 `NovelWorldManagerCard` 顶层。
 
 ## 相关模块
+
+- 世界内容的提案、提交、双侧同步 CAS 与复核恢复遵循[世界维护提交与恢复边界](../workflows/world-maintenance-recovery.md)；Gateway 只消费 canonical 本书世界与适用作者决定，不拥有 maintenance 写入。
 
 - `server/src/services/novel/worldContext/WorldContextGateway.ts`
 - `server/src/services/novel/worldContext/NovelWorldInstanceService.ts`

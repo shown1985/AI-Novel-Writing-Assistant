@@ -20,7 +20,7 @@ export const directorIdeaConstellationOptionsPrompt: PromptAsset<
   z.infer<typeof directorIdeaConstellationOptionsSchema>
 > = {
   id: "novel.director.idea_constellation_options",
-  version: "v3",
+  version: "v4",
   taskType: "planner",
   mode: "structured",
   language: "zh",
@@ -39,6 +39,8 @@ export const directorIdeaConstellationOptionsPrompt: PromptAsset<
   },
   render: (input) => [
     new SystemMessage([
+      "若上下文提供选定世界样本，须遵守其公理、边界、禁忌、势力和地点等硬性事实；在该世界内部变化人物、事件和冲突，不得另造矛盾的世界规则。",
+
       "你是面向中文网文新手的开书素材设计师。你的任务是根据当前题材、推进方式和用户想法，生成能直接拼成开书构想的具体网文素材，不是抽象主题词或编剧命题。",
       "必须严格输出七类、每类五项，共 35 项：protagonist 主角开局身份与困境、setting 题材舞台与利益规则、advantage 金手指或核心优势、opening_crisis 第一章爆点、core_goal 前期目标与阶段回报、story_variable 核心对手或主要阻力、relationship 能持续推进的关键关系。",
       "每项 label 必须具体、适合点击选择，控制在2到48个字符；需要表达完整设定时可以使用短句，不要为了凑短而丢失关键机制。hint 说明它会怎样落到开局行动、连续升级或读者回报。",
@@ -74,7 +76,7 @@ export const directorIdeaConstellationComposePrompt: PromptAsset<
   z.infer<typeof directorIdeaConstellationComposeSchema>
 > = {
   id: "novel.director.idea_constellation_compose",
-  version: "v2",
+  version: "v3",
   taskType: "planner",
   mode: "structured",
   language: "zh",
@@ -90,6 +92,8 @@ export const directorIdeaConstellationComposePrompt: PromptAsset<
   },
   render: (input) => [
     new SystemMessage([
+      "若上下文提供选定世界样本，须遵守其公理、边界、禁忌、势力和地点等硬性事实；在该世界内部变化人物、事件和冲突，不得另造矛盾的世界规则。",
+
       "你是中文网文开书灵感助手，负责把用户亲自选择的故事元素收束成一段可以直接开始创作的起始想法。",
       "必须保留每个已选元素的核心含义，并让它们形成因果关系，不能只把标签机械串联。",
       "优先写清主角的具体身份、金手指或核心优势、第一章发生的事件，以及前期必须完成的目标；不要重新抽象成主题句。",

@@ -20,6 +20,7 @@
 - 新增产品级 prompt 还必须进入提示词管理目录，能够被检索、查看版本、预览实际上下文并执行受控测试；只完成 Registry 注册不等于完成提示词管理纳管。
 - Prompt 工程完善的最高优先级是正文写作提示词，尤其是 `novel.chapter.writer` 及其直接依赖的章节写作上下文。规划、审校、修复、Workbench 和可视化工具的改动都应服务“能稳定产出可用正文”这一主目标；如果资源有限，优先保证正文写作 prompt 的上下文完整、角色硬事实准确、章节任务清晰、风格约束可控、章末钩子可执行。
 - `PromptAsset` 必须提供 `id`、`version`、`taskType`、`mode`、`language`、`contextPolicy`、`render()`，结构化 prompt 还必须有 `outputSchema` 或等价校验。
+- Registry loader 的声明 key 必须严格等于实际资产的 `buildPromptAssetKey(asset)`，并在全量 loader 中保持唯一。运行时重绑定或自修复不能用于容忍静态版本漂移；有意升级版本时必须在同一阶段同步资产、loader 和按版本消费的测试。
 - 创作语义判断必须 AI-first。角色身份承接、隐藏身份、题材理解、故事职责、质量风险、下一步动作、修复建议等产品语义，不得用正则、关键词表、固定字符串片段、字符比例或手写分支来判断或阻断流程；这类能力应进入 PromptAsset、结构化输出 schema、semantic retry 或 AI 评估链路。
 - 确定性代码只允许处理结构契约和安全边界，例如必填字段、枚举归一、ID 是否存在、数组长度、权限和数据保护。确定性质量闸门可以指出“缺少 protagonist / gender / 必填字段”这类结构问题，但不能判断“是否承接了某个题材身份”“名字是否像功能位”“语言是否像英文残留”等创作语义。
 - 结构化输出使用 `runStructuredPrompt`，纯文本使用 `runTextPrompt`，流式能力使用对应 stream runner。
@@ -28,6 +29,7 @@
 - 自动导演关键路径优先使用职责单一的小型结构化合同。开篇世界切片、路线窗口和下一章执行合同应分别约束，不要为了减少代码步骤把整本世界、全角色、整卷章节和执行细节塞进一个巨型 JSON。拆分的目标是降低 repair 面积和首章前耗时，不是复制生产链。
 - 自定义高级模板或业务上下文只能影响提示词正文。运行时必须在模板编译后强制追加 JSON skeleton、完整 Schema 和 repair 合同，用户模板不能覆盖这些结构安全边界。
 - 所有通过 registry runner 执行的 PromptAsset 都必须产生 prompt quality telemetry，用于观察 repair 率、semantic retry 率、空输出率、上下文 token 预算、输出长度和耗时。业务服务不得绕过 runner 自行吞掉 postValidate 失败；语义失败应通过 `semanticRetryPolicy` 重试，或通过明确的 `postValidateFailureRecovery` 降级。
+- 供应商拒绝过大的上下文或 payload 时，Prompt Runner 必须把它记录为独立的 `request_too_large` 失败类别，而不是并入笼统的 `llm_error`。聚合遥测可以按 Prompt、Provider、Model 和阶段统计此类次数；记录只保留脱敏能力键与预算快照，不保存 API Key、完整 Prompt 或模型正文。该分类只改善诊断，不改变默认重试和降级策略。
 - 章节列表、卷级拆章这类规划 prompt 可以在结构化输出后增加轻量业务质量闸门，用于拦截空泛摘要、连续被动推进、第一人称长句章名、缺少主角主动行动或缺少阶段兑现 / 钩子的章节段。质量闸门只负责指出结构化结果的问题并触发重试，不能替代 AI 做章节规划，也不能用关键词分支生成章节内容。
 - Prompt 中展示给模型的状态名、枚举名和示例必须与 schema 可接受值一致。上下文里如果存在历史别名或业务口语值，例如 `active` 表示已推进但未兑现，应在 prompt 明确转换规则，并在 schema preprocess 中做确定性归一，不能把同一类别名反复交给 LLM repair。
 - 高频评估类结构化 prompt 必须同时具备完整 JSON skeleton、受限枚举表、非空示例和 schema preprocess。章节接收闸门、章节任务单质量门禁这类 prompt 不能只在自然语言里描述“可用 / 可修 / 阻断”，必须把 `status`、`verdict`、`issues.target`、`confidence` 等字段的合法值写入 system prompt，并在 schema 边界归一常见别名，例如 `acceptable -> accepted`、`pacing -> semantic`、`85 -> 0.85`。
@@ -44,6 +46,7 @@
 - 开书灵感、短方向候选这类“小结构、强创作上下文”的任务，通用 JSON repair 可能只恢复字段结构，却丢失用户已选题材、推进方式和方向差异。此类 PromptAsset 应限制采样温度与输出预算、给出完整非空数组示例；原始输出退化或结构损坏时，优先携带原始业务上下文重新执行已注册 Prompt，而不是让无业务上下文的 repair 补造一组新内容。传输错误不能用内容重试掩盖模型连接问题；结构化调用只可按“模型路由管理”的全局重试次数，对尚未取得可信输出的服务端错误、超时或连接中断执行有限重试，默认 1 次、最多 3 次。达到次数后才可切换已启用的备用模型或返回来源页恢复；每次重试必须沿用同一 Prompt 与结构合同，并在 AI 实况中留下独立调用记录，不能伪造成功或把它当作 JSON repair。
 - 长列表与多层对象类 PromptAsset 必须同时控制字段长度、数组规模和调用级输出预算。仅声明“严格 JSON”不能防止模型把说明文字塞进字段或在闭合括号前持续生成；可以按卷、节拍或片段拆分的结果，应优先分段生成并持久化。
 - 空模型响应不属于 JSON 或 schema 修复问题。普通和流式结构化入口在原生 JSON 模式返回空内容时，都应先用同一模型、同一 Prompt 和同一 Schema 降级到 `prompt_json`；降级后仍为空，才按模型传输 / 输出失败进入有限重试和备用模型。repair 没有原始语义可保留，禁止用空对象补造必填业务内容。
+- “没有取得正文”必须先区分 transport 异常与真实空响应。HTTP 429/5xx、服务过载、临时不可用、超时和连接中断即使没有 `rawContent`，仍属于 `transport_error`，按模型路由的有限次数重试；只有 transport 正常结束且正文为空时才是 `empty_content`，按结构化策略降级。context/payload 超限、取消、JSON/schema 失败保持各自分类，不能用空正文兜底覆盖。
 - 支持开关思考模式的模型执行结构化任务时，应由 provider capability profile 显式关闭思考模式，避免推理预算耗尽后没有最终 JSON。新模型别名接入时必须同步验证其思考开关、结构化 profile 和实际请求参数，不能只把模型名加入下拉列表。DeepSeek 当前官方名 `deepseek-flash` / `deepseek-pro` 与旧名 `deepseek-v4-flash` / `deepseek-v4-pro` 必须按同一套思考开关处理。
 - GLM 4.5 及以上模型在官方兼容端点执行结构化任务时，必须通过 `thinking: { type: "disabled" }` 关闭思考。`enable_thinking: false` 是 Qwen 兼容参数，不能复用于 GLM；聚合或未知代理端点仍按自身已验证的能力处理。
 - Semantic retry 必须把原始业务失败原因传回重试 prompt，并指明需要整体重排还是局部修正。章节列表、卷级拆章这类结果如果因为标题同构、章节功能重复、摘要空泛或结尾牵引不足被拒绝，重试指令应要求重排整组标题骨架和章节功能分配，而不是只替换被点名的一章。
@@ -72,6 +75,7 @@
 - 旧未纳管 prompt 路径被触碰时，默认先迁入 registry，再扩展能力。
 - 推进模式库的“扩展”属于正式产品 AI 能力：它必须由注册 PromptAsset 同时读取选定根模式、现有同级模式和整库摘要，再输出可直接落库的完整 profile 候选。不能在前端按名称相似度或固定类别补齐，更不能把“扩展”退化为只换名称的子类生成。候选保存仍必须通过既有两级树、重复名称与 profile 校验。
 - 小说封面 Prompt 的默认产品目标是“带准确书名的完整竖版封面”，不是无文字主画面。Prompt 必须同时提供唯一书名、简体中文准确渲染、清晰高对比度排版和禁止副标题/作者名/水印的约束；负面提示词只能拦截乱码、错误书名等文字质量问题，不能把“文字/书名”整体列为禁止项。
+- 世界 Prompt 的公共消费边界是 `prompts/world/world.prompts.ts` 兼容门面。实现按灵感、生成、结构、维护、导入和展示能力归属到明确子目录；业务 service 与 Registry 只通过门面导入，不能深导入子目录。共享输入和 schema 继续由 `world.promptTypes.ts`、`world.promptSchemas.ts` 负责，能力私有的 postValidate 留在所属模块，不建立无所有权 helper。纯目录迁移必须证明资产 id/version/schema、Prompt 文本、Runner、budget/telemetry 与 repair 策略等价。
 
 批准例外：
 
@@ -130,8 +134,11 @@
 - 意图识别漏判：修 PromptAsset、输入上下文、schema 或工具目录，不加关键词路由。
 - 角色阵容看起来没有承接身份、题材或隐藏真相：先查角色准备 PromptAsset、上下文块和结构化输出，不加本地正则抽取身份，不用关键词判断候选能否自动应用。
 - 单个 PromptAsset 的 repair 或 semantic retry 频率异常升高：先查看 prompt quality telemetry 中的 promptId/version、上下文块、输出空率和失败分类，再判断是 schema 合同、上下文污染、模型路由还是 prompt 文案问题。
+- `getRegisteredPromptAsset(id, version)` 或 `hasRegisteredPromptAsset` 在资产明显存在时仍返回“missing prompt asset”：这通常不是资产丢失，而是 `server/src/prompting/registry/promptAssetLoaderEntries.ts` 里手写的 `key: "<id>@v<N>"` 字符串没有跟着 `PromptAsset.version` 的最新一次修改同步递增——例如给某条 prompt 加新规则时把 `version` 从 `v1` 改成了 `v2`，却忘了同步改 `promptAssetLoaderEntries.ts` 里的 `key`。`registry.ts` 的 loader 在按声明 key 找不到匹配版本时会遍历并水合其余全部条目再放弃，不会抛错，所以这种漂移不会在启动时报错，只会在按旧 key 精确查找、或 catalog/测试按最新 version 断言时才暴露。修复方式是把 `promptAssetLoaderEntries.ts` 里的 `key` 改成与资产文件里 `id`/`version` 字段一致，而不是把资产版本降回去迁就旧 key；同时要搜索仓库里其他硬编码了该旧 `@vN` 字符串的测试、文档（尤其是本 wiki 目录）一并更新。2026-09 从上游合并后一次性发现过 7 处这类漂移（`novel.world.generate_from_theme`、`novel.character.castOptions`、`novel.character.castAuto`、`novel.character.castAuto.members`、`novel.character.supplemental`、`novel.chapterHook.generate`、`style.detection`、`style.rewrite`），根因都是同一类“改资产版本号时漏改注册 key”，值得在改动任意 `version` 字段后，顺手用一次“遍历 `promptAssetLoaderEntries`、对比每条 `entry.key` 与其 `load()` 出的资产实际 `${id}@${version}`”的检查来防止复发。
 
 ## 相关模块
+
+- 世界评估、提案与提交后复核的 AI / Runtime 分工见[世界维护提交与恢复边界](../workflows/world-maintenance-recovery.md)。
 
 - `server/src/prompting/`
 - `server/src/prompting/core/promptRunner.ts`

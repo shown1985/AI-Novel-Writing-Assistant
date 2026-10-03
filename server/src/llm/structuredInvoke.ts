@@ -1,7 +1,7 @@
 import type { ZodType } from "zod";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
-import type { LLMProvider, ProviderAuthMode } from "@ai-novel/shared/types/llm";
+import type { LLMProvider, ProviderAuthMode, ReasoningEffort } from "@ai-novel/shared/types/llm";
 import type { TaskType } from "./modelRouter";
 import type { ModelRouteRequestProtocol } from "@ai-novel/shared/types/novel";
 import {
@@ -36,6 +36,14 @@ import {
 import { toText } from "../services/novel/novelP0Utils";
 import type { PromptInvocationMeta } from "../prompting/core/promptTypes";
 import { ReasoningStreamCollector } from "./reasoning";
+import {
+  buildPromptInvocationAttribution,
+  getModelAttemptExecutionEvidence,
+  getModelAttemptRequestState,
+  runWithModelAttemptRequestContext,
+  startModelTransportAttempt,
+} from "../platform/llm/provenance";
+import type { ModelAttemptRole } from "../platform/llm/provenance/attempts/contracts";
 
 export {
   parseStructuredLlmRawContentDetailed,
@@ -64,7 +72,16 @@ export interface StructuredInvokeInput<T> {
   label: string;
   maxRepairAttempts?: number;
   promptMeta?: PromptInvocationMeta;
+  sessionId?: string;
+  reasoningEnabled?: boolean;
+  reasoningEffort?: ReasoningEffort;
   disableFallbackModel?: boolean;
+  /** Internal PromptRunner constraint covering all provider calls in this request. */
+  singleProviderTransportAttempt?: boolean;
+  /** Internal production-wiring controls; not part of the public prompt API. */
+  deferModelAttemptAdoption?: boolean;
+  modelAttemptRole?: Exclude<ModelAttemptRole, "legacy_unknown">;
+  modelAttemptParentId?: string | null;
 }
 
 interface StructuredAttemptTarget {
@@ -162,6 +179,9 @@ async function resolveAttemptTarget(input: {
   taskType?: TaskType;
   requestProtocol?: ModelRouteRequestProtocol;
   structuredStrategy?: StructuredOutputStrategy;
+  sessionId?: string;
+  reasoningEnabled?: boolean;
+  reasoningEffort?: ReasoningEffort;
 }): Promise<StructuredAttemptTarget> {
   const shouldResolveRoutePreference = Boolean(
     input.taskType
@@ -181,6 +201,9 @@ async function resolveAttemptTarget(input: {
     taskType: input.taskType ?? "planner",
     requestProtocol: input.requestProtocol,
     structuredStrategy: input.structuredStrategy,
+    sessionId: input.sessionId,
+    reasoningEnabled: input.reasoningEnabled,
+    reasoningEffort: input.reasoningEffort,
     executionMode: "plain",
   });
   const preferredStrategy = input.structuredStrategy ?? (route
@@ -215,6 +238,7 @@ async function invokeStructuredAttempt<T>(input: {
   strategyIndex: number;
   fallbackAvailable: boolean;
   fallbackUsed: boolean;
+  transportRetryAttempt: number;
 }): Promise<StructuredInvokeResult<T>> {
   const attemptTemperature = computeAttemptTemperature(input.target.temperature, input.strategyIndex);
   const resolved = await resolveLLMClientOptions(input.target.provider, {
@@ -228,6 +252,9 @@ async function invokeStructuredAttempt<T>(input: {
     timeoutMs: input.baseInput.timeoutMs,
     taskType: input.baseInput.taskType ?? "planner",
     promptMeta: input.baseInput.promptMeta,
+    sessionId: input.baseInput.sessionId,
+    reasoningEnabled: input.baseInput.reasoningEnabled,
+    reasoningEffort: input.baseInput.reasoningEffort,
     executionMode: "structured",
     structuredStrategy: input.strategy,
     requestProtocol: input.target.requestProtocol,
@@ -261,11 +288,40 @@ async function invokeStructuredAttempt<T>(input: {
   const liveSession = beginLlmLiveSession({
     label: input.baseInput.label,
     mode: "structured",
+    requestId: getModelAttemptRequestState()?.requestId ?? null,
     promptMeta: input.baseInput.promptMeta,
     provider: resolved.provider,
     model: resolved.model,
     promptText: formatLivePrompt(messages),
   });
+  const requestedRole = input.baseInput.modelAttemptRole;
+  const attemptRole = input.fallbackUsed && requestedRole === "transport_retry"
+    ? "fallback"
+    : requestedRole
+    ?? (input.transportRetryAttempt > 0
+      ? "transport_retry"
+      : input.strategyIndex > 0
+        ? "strategy_retry"
+        : input.fallbackUsed ? "fallback" : "primary");
+  const modelAttempt = await startModelTransportAttempt({
+    provider: resolved.provider,
+    model: resolved.model,
+    modelRoute: resolved.modelRoute ?? null,
+    structuredStrategy: input.strategy,
+    role: attemptRole,
+    routeTier: input.fallbackUsed ? "fallback" : "primary",
+    // An explicit parent seeds the first physical call of a deferred stream
+    // or semantic retry. Later transport/strategy calls must follow the
+    // recorder's current last attempt; a fallback likewise points to the
+    // primary attempt that actually triggered the model switch.
+    parentAttemptId: !input.fallbackUsed
+      && input.transportRetryAttempt === 0
+      && input.strategyIndex === 0
+      ? input.baseInput.modelAttemptParentId
+      : null,
+  });
+  let transportCompleted = false;
+  let transportUsage: ReturnType<typeof mergeStreamTokenUsage> = null;
   try {
     liveSession.phase("streaming", "模型正在返回结构化结果");
     const collected = await runWithEnforcedTimeout({
@@ -279,19 +335,26 @@ async function invokeStructuredAttempt<T>(input: {
         );
         let rawContent = "";
         let tokenUsage = null;
+        let reasoningChars = 0;
         const reasoningCollector = new ReasoningStreamCollector();
         for await (const chunk of stream) {
           const content = toText(chunk.content);
-          liveSession.reasoning(reasoningCollector.push(chunk, content));
+          const reasoningDelta = reasoningCollector.push(chunk, content);
+          reasoningChars += reasoningDelta.length;
+          liveSession.reasoning(reasoningDelta);
           rawContent += content;
           liveSession.delta(content);
           tokenUsage = mergeStreamTokenUsage(tokenUsage, extractLlmTokenUsage(chunk));
         }
-        liveSession.reasoning(reasoningCollector.flush());
-        return { rawContent, tokenUsage };
+        const remainingReasoning = reasoningCollector.flush();
+        reasoningChars += remainingReasoning.length;
+        liveSession.reasoning(remainingReasoning);
+        return { rawContent, tokenUsage, reasoningChars };
       },
     });
     const rawContent = collected.rawContent;
+    transportUsage = collected.tokenUsage;
+    transportCompleted = true;
     logStructuredInvokeEvent({
       event: "invoke_done",
       label: input.baseInput.label,
@@ -300,6 +363,7 @@ async function invokeStructuredAttempt<T>(input: {
       taskType: input.baseInput.taskType,
       latencyMs: Date.now() - startedAt,
       rawChars: rawContent.length,
+      reasoningChars: collected.reasoningChars,
       strategy: input.strategy,
       fallbackUsed: input.fallbackUsed,
       reasoningForcedOff: resolved.reasoningForcedOff,
@@ -321,7 +385,10 @@ async function invokeStructuredAttempt<T>(input: {
       taskType: input.baseInput.taskType,
       requestProtocol: resolved.requestProtocol,
       label: input.baseInput.label,
-      maxRepairAttempts: input.baseInput.maxRepairAttempts,
+      maxRepairAttempts: input.baseInput.singleProviderTransportAttempt
+        ? 0
+        : input.baseInput.maxRepairAttempts,
+      classifyZeroRepairParseFailure: input.baseInput.singleProviderTransportAttempt === true,
       promptMeta: input.baseInput.promptMeta,
       onRepairOutputDelta: (content) => {
         if (!repairStarted) {
@@ -335,7 +402,19 @@ async function invokeStructuredAttempt<T>(input: {
       fallbackAvailable: input.fallbackAvailable,
       fallbackUsed: input.fallbackUsed,
       reasoningForcedOff: resolved.reasoningForcedOff,
+      reasoningChars: collected.reasoningChars,
+      reasoningEnabled: resolved.reasoningEnabled,
+      reasoningEffort: input.baseInput.reasoningEffort,
+      modelAttemptCandidate: modelAttempt,
     });
+    const candidate = parsed.modelAttemptCandidate ?? modelAttempt;
+    if (!input.baseInput.deferModelAttemptAdoption) {
+      await candidate?.finalizeSucceeded(
+        parsed.modelAttemptUsage ?? parsed.tokenUsage ?? transportUsage,
+        "adopted",
+      );
+    }
+    parsed.attemptEvidence = getModelAttemptExecutionEvidence();
     liveSession.usage(parsed.tokenUsage ? {
       ...parsed.tokenUsage,
       reasoningTokens: parsed.tokenUsage.reasoningTokens ?? null,
@@ -343,6 +422,14 @@ async function invokeStructuredAttempt<T>(input: {
     liveSession.complete();
     return parsed;
   } catch (error) {
+    // A provider stream that ended normally but produced invalid/empty output
+    // is still a successful transport candidate; validation decides adoption.
+    // If the stream itself failed, preserve the transport failure instead.
+    if (transportCompleted) {
+      await modelAttempt?.finalizeSucceeded(transportUsage, "not_adopted");
+    } else {
+      await modelAttempt?.finalizeFailed(error, input.baseInput.signal);
+    }
     liveSession.fail(error);
     const category = error instanceof StructuredOutputError
       ? error.category
@@ -376,6 +463,7 @@ async function tryStructuredStrategies<T>(input: {
   target: StructuredAttemptTarget;
   fallbackAvailable: boolean;
   fallbackUsed: boolean;
+  transportRetryAttempt: number;
 }): Promise<StructuredInvokeResult<T>> {
   const sequence = buildStrategySequence(input.target.profile, input.baseInput.schema);
   const preferredSequence = input.target.preferredStrategy
@@ -385,7 +473,8 @@ async function tryStructuredStrategies<T>(input: {
     ]
     : sequence;
   let lastError: StructuredOutputError | null = null;
-  for (let index = 0; index < preferredSequence.length; index += 1) {
+  const strategyLimit = input.baseInput.singleProviderTransportAttempt ? 1 : preferredSequence.length;
+  for (let index = 0; index < strategyLimit; index += 1) {
     const strategy = preferredSequence[index]!;
     try {
       return await invokeStructuredAttempt({
@@ -395,6 +484,7 @@ async function tryStructuredStrategies<T>(input: {
         strategyIndex: index,
         fallbackAvailable: input.fallbackAvailable,
         fallbackUsed: input.fallbackUsed,
+        transportRetryAttempt: input.transportRetryAttempt,
       });
     } catch (error) {
       lastError = wrapStructuredInvokeError({
@@ -405,7 +495,13 @@ async function tryStructuredStrategies<T>(input: {
         fallbackAvailable: input.fallbackAvailable,
         fallbackUsed: input.fallbackUsed,
       });
-      if (lastError.category === "transport_error" && !lastError.retryWithNextStrategy) {
+      if (
+        (lastError.category === "transport_error" || lastError.category === "empty_content")
+        && !lastError.retryWithNextStrategy
+      ) {
+        break;
+      }
+      if (["request_too_large", "reasoning_budget_exhausted", "output_truncated"].includes(lastError.category)) {
         break;
       }
       if (lastError.category === "schema_mismatch" && strategy === "prompt_json") {
@@ -438,6 +534,7 @@ async function tryStructuredStrategiesWithTransportRetries<T>(input: {
         target: input.target,
         fallbackAvailable: input.fallbackAvailable,
         fallbackUsed: input.fallbackUsed,
+        transportRetryAttempt: retryAttempt,
       });
     } catch (error) {
       const structuredError = error instanceof StructuredOutputError ? error : null;
@@ -463,7 +560,7 @@ async function tryStructuredStrategiesWithTransportRetries<T>(input: {
   }
 }
 
-export async function invokeStructuredLlmDetailed<T>(input: StructuredInvokeInput<T>): Promise<StructuredInvokeResult<T>> {
+async function invokeStructuredLlmDetailedInContext<T>(input: StructuredInvokeInput<T>): Promise<StructuredInvokeResult<T>> {
   const primaryTarget = await resolveAttemptTarget({
     provider: input.provider,
     model: input.model,
@@ -475,6 +572,9 @@ export async function invokeStructuredLlmDetailed<T>(input: StructuredInvokeInpu
     taskType: input.taskType ?? "planner",
     requestProtocol: input.requestProtocol,
     structuredStrategy: input.structuredStrategy,
+    sessionId: input.sessionId,
+    reasoningEnabled: input.reasoningEnabled,
+    reasoningEffort: input.reasoningEffort,
   });
   const fallbackSettings = input.disableFallbackModel ? null : await getStructuredFallbackSettings();
   const transportRetryCount = normalizeTransportRetryCount(fallbackSettings?.retryCount);
@@ -493,10 +593,10 @@ export async function invokeStructuredLlmDetailed<T>(input: StructuredInvokeInpu
       target: primaryTarget,
       fallbackAvailable: fallbackEnabled,
       fallbackUsed: false,
-      retryCount: transportRetryCount,
+      retryCount: input.singleProviderTransportAttempt ? 0 : transportRetryCount,
     });
   } catch (primaryError) {
-    if (!fallbackEnabled || !fallbackSettings) {
+    if (input.singleProviderTransportAttempt || !fallbackEnabled || !fallbackSettings) {
       throw primaryError;
     }
 
@@ -504,9 +604,11 @@ export async function invokeStructuredLlmDetailed<T>(input: StructuredInvokeInpu
       provider: fallbackSettings.provider,
       model: fallbackSettings.model,
       temperature: fallbackSettings.temperature,
-      maxTokens: fallbackSettings.maxTokens ?? undefined,
-      taskType: input.taskType ?? "planner",
-    });
+        maxTokens: fallbackSettings.maxTokens ?? undefined,
+        taskType: input.taskType ?? "planner",
+        sessionId: input.sessionId,
+        reasoningEffort: input.reasoningEffort,
+      });
     try {
       return await tryStructuredStrategiesWithTransportRetries({
         baseInput: {
@@ -528,6 +630,27 @@ export async function invokeStructuredLlmDetailed<T>(input: StructuredInvokeInpu
         : primaryError;
     }
   }
+}
+
+/**
+ * Keep every physical call made by one structured business execution under a
+ * stable request scope. Direct low-level callers still get a complete
+ * adopted attempt; PromptRunner passes the internal defer flag so its
+ * semantic coordinator can decide adoption after post-validation.
+ */
+export async function invokeStructuredLlmDetailed<T>(input: StructuredInvokeInput<T>): Promise<StructuredInvokeResult<T>> {
+  return runWithModelAttemptRequestContext({
+    mode: "invoke",
+    prompt: {
+      taskType: input.taskType,
+      modelRoute: input.promptMeta?.promptId,
+    },
+    attribution: buildPromptInvocationAttribution({
+      novelId: input.promptMeta?.novelId,
+      chapterId: input.promptMeta?.chapterId,
+      entrypoint: input.promptMeta?.entrypoint,
+    }),
+  }, () => invokeStructuredLlmDetailedInContext(input));
 }
 
 export async function invokeStructuredLlm<T>(input: StructuredInvokeInput<T>): Promise<T> {
@@ -557,7 +680,11 @@ export function summarizeStructuredOutputFailure(input: {
     incomplete_json: incompleteJsonSummary,
     malformed_json: `模型输出的 JSON 格式不稳定${suffix}`,
     schema_mismatch: `模型输出未满足目标结构要求${suffix}`,
+    reasoning_budget_exhausted: `模型思考消耗了输出额度，未生成结构化正文${suffix}`,
+    output_truncated: `模型输出达到额度上限，结构化结果不完整${suffix}`,
+    empty_content: `模型没有返回结构化正文${suffix}`,
     transport_error: `结构化调用过程发生传输或服务端错误${suffix}`,
+    request_too_large: `本次请求携带的上下文或输出规模超过模型限制，请减少世界规模或拆分生成${suffix}`,
   };
   return {
     category,

@@ -5,9 +5,9 @@ import { Link } from "react-router-dom";
 import {
   getAPIKeySettings,
   getModelRoutes,
+  getModelRouteReadiness,
   getRagSettings,
   getStyleEngineRuntimeSettings,
-  testModelRouteConnectivity,
 } from "@/api/settings";
 import { queryKeys } from "@/api/queryKeys";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import SettingsReadinessCard, { buildSettingsReadinessItems } from "../components/SettingsReadinessCard";
 import { SettingsShell } from "../components/SettingsShell";
 import { APP_RUNTIME } from "@/lib/constants";
+import { createDiagnosticReadQueryPolicy } from "../diagnostics";
 
 const entries = [
   { to: "/settings/models", title: "模型与厂商", description: "添加模型厂商、选择模型并管理连接。", icon: Bot },
@@ -27,23 +28,23 @@ const entries = [
 export default function SettingsOverviewPage() {
   const providersQuery = useQuery({ queryKey: queryKeys.settings.apiKeys, queryFn: getAPIKeySettings });
   const routesQuery = useQuery({ queryKey: queryKeys.settings.modelRoutes, queryFn: getModelRoutes });
-  const connectivityQuery = useQuery({
-    queryKey: queryKeys.settings.modelRouteConnectivity,
-    queryFn: testModelRouteConnectivity,
+  const readinessQuery = useQuery({
+    queryKey: queryKeys.settings.modelRouteReadiness,
+    ...createDiagnosticReadQueryPolicy(getModelRouteReadiness),
     enabled: routesQuery.isSuccess,
-    refetchOnWindowFocus: false,
   });
   const ragQuery = useQuery({ queryKey: queryKeys.settings.rag, queryFn: getRagSettings });
   const styleQuery = useQuery({ queryKey: queryKeys.settings.styleEngineRuntime, queryFn: getStyleEngineRuntimeSettings });
   const items = useMemo(() => buildSettingsReadinessItems({
     providers: providersQuery.data?.data ?? [],
     modelRoutes: routesQuery.data?.data,
-    modelRouteConnectivity: connectivityQuery.data?.data,
+    modelRouteReadiness: readinessQuery.data?.data,
     ragSettings: ragQuery.data?.data,
     styleSettings: styleQuery.data?.data,
-    isModelRoutesChecking: connectivityQuery.isPending || connectivityQuery.isFetching,
+    isModelRoutesLoading: routesQuery.isPending || readinessQuery.isPending || readinessQuery.isFetching,
+    isModelRoutesError: routesQuery.isError || readinessQuery.isError,
     isStyleSettingsLoaded: styleQuery.isSuccess,
-  }), [connectivityQuery.data?.data, connectivityQuery.isFetching, connectivityQuery.isPending, providersQuery.data?.data, ragQuery.data?.data, routesQuery.data?.data, styleQuery.data?.data, styleQuery.isSuccess]);
+  }), [providersQuery.data?.data, ragQuery.data?.data, readinessQuery.data?.data, readinessQuery.isError, readinessQuery.isFetching, readinessQuery.isPending, routesQuery.data?.data, routesQuery.isError, routesQuery.isPending, styleQuery.data?.data, styleQuery.isSuccess]);
   const configuredProvider = providersQuery.data?.data?.find((item) => item.isConfigured && item.isActive);
   const routeCount = routesQuery.data?.data?.routes.filter((route) => route.provider && route.model).length ?? 0;
   const rag = ragQuery.data?.data;

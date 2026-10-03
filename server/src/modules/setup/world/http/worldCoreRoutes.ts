@@ -15,6 +15,7 @@ import {
   worldIdSchema,
   worldImportSchema,
   worldService,
+  handleWorldMaintenanceError,
 } from "./worldHttpContext";
 
 export function registerCoreWorldRoutes(router: Router): void {
@@ -121,6 +122,9 @@ export function registerCoreWorldRoutes(router: Router): void {
         message: "World updated.",
       } satisfies ApiResponse<typeof data>);
     } catch (error) {
+      if (handleWorldMaintenanceError(error, res)) {
+        return;
+      }
       next(error);
     }
   });

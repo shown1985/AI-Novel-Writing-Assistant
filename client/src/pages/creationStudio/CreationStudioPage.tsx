@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ArrowUpRight, Check, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -12,12 +12,14 @@ import {
   getCreationStudioTask,
   interpretCreationIdea,
   regenerateCreationDirections,
+  replaceCreationDirection,
 } from "@/api/creationStudio";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
+import { openLiveExecution } from "@/components/liveExecution/liveExecutionControl";
 import { cn } from "@/lib/utils";
 
 function normalizeTarget(form: NarrativeForm, value: number): number {
@@ -38,6 +40,10 @@ export default function CreationStudioPage() {
   const [confirmedBaseline, setConfirmedBaseline] = useState("");
   const [initialPlatformPreference, setInitialPlatformPreference] = useState<WritingPlatformPreference>("ai_recommend");
   const [writingPlatform, setWritingPlatform] = useState<WritingPlatform>("fanqie_free");
+  const [directionCount, setDirectionCount] = useState<2 | 4 | 6>(4);
+  const [replacingDirectionId, setReplacingDirectionId] = useState("");
+  const [feedbackClear, setFeedbackClear] = useState({ directionId: "", revision: 0 });
+  const preserveSelectionVersion = useRef<string | null>(null);
 
   const taskQuery = useQuery({
     queryKey: ["creation-studio", taskId],
@@ -58,10 +64,20 @@ export default function CreationStudioPage() {
     if (!interpretation) return;
     setNarrativeForm(interpretation.recommendedNarrativeForm);
     setTargetWordCount(interpretation.recommendedTargetWordCount);
-    setSelectedDirectionId((current) => current || interpretation.directions[0].id);
+    if (interpretation.recommendedNarrativeForm === "short_story" && [2, 4, 6].includes(interpretation.directions.length)) {
+      setDirectionCount(interpretation.directions.length as 2 | 4 | 6);
+    }
     setWritingPlatform(interpretation.recommendedWritingPlatform);
     setConfirmedBaseline(`${interpretation.recommendedNarrativeForm}:${interpretation.recommendedTargetWordCount}:${interpretation.recommendedWritingPlatform}`);
   }, [task?.taskId, interpretation]);
+
+  useEffect(() => {
+    if (task?.intentVersionId && preserveSelectionVersion.current === task.intentVersionId) {
+      preserveSelectionVersion.current = null;
+      return;
+    }
+    setSelectedDirectionId("");
+  }, [task?.intentVersionId]);
 
   const currentScaleKey = `${narrativeForm}:${targetWordCount}:${writingPlatform}`;
   const scaleNeedsRefresh = Boolean(interpretation && confirmedBaseline && currentScaleKey !== confirmedBaseline);
@@ -74,13 +90,14 @@ export default function CreationStudioPage() {
     mutationFn: () => interpretCreationIdea({
       idea: idea.trim(),
       preferredNarrativeForm: shortStoryEntry ? "short_story" : undefined,
+      directionCount: shortStoryEntry ? directionCount : 2,
       writingPlatformPreference: initialPlatformPreference,
     }),
     onSuccess: (response) => {
       const created = response.data;
       if (!created) return;
       setSearchParams({ taskId: created.taskId }, { replace: true });
-      toast.success("AI 已整理好两个可选方向。");
+      toast.success("AI 已整理好创作方向。");
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "暂时无法理解这个想法，请重试。"),
   });
@@ -90,15 +107,33 @@ export default function CreationStudioPage() {
       narrativeForm,
       targetWordCount: normalizeTarget(narrativeForm, targetWordCount),
       writingPlatformPreference: writingPlatform,
-      feedback: "请按我调整后的作品规模与目标平台重新适配两个方向。",
+      directionCount: narrativeForm === "short_story" ? directionCount : 2,
+      feedback: "请按我调整后的作品规模与目标平台重新适配创作方向。",
     }),
     onSuccess: async (response) => {
       setConfirmedBaseline(`${narrativeForm}:${normalizeTarget(narrativeForm, targetWordCount)}:${writingPlatform}`);
-      setSelectedDirectionId(response.data?.interpretation?.directions[0].id ?? "");
+      setSelectedDirectionId("");
       await queryClient.invalidateQueries({ queryKey: ["creation-studio", taskId] });
       toast.success("方向已按新的作品规模更新。");
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "更新方向失败。"),
+  });
+
+  const replaceMutation = useMutation({
+    mutationFn: ({ directionId, feedback }: { directionId: string; feedback?: string }) => {
+      if (!task?.intentVersionId) throw new Error("方向尚未准备好，请刷新后重试。");
+      return replaceCreationDirection(taskId, { directionId, intentVersionId: task.intentVersionId, feedback });
+    },
+    onMutate: ({ directionId }) => setReplacingDirectionId(directionId),
+    onSuccess: async (response, variables) => {
+      if (selectedDirectionId === variables.directionId) setSelectedDirectionId("");
+      else preserveSelectionVersion.current = response.data?.intentVersionId ?? null;
+      setFeedbackClear((current) => ({ directionId: variables.directionId, revision: current.revision + 1 }));
+      await queryClient.invalidateQueries({ queryKey: ["creation-studio", taskId] });
+      toast.success(selectedDirectionId === variables.directionId ? "新方向可重新选择。" : "这个方向已更新。");
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "换方向失败，原方向已保留。"),
+    onSettled: () => setReplacingDirectionId(""),
   });
 
   const confirmMutation = useMutation({
@@ -106,6 +141,7 @@ export default function CreationStudioPage() {
       if (!selectedDirection) throw new Error("请先选择一个方向。");
       return confirmCreationDirection(taskId, {
         directionId: selectedDirection.id,
+        intentVersionId: task?.intentVersionId ?? "",
         narrativeForm,
         targetWordCount: normalizeTarget(narrativeForm, targetWordCount),
         idempotencyKey: `creation:${taskId}:${selectedDirection.id}`,
@@ -145,8 +181,8 @@ export default function CreationStudioPage() {
         </h1>
         <p className="mt-5 max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
           {shortStoryEntry
-            ? "写下一段画面、一个人物，或者某种很想表达的情绪。AI 会把它整理成两个清晰方向，确认后直接写成完整作品。"
-            : "不必先理解结构和规划。写下最想表达的部分，AI 会整理作品规模和两个清晰方向。"}
+            ? "写下一段画面、一个人物，或者某种很想表达的情绪。AI 会围绕你的想法提出不同方向，确认后直接写成完整作品。"
+            : "不必先理解结构和规划。写下最想表达的部分，AI 会整理作品规模和清晰方向。"}
         </p>
       </section>
 
@@ -177,7 +213,18 @@ export default function CreationStudioPage() {
             maxLength={12000}
             autoFocus
           />
-          <div className="flex flex-col gap-3 border-t border-border/60 pt-4 sm:flex-row sm:items-center sm:justify-between">
+            {shortStoryEntry ? (
+              <div className="flex items-center gap-3 border-t border-border/60 py-3 text-sm">
+                <span className="text-muted-foreground">方向数量</span>
+                <Select value={String(directionCount)} onValueChange={(value) => setDirectionCount(Number(value) as 2 | 4 | 6)}>
+                  <SelectTrigger aria-label="选择方向数量" className="h-9 w-28"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2">2 个</SelectItem><SelectItem value="4">4 个</SelectItem><SelectItem value="6">6 个</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+            <div className="flex flex-col gap-3 border-t border-border/60 pt-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
               <span className="shrink-0">目标平台</span>
               <Select
@@ -201,7 +248,10 @@ export default function CreationStudioPage() {
               <Button
                 size="lg"
                 className="h-11 rounded-full px-6 shadow-none"
-                onClick={() => interpretMutation.mutate()}
+                onClick={() => {
+                  openLiveExecution();
+                  interpretMutation.mutate();
+                }}
                 disabled={!idea.trim() || interpretMutation.isPending}
               >
                 {interpretMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
@@ -212,14 +262,14 @@ export default function CreationStudioPage() {
         </section>
       ) : (
         <div className="space-y-6">
-          <Card className="border-border/70 bg-muted/20">
+          <Card className="border-0 bg-muted/20 shadow-none">
             <CardContent className="grid gap-5 p-5 md:grid-cols-[minmax(0,1fr)_18rem]">
               <div>
                 <div className="text-xs font-medium uppercase tracking-wider text-primary">AI 对作品的理解</div>
                 <p className="mt-2 text-sm leading-7 text-foreground">{interpretation.understanding}</p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">{interpretation.recommendationReason}</p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">平台建议：{interpretation.writingPlatformReason}</p>
-                {interpretation.productionFoundation ? (
+                {narrativeForm === "long_novel" && interpretation.productionFoundation ? (
                   <div className="mt-4 border-t border-border/60 pt-3">
                     <div className="text-xs text-muted-foreground">AI 建议的创作底座</div>
                     <div className="mt-1 text-sm font-medium text-foreground">
@@ -256,7 +306,10 @@ export default function CreationStudioPage() {
               <p className="text-sm text-muted-foreground">作品规模或目标平台变了，先让 AI 重新适配方向。</p>
               <Button
                 variant="outline"
-                onClick={() => regenerateMutation.mutate()}
+                onClick={() => {
+                  openLiveExecution();
+                  regenerateMutation.mutate();
+                }}
                 disabled={regenerateMutation.isPending}
               >
                 <RefreshCw className={cn("mr-2 h-4 w-4", regenerateMutation.isPending && "animate-spin")} />
@@ -272,6 +325,14 @@ export default function CreationStudioPage() {
                 direction={direction}
                 selected={direction.id === selectedDirectionId}
                 onSelect={() => setSelectedDirectionId(direction.id)}
+                canReplace={narrativeForm === "short_story" && !scaleNeedsRefresh}
+                replacing={replacingDirectionId === direction.id}
+                replaceDisabled={replaceMutation.isPending}
+                feedbackClearRevision={feedbackClear.directionId === direction.id ? feedbackClear.revision : 0}
+                onReplace={(feedback) => {
+                  openLiveExecution();
+                  replaceMutation.mutate({ directionId: direction.id, feedback });
+                }}
               />
             ))}
           </div>
@@ -285,8 +346,11 @@ export default function CreationStudioPage() {
             </div>
             <Button
               size="lg"
-              onClick={() => confirmMutation.mutate()}
-              disabled={!selectedDirection || scaleNeedsRefresh || confirmMutation.isPending}
+              onClick={() => {
+                openLiveExecution();
+                confirmMutation.mutate();
+              }}
+              disabled={!selectedDirection || scaleNeedsRefresh || confirmMutation.isPending || replaceMutation.isPending || regenerateMutation.isPending}
             >
               {confirmMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
               确认这个方向并开始
@@ -302,16 +366,23 @@ function DirectionCard(props: {
   direction: CreationDirection;
   selected: boolean;
   onSelect: () => void;
+  canReplace: boolean;
+  replacing: boolean;
+  replaceDisabled: boolean;
+  feedbackClearRevision: number;
+  onReplace: (feedback?: string) => void;
 }) {
   const direction = props.direction;
+  const [feedback, setFeedback] = useState("");
+  useEffect(() => { setFeedback(""); }, [props.feedbackClearRevision]);
   return (
-    <button type="button" className="h-full text-left" onClick={props.onSelect} aria-pressed={props.selected}>
+    <div className="relative h-full">
       <Card className={cn(
-        "h-full transition hover:border-primary/50 hover:shadow-sm",
-        props.selected && "border-primary ring-2 ring-primary/15",
+        "h-full border-0 bg-muted/20 shadow-none transition",
+        props.selected && "ring-2 ring-primary/50",
       )}>
         <CardContent className="space-y-4 p-5">
-          <div className="flex items-start justify-between gap-3">
+          <button type="button" className="flex w-full items-start justify-between gap-3 text-left" onClick={props.onSelect} aria-pressed={props.selected} disabled={props.replacing}>
             <h2 className="text-xl font-semibold">{direction.title}</h2>
             <span className={cn(
               "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border",
@@ -319,7 +390,7 @@ function DirectionCard(props: {
             )}>
               {props.selected ? <Check className="h-3.5 w-3.5" /> : null}
             </span>
-          </div>
+          </button>
           <p className="text-sm leading-7 text-foreground">{direction.premise}</p>
           <div className="grid gap-3 text-sm sm:grid-cols-2">
             <DirectionFact label="核心体验" value={direction.coreExperience} />
@@ -332,9 +403,29 @@ function DirectionCard(props: {
               <span key={keyword} className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">{keyword}</span>
             ))}
           </div>
+          {props.canReplace ? (
+            <div className="space-y-2 border-t border-border/50 pt-3">
+              <Input
+                value={feedback}
+                onChange={(event) => setFeedback(event.target.value)}
+                maxLength={4000}
+                placeholder="想调整什么？可选填"
+                aria-label={`给《${direction.title}》的换方向反馈`}
+                disabled={props.replaceDisabled}
+              />
+              <Button type="button" variant="ghost" size="sm" className="-ml-2" onClick={() => props.onReplace(feedback.trim() || undefined)} disabled={props.replaceDisabled}>
+                <RefreshCw className={cn("mr-2 h-4 w-4", props.replacing && "animate-spin")} />换一个方向
+              </Button>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
-    </button>
+      {props.replacing ? (
+        <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-background/65 backdrop-blur-[2px]" aria-live="polite">
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />正在换方向…
+        </div>
+      ) : null}
+    </div>
   );
 }
 

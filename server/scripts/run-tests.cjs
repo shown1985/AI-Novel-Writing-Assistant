@@ -17,6 +17,7 @@ const integrationTests = new Set([
   "prompting.test.js",
   "promptWorkbench.test.js",
   "ragCompatibilityBootstrap.test.js",
+  "runtimeCreativeCarryoverMigration.test.js",
   "runtimeMigrations.test.js",
 ]);
 

@@ -114,6 +114,7 @@ export class NovelWorldManualService {
           "novelId",
           "sourceWorldId",
           "sourceType",
+          "contentRevision",
           "title",
           "coverSummary",
           "structuredDataJson",
@@ -133,6 +134,7 @@ export class NovelWorldManualService {
           ${input.novelId},
           ${world.id},
           ${"manual"},
+          ${1},
           ${title},
           ${coverSummary},
           ${structuredDataJson},
@@ -151,6 +153,7 @@ export class NovelWorldManualService {
         ON CONFLICT ("novelId") DO UPDATE SET
           "sourceWorldId" = EXCLUDED."sourceWorldId",
           "sourceType" = EXCLUDED."sourceType",
+          "contentRevision" = COALESCE("contentRevision", 1) + 1,
           "title" = EXCLUDED."title",
           "coverSummary" = EXCLUDED."coverSummary",
           "structuredDataJson" = EXCLUDED."structuredDataJson",

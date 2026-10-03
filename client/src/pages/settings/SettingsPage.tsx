@@ -19,6 +19,7 @@ import ProviderConfigDialog, { type ProviderFormState } from "./components/Provi
 import ProviderSettingsSection from "./components/ProviderSettingsSection";
 import SettingsActionResult from "./SettingsActionResult";
 import { AUTO_DIRECTOR_MOBILE_CLASSES } from "@/mobile/autoDirector";
+import { resetDiagnosticReadinessAfterConfigurationChange } from "./diagnostics";
 
 function formatConnectionTestResult(response: Awaited<ReturnType<typeof testLLMConnection>>): string {
   const latency = response.data?.latency ?? 0;
@@ -99,6 +100,7 @@ export default function SettingsPage() {
       queryClient.invalidateQueries({ queryKey: queryKeys.settings.apiKeys }),
       queryClient.invalidateQueries({ queryKey: queryKeys.settings.apiKeyBalances }),
       queryClient.invalidateQueries({ queryKey: queryKeys.llm.providers }),
+      resetDiagnosticReadinessAfterConfigurationChange(queryClient, queryKeys.settings.modelRouteReadiness),
     ]);
   };
 
@@ -124,6 +126,7 @@ export default function SettingsPage() {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.settings.apiKeyBalances }),
       queryClient.invalidateQueries({ queryKey: queryKeys.llm.providers }),
+      resetDiagnosticReadinessAfterConfigurationChange(queryClient, queryKeys.settings.modelRouteReadiness),
     ]);
   };
 

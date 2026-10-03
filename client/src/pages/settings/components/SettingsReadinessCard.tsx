@@ -1,33 +1,43 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, CheckCircle2, CircleAlert, CircleDashed, Loader2 } from "lucide-react";
+import { ArrowRight, CheckCircle2, CircleAlert, CircleDashed, Clock3, Loader2 } from "lucide-react";
 import type {
   APIKeyStatus,
-  ModelRouteConnectivityResponse,
   ModelRoutesResponse,
   RagSettingsStatus,
   StyleEngineRuntimeSettingsStatus,
 } from "@/api/settings";
+import type { DiagnosticReadinessReport } from "@ai-novel/shared/types/diagnostics";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AUTO_DIRECTOR_MOBILE_CLASSES } from "@/mobile/autoDirector";
+import {
+  resolveSettingsReadinessDecision,
+  resolveDiagnosticUiState,
+  type DiagnosticUiState,
+} from "../diagnostics";
+
+type SettingsReadinessState = DiagnosticUiState | "ready" | "warning" | "optional";
 
 export type SettingsReadinessItem = {
   key: "model" | "routes" | "rag" | "style";
   title: string;
   description: string;
-  state: "ready" | "warning" | "optional" | "checking";
+  state: SettingsReadinessState;
 };
 
 function getReadinessIcon(state: SettingsReadinessItem["state"]) {
-  if (state === "ready") {
+  if (state === "ready" || state === "healthy") {
     return <CheckCircle2 className="h-4 w-4 text-emerald-600" />;
   }
-  if (state === "checking") {
+  if (state === "loading" || state === "pending") {
     return <Loader2 className="h-4 w-4 animate-spin text-amber-600" />;
   }
-  if (state === "optional") {
+  if (state === "optional" || state === "not_checked" || state === "stale") {
     return <CircleDashed className="h-4 w-4 text-sky-600" />;
+  }
+  if (state === "error") {
+    return <Clock3 className="h-4 w-4 text-amber-600" />;
   }
   return <CircleAlert className="h-4 w-4 text-amber-600" />;
 }
@@ -36,10 +46,22 @@ function getReadinessBadge(state: SettingsReadinessItem["state"]) {
   switch (state) {
     case "ready":
       return "可用";
-    case "checking":
-      return "检查中";
+    case "loading":
+      return "读取中";
+    case "pending":
+      return "检测中";
     case "optional":
       return "可选增强";
+    case "not_checked":
+      return "未检测";
+    case "stale":
+      return "配置已变";
+    case "failed":
+      return "检测失败";
+    case "error":
+      return "读取失败";
+    case "healthy":
+      return "可用";
     case "warning":
       return "需要处理";
   }
@@ -50,8 +72,9 @@ export function buildSettingsReadinessItems(input: {
   ragSettings?: RagSettingsStatus | null;
   styleSettings?: StyleEngineRuntimeSettingsStatus | null;
   modelRoutes?: ModelRoutesResponse | null;
-  modelRouteConnectivity?: ModelRouteConnectivityResponse | null;
-  isModelRoutesChecking: boolean;
+  modelRouteReadiness?: DiagnosticReadinessReport | null;
+  isModelRoutesLoading: boolean;
+  isModelRoutesError: boolean;
   isStyleSettingsLoaded: boolean;
 }): SettingsReadinessItem[] {
   const {
@@ -59,17 +82,19 @@ export function buildSettingsReadinessItems(input: {
     ragSettings,
     styleSettings,
     modelRoutes,
-    modelRouteConnectivity,
-    isModelRoutesChecking,
+    modelRouteReadiness,
+    isModelRoutesLoading,
+    isModelRoutesError,
     isStyleSettingsLoaded,
   } = input;
   const runnableProviders = providers.filter((item) => item.isConfigured && item.isActive && item.currentModel);
   const currentRagProvider = ragSettings?.providers.find((item) => item.provider === ragSettings.embeddingProvider);
-  const routeStatuses = modelRouteConnectivity?.statuses ?? [];
-  const failedRouteCount = routeStatuses.filter(
-    (item) => (item.plain && !item.plain.ok) || (item.structured && !item.structured.ok),
-  ).length;
-  const hasRoutes = (modelRoutes?.routes ?? []).length > 0;
+  const routeState = resolveDiagnosticUiState({
+    report: modelRouteReadiness,
+    isLoading: isModelRoutesLoading,
+    isError: isModelRoutesError,
+  });
+  const routeCount = modelRoutes?.taskTypes.length ?? 0;
   const styleTimeout = styleSettings?.styleExtractionTimeoutMs;
   const styleReady = Boolean(styleSettings)
     && typeof styleTimeout === "number"
@@ -88,12 +113,20 @@ export function buildSettingsReadinessItems(input: {
     {
       key: "routes",
       title: "模型路由",
-      state: isModelRoutesChecking ? "checking" : hasRoutes && failedRouteCount === 0 ? "ready" : "warning",
-      description: isModelRoutesChecking
-        ? "正在检查开书、拆章、正文生成和审核任务的模型兼容性。"
-        : hasRoutes && failedRouteCount === 0
-          ? "创作任务已有可用路由，后续流程会按任务选择模型。"
-          : "部分创作任务还需要补齐或修复模型路由。",
+      state: routeState,
+      description: routeState === "healthy"
+        ? `${routeCount} 类创作任务已有最近一次可用检测记录。`
+        : routeState === "failed"
+          ? "最近一次模型路由检测未通过，请到模型路由页查看具体任务。"
+          : routeState === "stale"
+            ? "模型配置已变化；不影响按当前配置创作，可按需重新检测。"
+            : routeState === "not_checked"
+              ? "尚未检测模型路由；基础配置完整时仍可开始创作。"
+              : routeState === "pending"
+                ? "正在检测模型路由，页面会自动读取完成结果。"
+                : routeState === "error"
+                  ? "暂时无法读取检测记录；这不代表模型配置不可用。"
+                  : "正在读取已有的模型路由检测记录。",
     },
     {
       key: "rag",
@@ -106,10 +139,10 @@ export function buildSettingsReadinessItems(input: {
     {
       key: "style",
       title: "写法引擎",
-      state: !isStyleSettingsLoaded ? "checking" : styleReady ? "ready" : "warning",
+      state: !isStyleSettingsLoaded ? "loading" : styleReady ? "ready" : "optional",
       description: styleReady
         ? "写法提取等待时间在可用范围内，可用于学习样本文风。"
-        : "请确认写法提取等待时间在可用范围内。",
+        : "不影响先开始创作；需要提取样本文风时，请确认等待时间在可用范围内。",
     },
   ];
 }
@@ -118,17 +151,7 @@ export default function SettingsReadinessCard(props: {
   items: SettingsReadinessItem[];
 }) {
   const { items } = props;
-  const modelItem = items.find((item) => item.key === "model");
-  const routesItem = items.find((item) => item.key === "routes");
-  const hasModel = modelItem?.state === "ready";
-  const hasHealthyRoutes = routesItem?.state === "ready";
-  const blockingCount = items.filter((item) => item.key !== "rag" && item.state === "warning").length;
-  const canStart = hasModel && hasHealthyRoutes && blockingCount === 0;
-  const primaryAction = !hasModel
-    ? { label: "配置正文模型", to: "/settings/models" }
-    : !hasHealthyRoutes
-      ? { label: "检查模型路由", to: "/settings/models" }
-      : { label: "开始创建小说", to: "/novels/create" };
+  const { canStart, primaryAction } = resolveSettingsReadinessDecision(items);
 
   return (
     <Card className="min-w-0 overflow-hidden border-primary/20 bg-primary/5">
@@ -155,7 +178,7 @@ export default function SettingsReadinessCard(props: {
                   {getReadinessIcon(item.state)}
                   <div className="min-w-0 font-medium">{item.title}</div>
                 </div>
-                <Badge variant={item.state === "ready" ? "default" : "outline"}>
+                <Badge variant={item.state === "ready" || item.state === "healthy" ? "default" : "outline"}>
                   {getReadinessBadge(item.state)}
                 </Badge>
               </div>

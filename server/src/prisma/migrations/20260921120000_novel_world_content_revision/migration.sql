@@ -1,0 +1,2 @@
+ALTER TABLE "NovelWorld"
+ADD COLUMN "contentRevision" INTEGER NOT NULL DEFAULT 1;

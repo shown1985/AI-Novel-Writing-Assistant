@@ -50,6 +50,31 @@ Web API 只接收命令和返回轻量投影；Worker 负责执行重型生产�
 
 ## 当前规则
 
+### Agent Runtime 的复用边界
+
+项目已经具备高层 Agent Runtime 的最小控制平面，不应再并行创建一套“通用 Agent Runtime”来包裹现有导演链。新增 AI 能力必须接入下面这条既有边界：
+
+| 职责 | 当前所有者 | 约束 |
+|---|---|---|
+| 命令、租约与后台唤醒 | `DirectorCommandService`、`DirectorTaskQueue`、`DirectorWorker` | API 只提交命令；长任务不能在 HTTP 请求中直接执行 |
+| 运行状态、检查点与幂等 | `DirectorRuntimeService`、`DirectorRuntimeStore` | 运行事实写入 Runtime 快照和事件，不由模型维护状态 |
+| 步骤编排与执行 | `DirectorNodeRunner`、`WorkflowStepModule`、Pipeline | 每个能力声明输入、输出、产物、进度、恢复与幂等键 |
+| 安全策略与人工门 | `DirectorPolicyEngine`、问题治理 | 模型可以提出结构化建议，但不能绕过保护内容、审批或恢复边界 |
+| 模型调用与预算 | Prompt Registry、Prompt Runner、LLM Provider Adapter | Prompt 只能从注册表进入；端点差异、预算和重试留在适配层 |
+| UI 状态 | `DirectorEventProjectionService` 及 Dashboard View | 前端消费轻量投影，不从模型文本或多个接口自行推断主状态 |
+
+世界准备已经作为 `world_setup` 工作流步骤存在。该步骤通过 `WorldContextGateway` 委托世界服务，随后由现有 Runtime 记录步骤、产物和恢复事实；世界生成不能直接创建第二个队列、第二套检查点或另一条章节生产链。世界向导的独立检查点仍属于世界服务的业务恢复数据，若要由自动导演驱动，只能通过步骤适配器调用，不能让世界服务反向管理导演租约。
+
+因此，Agent Runtime MVP 的完成标准是“现有控制平面能够稳定承载更多结构化 AI 步骤”，而不是新增一个抽象层。后续扩展必须满足：
+
+- 使用 `DirectorRuntimeService.runNode` 或 `runUntilGate` 进入执行边界；
+- 通过 `WorkflowStepModule` 声明依赖、写入产物、完成条件和恢复策略；
+- 将模型能力、预算、结构化输出和供应商错误交给统一 LLM 层；
+- 将事件和事实投影给任务中心与源页面，任务中心保持只读；
+- 保留现有完成优先、局部质量债不阻断全局链的停止规则。
+
+除非现有 Runtime 无法表达新的生命周期，否则不得增加新的队列、状态机、重试计数或“万能 Agent”门面。若确实需要扩展，应先补充本页的边界和状态契约，再实现单一职责的适配器。
+
 ### 统一问题治理与停止边界
 
 自动导演的新任务使用一条统一问题链路：生产阶段报告稳定问题码，治理服务结合任务启动时冻结的全局/本书问题动作，写入 `issue_detected`、执行既有处理入口，再写入 `issue_action_applied`。已带稳定问题码的事件直接使用调用方提供的结构化事实，不再重复调用 AI；只有 `runtime.unclassified` 才调用结构化 AI 补全问题分类。AI 评估不得改变控制流。完整问题记录保存在 `DirectorEvent.metadata`，不另建问题表；相同 fingerprint 必须幂等。旧任务没有 `issueGovernanceVersion: 1` 时继续使用原运行逻辑。
@@ -163,13 +188,14 @@ Web API 只接收命令和返回轻量投影；Worker 负责执行重型生产�
 - 用户确认新书方向后，自动导演先投影为“准备开篇”。正文必须等待开篇路线可用；尚未选择界面时，准备完成后投影为“等待选择创作界面”。选择阅读书架或完整工作台都会让原任务进入同一套全书自动生产，界面切换只更新显示偏好和返回路由，不暂停正在运行的章节，也不改变已有正文和人工内容。
 - 新书自动导演创建的恢复入口是独立页面 `/novels/auto-director?taskId=<workflowTaskId>`。`taskId` 是前端 URL 的主参数；旧的 `/novels/create?mode=director&workflowTaskId=<id>` 只作为兼容输入，进入后应规范化到新页面。运行记录的来源链接、恢复提示、候选确认链接和服务端 `sourceRoute` 都应指向新页面，保证刷新、桌面重启或崩溃恢复后回到同一个候选/进度现场；恢复动作只在该来源页面执行。
 - `/novels/create` 只承担手动创建表单和旧链接跳转，不再挂载自动导演弹窗。自动导演候选批次、定向修订、标题重做、候选确认和执行进度都属于独立创建页主区，不能再通过候选弹窗套在创建弹窗里展示。
-- 现有项目接管的默认范围是“全书前置规划接管”，不是章节范围。接管可以选择资产起点，但导演必须先补齐 Story Macro / Book Contract / 角色 / 卷战略 / 拆章，随后停在 `production_experience_required`；接管入口携带的旧章节范围或全书自动参数不得提前启动正文。
+- 现有项目接管的默认范围是“全书前置规划接管”，不是章节范围。接管可以选择资产起点，但导演必须先补齐 Story Macro / Book Contract / 角色 / 卷战略 / 拆章，随后停在 `production_experience_required`。接管入口携带的章节范围或全书自动参数在这一阶段只作为执行契约写入任务 Seed，不得提前启动正文；等待选择生产方式期间会话状态显示为 `auto_to_ready`，只表示“尚未开始正文”，不代表执行契约被降级。
 - 现有项目接管的用户入口应优先呈现“系统推荐接续位置 + 资产保护说明 + 一键继续”。阶段选择、重跑当前步、范围执行、自动审批等属于高级控制，默认折叠。只有会覆盖或重建已有资产的动作才需要显式确认；普通 `continue_existing` 不应让用户先理解内部阶段卡片才能启动。
 - 接管入口的进度体检应把“系统看到的资产”直接展示给用户，至少包含卷规划、拆章同步、章节细化、正文书写和质量进度。若 URL 或上下文携带 `workspaceTaskId` / `directorTaskId`，前端应并行读取该任务快照，并优先用任务真实阶段、当前章节和任务状态解释主按钮；任务快照读取失败时再退回小说资产体检，不能让慢体检阻塞弹窗打开。
 - 接管入口只能把 `directorTaskId`、当前 active auto-director task 或 live auto-director projection 作为“当前导演任务”上下文。`workspaceTaskId` 属于普通编辑工作流 lane，不能传入接管弹窗参与“进入当前任务”判断；否则被本地收起但仍处于 `waiting_approval` 的手动流程会误导接管入口，以为存在可继续的自动导演任务。
 - 书级自动化投影如果返回 `failed`、`blocked` 或 `waiting_recovery` 且包含 `latestTask.id`，前端必须把它视为当前需要处理的导演状态。即使 URL 没有 `directorTaskId`、active auto-director task 查询返回空，AI 驾驶舱、任务抽屉入口和恢复入口也要显示该投影，并在用户打开详情时把 `latestTask.id` 写入 `directorTaskId`。`completed` / `cancelled` 终态可以继续只在 URL 钉住时展示，避免旧任务反复打扰。
 - 当接管入口能从任务快照或小说资产推断出下一章和章节总数时，默认入口可以提供“推进至第 N 章”的轻量选择。该选择必须生成显式 `chapter_range` 的 `autoExecutionPlan`，范围从当前待执行章开始，到用户选择的目标章结束；高级设置打开时仍以高级范围配置为准。
-- 现有项目接管进入执行面时，用户提交的 `runMode`、`chapter_range` 与自动审批配置必须作为同一份执行契约写入任务 Seed，并驱动后续拆章细化与章节执行。运行时不得把范围接管降级为 `auto_to_ready`，也不得回退读取上一条已完成任务的范围；若最终持久化范围和用户请求不一致，应明确失败并保留可诊断证据，而不能显示为流程完成。
+- 现有项目接管进入执行面时（用户在 `production_experience_required` 选择生产方式后开始正文），Seed 中的 `runMode`、`chapter_range` 与自动审批配置作为同一份执行契约驱动后续拆章细化与章节执行：任务转为 `full_book_autopilot`，已写入的 `chapter_range` 保留为自动生产的停止边界，没有范围时才使用全书计划（`DirectorProductionExperienceService.buildProductionExperienceSeed`）。执行契约不得被降级为 `auto_to_ready`，也不得回退读取上一条已完成任务的范围；若最终持久化范围和用户请求不一致，应明确失败并保留可诊断证据，而不能显示为流程完成。
+- 全书自动（`full_book_autopilot`）由 AI 主导推进，自动审校与自动修复默认开启；计划中显式关闭时保留用户选择，不强制重新开启。关闭审校时修复同时关闭，因为修复只在审校之后运行（`applyDirectorRunModeContract`）。
 - `workflow_completed` 是任务主状态的终态事实。章节正文、连续性、角色资源和读者承诺的索引事件可以在安全落库后异步补记，但只能作为历史事件，不能覆盖完成任务的主进度、当前动作或检查点展示。
 - 接管任务的 `downstreamReset` 元数据只表达“从接管点开始，后续旧资产需要重新校验”，不能覆盖任务已经推进到更后阶段的事实进度。UI 合成步骤状态时，应以当前运行阶段为边界，只把当前阶段及其后的 reset steps 显示为待推进；早于当前阶段的步骤应按任务进度或真实资产显示已完成。
 - `chapter_batch_ready` 的质量提醒属于当前批次的继续门。用户点击“继续自动执行章节”后，`approveAutoExecutionScope` 应允许 AI 主驾跳过当前质量提醒并启动剩余章节。

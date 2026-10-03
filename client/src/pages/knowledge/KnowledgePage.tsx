@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ApiResponse } from "@ai-novel/shared/types/api";
 import type { KnowledgeDocumentStatus, KnowledgeRecallTestResult } from "@ai-novel/shared/types/knowledge";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "@/components/ui/toast";
@@ -8,18 +7,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { queryKeys } from "@/api/queryKeys";
 import {
   activateKnowledgeDocumentVersion,
+  checkRagReadiness,
   clearFinishedRagJobs,
   createKnowledgeDocument,
   createKnowledgeDocumentVersion,
   deleteRagJob,
   getKnowledgeDocument,
-  getRagHealth,
+  getRagReadiness,
   getRagJobs,
   listKnowledgeDocuments,
   reindexKnowledgeDocument,
   testKnowledgeDocumentRecall,
   updateKnowledgeDocumentStatus,
-  type RagHealthStatus,
   type RagJobSummary,
 } from "@/api/knowledge";
 import { getRagEmbeddingModels, getRagSettings, saveRagSettings } from "@/api/settings";
@@ -29,6 +28,13 @@ import KnowledgeDocumentsTab from "./components/KnowledgeDocumentsTab";
 import KnowledgeEmbeddingSettingsCard, { type KnowledgeEmbeddingSettingsFormState } from "./components/KnowledgeEmbeddingSettingsCard";
 import KnowledgeLibraryOverview from "./components/KnowledgeLibraryOverview";
 import KnowledgeOpsTab from "./components/KnowledgeOpsTab";
+import {
+  createDiagnosticReadQueryPolicy,
+  createExplicitDiagnosticCheckController,
+  refreshDiagnosticReadinessAfterCheck,
+  resetDiagnosticReadinessAfterConfigurationChange,
+  resolveDiagnosticUiState,
+} from "@/pages/settings/diagnostics";
 
 const TAB_VALUES = new Set(["documents", "ops", "settings"]);
 
@@ -52,6 +58,10 @@ export default function KnowledgePage() {
   const [recallQuery, setRecallQuery] = useState("");
   const [recallResult, setRecallResult] = useState<KnowledgeRecallTestResult | null>(null);
   const [ragJobsActionMessage, setRagJobsActionMessage] = useState("");
+  const [ragDiagnosticActionMessage, setRagDiagnosticActionMessage] = useState("");
+  const checkRagReadinessController = useRef(
+    createExplicitDiagnosticCheckController(checkRagReadiness),
+  );
   const [ragForm, setRagForm] = useState<KnowledgeEmbeddingSettingsFormState>({
     embeddingProvider: "openai",
     embeddingModel: "text-embedding-3-small",
@@ -105,13 +115,21 @@ export default function KnowledgePage() {
     enabled: Boolean(selectedDocumentId),
   });
 
-  const ragHealthQuery = useQuery({
-    queryKey: queryKeys.knowledge.ragHealth,
-    queryFn: () => {
-      const previousHealth = queryClient.getQueryData<ApiResponse<RagHealthStatus>>(queryKeys.knowledge.ragHealth);
-      return getRagHealth(previousHealth?.data);
-    },
+  const ragReadinessQuery = useQuery({
+    queryKey: queryKeys.settings.ragReadiness,
+    ...createDiagnosticReadQueryPolicy(getRagReadiness),
     enabled: activeTab === "ops",
+  });
+
+  const checkRagReadinessMutation = useMutation({
+    mutationFn: () => checkRagReadinessController.current.run(),
+    onMutate: () => setRagDiagnosticActionMessage(""),
+    onSuccess: async () => {
+      await refreshDiagnosticReadinessAfterCheck(queryClient, queryKeys.settings.ragReadiness);
+    },
+    onError: (error) => {
+      setRagDiagnosticActionMessage(error instanceof Error ? error.message : "资料连接检测失败，请稍后重试。");
+    },
   });
 
   const ragJobsQuery = useQuery({
@@ -242,7 +260,7 @@ export default function KnowledgePage() {
       }
       await queryClient.invalidateQueries({ queryKey: queryKeys.settings.rag });
       await queryClient.invalidateQueries({ queryKey: ragJobsQueryKey });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.ragHealth });
+      await resetDiagnosticReadinessAfterConfigurationChange(queryClient, queryKeys.settings.ragReadiness);
     },
   });
 
@@ -362,13 +380,16 @@ export default function KnowledgePage() {
   );
   const failedJobs = (ragJobsQuery.data?.data ?? []).filter((item) => item.status === "failed").slice(0, 5);
   const selectedDocument = detailQuery.data?.data;
-  const ragHealthNotice = ragHealthQuery.isError
-    ? (ragHealthQuery.error instanceof Error ? ragHealthQuery.error.message : "加载 RAG 健康状态失败。")
-    : (ragHealthQuery.data?.message && ragHealthQuery.data.message !== "RAG health check passed."
-      ? (ragHealthQuery.data.message === "RAG health check failed."
-        ? "资料检索连接检查未通过。"
-        : ragHealthQuery.data.message)
-      : undefined);
+  const ragReadinessState = resolveDiagnosticUiState({
+    report: ragReadinessQuery.data?.data,
+    isLoading: ragReadinessQuery.isPending,
+    isRefreshing: ragReadinessQuery.isFetching,
+    isError: ragReadinessQuery.isError,
+    isChecking: checkRagReadinessMutation.isPending,
+  });
+  const ragReadinessNotice = ragReadinessQuery.isError
+    ? (ragReadinessQuery.error instanceof Error ? ragReadinessQuery.error.message : "读取资料连接状态失败。")
+    : ragDiagnosticActionMessage || undefined;
   const recallErrorMessage = recallTestMutation.isError
     ? (recallTestMutation.error instanceof Error ? recallTestMutation.error.message : "召回测试失败。")
     : null;
@@ -586,8 +607,9 @@ export default function KnowledgePage() {
             visibleDocumentsCount={visibleDocuments.length}
             enabledCount={enabledCount}
             disabledCount={disabledCount}
-            ragHealth={ragHealthQuery.data?.data}
-            ragHealthNotice={ragHealthNotice}
+            ragReadiness={ragReadinessQuery.data?.data}
+            ragReadinessState={ragReadinessState}
+            ragReadinessNotice={ragReadinessNotice}
             jobs={ragJobsQuery.data?.data ?? []}
             failedJobs={failedJobs}
             actionMessage={ragJobsActionMessage}
@@ -596,6 +618,15 @@ export default function KnowledgePage() {
             onClearFinishedJobs={handleClearFinishedRagJobs}
             onDeleteJob={handleDeleteRagJob}
             onOpenSettings={() => setSearchParams({ tab: "settings" })}
+            onCheckReadiness={() => {
+              if (ragReadinessState !== "pending") {
+                checkRagReadinessMutation.mutate();
+              }
+            }}
+            onRetryReadiness={() => {
+              setRagDiagnosticActionMessage("");
+              void ragReadinessQuery.refetch();
+            }}
           />
         </TabsContent>
 

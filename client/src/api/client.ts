@@ -11,6 +11,7 @@ export interface ApiHttpError extends Error {
 declare module "axios" {
   interface AxiosRequestConfig {
     silentErrorStatuses?: number[];
+    suppressErrorToast?: boolean;
   }
 }
 
@@ -42,7 +43,7 @@ apiClient.interceptors.response.use(
       description = backendMessage && backendMessage !== title ? backendMessage : undefined;
     }
 
-    if (!status || !silentErrorStatuses.includes(status)) {
+    if (!error.config?.suppressErrorToast && (!status || !silentErrorStatuses.includes(status))) {
       const isGenericServerErrorToast = title === "服务器错误，请稍后重试。";
 
       if (description) {

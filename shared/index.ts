@@ -1,5 +1,6 @@
 export * from "./types/api";
 export * from "./types/bookAnalysis";
+export * from "./types/creativeCarryoverContract";
 export * from "./types/characterDynamics";
 export * from "./types/chapterLengthControl";
 export * from "./types/chapterCreativeContract";
@@ -25,6 +26,7 @@ export * from "./types/timeline";
 export * from "./types/novelDirector";
 export * from "./types/directorRuntime";
 export * from "./types/directorIssue";
+export * from "./types/diagnostics";
 export * from "./types/autoDirectorApproval";
 export * from "./types/autoDirectorFollowUp";
 export * from "./types/autoDirectorValidation";

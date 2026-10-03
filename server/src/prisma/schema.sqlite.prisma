@@ -359,6 +359,8 @@ model Novel {
   continuationBookAnalysisSections String?
   referenceBookAnalysisId String?
   referenceBookAnalysisSections String?
+  creativeCarryoverContractJson String?
+  creativeCarryoverContractSchemaVersion Int?
   outline           String?
   structuredOutline String?
   storyWorldSliceJson String?
@@ -1500,6 +1502,7 @@ model World {
   factions           String?
   status             String                @default("draft")
   version            Int                   @default(1)
+  contentRevision    Int                   @default(1)
   selectedDimensions String?
   selectedElements   String?
   layerStates        String?
@@ -1515,6 +1518,7 @@ model World {
   libraryItems       WorldPropertyLibrary[]
   novelWorlds        NovelWorld[]
   assets             WorldAsset[]
+  structureBackfillOperations WorldStructureBackfillOperation[]
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
 }
@@ -1536,6 +1540,7 @@ model NovelWorld {
   syncEnabled           Boolean  @default(false)
   syncDirection         String   @default("none")
   syncBaseVersion       Int?
+  contentRevision       Int      @default(1)
   syncPendingChangesJson String?
   lastSyncedAt          DateTime?
   generationPolicyJson  String?
@@ -1613,6 +1618,125 @@ model WorldSnapshot {
   createdAt DateTime @default(now())
 
   @@index([worldId, createdAt])
+}
+
+model WorldMaintenanceOperation {
+  id            String   @id @default(cuid())
+  targetType    String
+  targetId      String
+  operationType String
+  operationId   String
+  requestHash   String
+  status        String
+  receipt       WorldMaintenanceCommitReceipt?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([targetType, targetId, operationType, operationId])
+  @@index([targetType, targetId, updatedAt])
+}
+
+model WorldMaintenanceCommitReceipt {
+  id                   String   @id @default(cuid())
+  operationRecordId    String   @unique
+  targetType           String
+  targetId             String
+  baseRevision         Int
+  committedRevision    Int
+  decisionRevision     Int
+  selectedPatchIdsJson String
+  beforeDigest         String
+  afterDigest          String
+  committedAt          DateTime @default(now())
+  operationRecord      WorldMaintenanceOperation @relation(fields: [operationRecordId], references: [id], onDelete: Cascade)
+}
+
+model WorldStructureBackfillOperation {
+  id                     String   @id @default(cuid())
+  worldId                String
+  operationId            String
+  requestHash            String
+  baseContentRevision    Int
+  promptId               String
+  promptVersion          String
+  provider               String?
+  model                  String?
+  generationPolicyVersion String
+  sourceDigest           String
+  status                 String   @default("model_not_called")
+  leaseExpiresAt         DateTime?
+  modelRequestId         String?
+  modelAttemptId         String?
+  failureCategory        String?
+  world                  World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  result                 WorldStructureBackfillResult?
+  commitReceipt          WorldStructureBackfillCommitReceipt?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@unique([worldId, operationId])
+  @@index([worldId, updatedAt])
+}
+
+model WorldStructureBackfillResult {
+  id                       String   @id @default(cuid())
+  operationRecordId        String   @unique
+  normalizedStructureJson  String
+  bindingSupportJson       String
+  baseContentRevision      Int
+  requestHash              String
+  generationPolicyVersion  String
+  digest                   String
+  modelRequestId           String?
+  modelAttemptId           String?
+  operationRecord          WorldStructureBackfillOperation @relation(fields: [operationRecordId], references: [id], onDelete: Cascade)
+  createdAt                DateTime @default(now())
+}
+
+model WorldStructureBackfillCommitReceipt {
+  id                   String   @id @default(cuid())
+  operationRecordId    String   @unique
+  worldId              String
+  operationId          String
+  resultDigest         String
+  baseContentRevision  Int
+  committedRevision    Int
+  beforeDigest         String
+  afterDigest          String
+  committedAt          DateTime @default(now())
+  operationRecord      WorldStructureBackfillOperation @relation(fields: [operationRecordId], references: [id], onDelete: Cascade)
+}
+
+model WorldGenerationRun {
+  id               String   @id @default(cuid())
+  requestHash      String
+  requestJson      String
+  sourceRoute      String   @default("/worlds/new")
+  status           String   @default("running")
+  currentStage     String?
+  nextStageIndex   Int      @default(0)
+  lastError        String?
+  finalPayloadJson String?
+  checkpoints     WorldGenerationCheckpoint[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([requestHash, status])
+  @@index([status, updatedAt])
+}
+
+model WorldGenerationCheckpoint {
+  id          String              @id @default(cuid())
+  runId       String
+  sequence    Int
+  stage       String
+  structureJson String
+  summary     String?
+  run         WorldGenerationRun   @relation(fields: [runId], references: [id], onDelete: Cascade)
+  createdAt   DateTime             @default(now())
+
+  @@unique([runId, sequence])
+  @@index([runId, createdAt])
 }
 
 model WorldDeepeningQA {
@@ -1825,10 +1949,63 @@ model ModelRouteConfig {
   maxTokens                Int?
   requestProtocol          String  @default("auto")
   structuredResponseFormat String  @default("auto")
+  revision                 Int     @default(0)
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 
   @@index([provider])
+}
+
+model DiagnosticRun {
+  id                         String   @id @default(cuid())
+  scope                      String
+  configurationFingerprint   String
+  checkState                 String
+  startedAt                  DateTime
+  completedAt                DateTime?
+  errorSummary               String?
+  activeClaimKey             String?  @unique
+  leaseExpiresAt             DateTime?
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+  targets                    DiagnosticTargetResult[]
+  recommendationApplications DiagnosticRecommendationApplication[]
+
+  @@index([scope, createdAt])
+}
+
+model DiagnosticTargetResult {
+  id                 String   @id @default(cuid())
+  runId              String
+  targetId           String
+  targetKind         String
+  taskType           String?
+  provider           String?
+  model              String?
+  checkState         String
+  capabilitiesJson   String
+  errorSummary       String?
+  recommendationJson String?
+  revision           Int      @default(0)
+  checkedAt          DateTime?
+  createdAt          DateTime @default(now())
+  run                DiagnosticRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, targetId])
+}
+
+model DiagnosticRecommendationApplication {
+  id                  String   @id @default(cuid())
+  operationId         String   @unique
+  diagnosticId        String
+  selectionHash       String
+  expectedFingerprint String
+  currentFingerprint  String
+  resultJson          String
+  createdAt           DateTime @default(now())
+  run                 DiagnosticRun @relation(fields: [diagnosticId], references: [id], onDelete: Restrict)
+
+  @@index([diagnosticId, createdAt])
 }
 
 model NovelBible {
@@ -2500,6 +2677,56 @@ model DirectorLlmUsageRecord {
   @@index([stepIdempotencyKey, recordedAt])
   @@index([nodeKey, recordedAt])
   @@index([attributionStatus, recordedAt])
+}
+
+model ModelAttemptEvidence {
+  attemptId                  String   @id
+  requestId                  String
+  parentAttemptId            String?
+  attemptIndex               Int
+  role                       String
+  routeTier                  String
+  mode                       String
+  status                     String
+  finalAdoption              String
+  provider                   String?
+  model                      String?
+  structuredStrategy         String?
+  attributionKind            String
+  attributionSource          String
+  novelId                    String?
+  taskId                     String?
+  directorRunId              String?
+  directorStepIdempotencyKey String?
+  directorNodeKey            String?
+  chapterId                  String?
+  entrypoint                 String?
+  promptId                   String?
+  promptVersion              String?
+  taskType                   String?
+  modelRoute                 String?
+  promptTokens               Int?
+  completionTokens           Int?
+  reasoningTokens            Int?
+  totalTokens                Int?
+  failureCode                String?
+  failureCategory            String?
+  failureRetryable           Boolean?
+  startedAt                  DateTime
+  finishedAt                 DateTime?
+  durationMs                 Int?
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  @@unique([requestId, attemptIndex])
+  @@index([requestId, startedAt])
+  @@index([parentAttemptId])
+  @@index([novelId, startedAt])
+  @@index([taskId, startedAt])
+  @@index([directorRunId, startedAt])
+  @@index([chapterId, startedAt])
+  @@index([status, startedAt])
+  @@index([requestId, finalAdoption])
 }
 
 model DirectorEvent {

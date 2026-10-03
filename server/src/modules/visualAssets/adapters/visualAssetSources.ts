@@ -31,6 +31,11 @@ export interface VisualAssetSourceItem {
   metadata: Record<string, unknown>;
 }
 
+export interface VisualAssetSourceGroup {
+  sourceDomain: VisualAssetSourceDomain;
+  read: () => Promise<VisualAssetSourceItem[]>;
+}
+
 interface ImageState {
   status?: unknown;
   version?: unknown;
@@ -287,7 +292,31 @@ async function readDramaSources(): Promise<VisualAssetSourceItem[]> {
   return output;
 }
 
-export async function collectVisualAssetSources(): Promise<VisualAssetSourceItem[]> {
-  const groups = await Promise.all([readImageAssetSources(), readComicSources(), readDramaSources()]);
+const DEFAULT_VISUAL_ASSET_SOURCE_GROUPS: readonly VisualAssetSourceGroup[] = [
+  { sourceDomain: "image_asset", read: readImageAssetSources },
+  { sourceDomain: "comic", read: readComicSources },
+  { sourceDomain: "drama", read: readDramaSources },
+];
+
+function describeSourceFailure(error: unknown): string {
+  if (!error || typeof error !== "object") return "unknown_error";
+  const code = "code" in error && typeof error.code === "string" ? error.code : null;
+  const name = "name" in error && typeof error.name === "string" ? error.name : null;
+  return code ?? name ?? "unknown_error";
+}
+
+export async function collectVisualAssetSources(
+  sourceGroups: readonly VisualAssetSourceGroup[] = DEFAULT_VISUAL_ASSET_SOURCE_GROUPS,
+): Promise<VisualAssetSourceItem[]> {
+  const groups = await Promise.all(sourceGroups.map(async (group) => {
+    try {
+      return await group.read();
+    } catch (error) {
+      console.warn(
+        `[visual-assets] skipped source domain ${group.sourceDomain}: ${describeSourceFailure(error)}`,
+      );
+      return [];
+    }
+  }));
   return groups.flat();
 }

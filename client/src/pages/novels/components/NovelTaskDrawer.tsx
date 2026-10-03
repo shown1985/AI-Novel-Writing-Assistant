@@ -2,7 +2,6 @@
   NovelWorkflowMilestone,
   NovelWorkflowMilestoneType,
 } from "@ai-novel/shared/types/novelWorkflow";
-import type { DirectorBookAutomationAction } from "@ai-novel/shared/types/directorRuntime";
 import type { TaskStatus } from "@ai-novel/shared/types/task";
 import type { CharacterResourceProposalSummary } from "@ai-novel/shared/types/characterResource";
 import type { AutoDirectorAction } from "@ai-novel/shared/types/autoDirectorFollowUp";
@@ -257,7 +256,6 @@ export default function NovelTaskDrawer({
   projection,
   currentUiModel,
   actions,
-  onProjectionAction,
   resourceProposals = [],
   onOpenResourceProposalSource,
   onConfirmResourceProposal,
@@ -298,45 +296,6 @@ export default function NovelTaskDrawer({
         : 0,
   )));
   const tokenUsage = task?.tokenUsage ?? null;
-  const primaryAction = projection?.primaryAction ?? null;
-  const primaryActionLabel = (
-    (primaryAction?.type === "continue" || primaryAction?.type === "auto_execute_range")
-    && projection?.displayState === "needs_confirmation"
-    && projection.latestTask?.checkpointType !== "replan_required"
-  )
-    ? "确认并继续"
-    : primaryAction?.label;
-  const runProjectedAction = (action: DirectorBookAutomationAction) => {
-    const matchedAction = actions.find((item) => {
-      if (item.label === action.label) {
-        return true;
-      }
-      if (action.type === "continue") {
-        return item.label.includes("继续");
-      }
-      if (action.type === "auto_execute_range") {
-        return item.label.includes("自动执行");
-      }
-      if (action.type === "confirm_candidate") {
-        return item.label.includes("书级方向");
-      }
-      if (action.type === "open_quality_repair") {
-        return item.label.includes("质量修复");
-      }
-      if (action.type === "open_chapter") {
-        return item.label.includes("章节执行");
-      }
-      return false;
-    });
-    matchedAction?.onClick();
-  };
-  const handleProjectionAction = (action: DirectorBookAutomationAction) => {
-    if (onProjectionAction) {
-      onProjectionAction(action);
-      return;
-    }
-    runProjectedAction(action);
-  };
   const canShowRuntimePolicy = capabilities?.canAdjustRuntimePolicy !== false && Boolean(task?.id && runtimeSnapshot);
   const canShowManualImpact = capabilities?.canInspectManualEditImpact !== false && Boolean(task);
   const canShowRetryWithOverrideModel = capabilities?.canRetryWithOverrideModel === true;
@@ -348,7 +307,7 @@ export default function NovelTaskDrawer({
         <DialogHeader className="border-b border-border/70 px-5 py-4">
           <DialogTitle>执行详情</DialogTitle>
           <DialogDescription>
-            查看本书 AI 推进记录、快捷处理动作和排查信息。
+            查看本书 AI 推进记录、产物与排查信息。需要继续或恢复时，请回到当前创作页面。
           </DialogDescription>
         </DialogHeader>
 
@@ -359,8 +318,8 @@ export default function NovelTaskDrawer({
               mode="focusedNovel"
               fallbackSummary={dashboardView?.currentAction || displayState?.currentAction || task?.blockingReason || task?.currentItemLabel || "当前没有需要处理的 AI 推进动作。"}
               fallbackStatusLabel={dashboardView?.statusLabel ?? (task ? formatTaskStatus(task) : "未开启")}
+              showPrimaryAction={false}
               showDetailsAction={false}
-              onAction={(_projection, action) => handleProjectionAction(action)}
             />
           ) : null}
 
@@ -654,18 +613,13 @@ export default function NovelTaskDrawer({
         </div>
 
         <div className="space-y-2 border-t border-border/70 px-5 py-4">
-          {primaryAction ? (
-            <Button type="button" className="w-full" onClick={() => handleProjectionAction(primaryAction)}>
-              {primaryActionLabel || "继续处理"}
-            </Button>
-          ) : null}
           {task?.sourceRoute ? (
             <Button asChild type="button" variant="outline" className="w-full">
               <Link to={task.sourceRoute}>打开来源页面</Link>
             </Button>
           ) : null}
-          <Button type="button" variant={primaryAction ? "ghost" : "outline"} className="w-full" onClick={onOpenFullTaskCenter}>
-            打开后台任务中心
+          <Button type="button" variant="outline" className="w-full" onClick={onOpenFullTaskCenter}>
+            打开运行记录
           </Button>
         </div>
       </DialogContent>

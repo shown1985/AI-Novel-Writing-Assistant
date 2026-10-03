@@ -10,10 +10,9 @@ import {
   directorIdeaConstellationOptionsPrompt,
 } from "../../../../prompting/prompts/novel/ideaConstellation/ideaConstellation.prompts";
 import {
-  buildDirectorIdeaContextSummary,
+  resolveDirectorIdeaContext,
   shouldRetryDirectorIdeaWithOriginalContext,
 } from "./ideaContext";
-import { marketRadarService } from "../../../../modules/marketRadar/application/MarketRadarService";
 
 const CONSTELLATION_OPTIONS_MAX_TOKENS = 5_000;
 const CONSTELLATION_COMPOSE_MAX_TOKENS = 800;
@@ -27,11 +26,10 @@ function composeTemperature(input: DirectorIdeaConstellationComposeRequest): num
   return Math.min(0.72, Math.max(0.4, input.temperature ?? 0.58));
 }
 
-async function runOptionsPrompt(input: DirectorIdeaConstellationOptionsRequest, temperature: number) {
-  const marketBriefPrompt = await marketRadarService.getBriefPromptBlock(input.marketBriefId);
+async function runOptionsPrompt(input: DirectorIdeaConstellationOptionsRequest, temperature: number, contextSummary: string) {
   return runStructuredPrompt({
     asset: directorIdeaConstellationOptionsPrompt,
-    promptInput: { contextSummary: buildDirectorIdeaContextSummary(input, marketBriefPrompt) },
+    promptInput: { contextSummary },
     options: {
       provider: input.provider,
       model: input.model,
@@ -41,12 +39,11 @@ async function runOptionsPrompt(input: DirectorIdeaConstellationOptionsRequest, 
   });
 }
 
-async function runComposePrompt(input: DirectorIdeaConstellationComposeRequest, temperature: number) {
-  const marketBriefPrompt = await marketRadarService.getBriefPromptBlock(input.marketBriefId);
+async function runComposePrompt(input: DirectorIdeaConstellationComposeRequest, temperature: number, contextSummary: string) {
   return runStructuredPrompt({
     asset: directorIdeaConstellationComposePrompt,
     promptInput: {
-      contextSummary: buildDirectorIdeaContextSummary(input, marketBriefPrompt),
+      contextSummary,
       selectedSummary: input.selectedOptions
         .map((option) => `${option.category}：${option.label}（${option.hint}）`)
         .join("\n"),
@@ -64,12 +61,13 @@ export class NovelDirectorIdeaConstellationService {
   async generateOptions(
     input: DirectorIdeaConstellationOptionsRequest,
   ): Promise<DirectorIdeaConstellationOptionsResponse> {
+    const contextSummary = await resolveDirectorIdeaContext(input);
     let result: Awaited<ReturnType<typeof runOptionsPrompt>>;
     try {
-      result = await runOptionsPrompt(input, optionsTemperature(input));
+      result = await runOptionsPrompt(input, optionsTemperature(input), contextSummary);
     } catch (error) {
       if (!shouldRetryDirectorIdeaWithOriginalContext(error)) throw error;
-      result = await runOptionsPrompt(input, CONSTELLATION_RETRY_TEMPERATURE);
+      result = await runOptionsPrompt(input, CONSTELLATION_RETRY_TEMPERATURE, contextSummary);
     }
 
     return {
@@ -85,12 +83,13 @@ export class NovelDirectorIdeaConstellationService {
   async compose(
     input: DirectorIdeaConstellationComposeRequest,
   ): Promise<DirectorIdeaConstellationComposeResponse> {
+    const contextSummary = await resolveDirectorIdeaContext(input);
     let result: Awaited<ReturnType<typeof runComposePrompt>>;
     try {
-      result = await runComposePrompt(input, composeTemperature(input));
+      result = await runComposePrompt(input, composeTemperature(input), contextSummary);
     } catch (error) {
       if (!shouldRetryDirectorIdeaWithOriginalContext(error)) throw error;
-      result = await runComposePrompt(input, CONSTELLATION_RETRY_TEMPERATURE);
+      result = await runComposePrompt(input, CONSTELLATION_RETRY_TEMPERATURE, contextSummary);
     }
     return { idea: result.output.idea.trim() };
   }

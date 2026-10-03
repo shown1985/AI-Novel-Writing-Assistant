@@ -6,8 +6,8 @@ const {
   sanitizeStyleContextForGeneration,
 } = require("../dist/services/styleEngine/styleGenerationSanitizer.js");
 const {
-  buildStyleEngineBlock,
-} = require("../dist/services/novel/runtime/runtimeContextBlocks.js");
+  buildWriterStyleContractText,
+} = require("../dist/services/styleEngine/styleContractText.js");
 
 function section(key, text) {
   return {
@@ -120,7 +120,9 @@ test("sanitizeStyleContextForGeneration redacts source entities before writer co
     ["北凉王世子"],
   );
 
-  const block = buildStyleEngineBlock(sanitized);
+  // The writer's style_contract context block (chapterContextBlocks.ts) renders the
+  // compiled contract via buildWriterStyleContractText, so redaction must land there.
+  const block = buildWriterStyleContractText(sanitized.compiledBlocks.contract);
   assert.match(block, /\[source-entity\]/);
   assert.doesNotMatch(block, /北凉王世子/);
   assert.doesNotMatch(block, /徐凤年/);

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -16,6 +16,7 @@ import {
   type WorldReferenceContext,
   type WorldSkeletonGenerationCounts,
   type WorldSkeletonGenerationPayload,
+  type WorldSkeletonGenerationCheckpointSummary,
   type WorldSkeletonPreset,
 } from "@ai-novel/shared/types/worldWizard";
 import { Button } from "@/components/ui/button";
@@ -25,9 +26,13 @@ import LLMSelector from "@/components/common/LLMSelector";
 import {
   createWorld,
   generateWorldSkeleton,
+  getLatestUnfinishedWorldSkeletonGeneration,
+  getWorldSkeletonGenerationSummary,
+  recoverWorldSkeleton,
   WORLD_INSPIRATION_ANALYZE_STREAM_PATH,
   type WorldInspirationAnalysisResult,
 } from "@/api/world";
+import type { ApiHttpError } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import { useSSE } from "@/hooks/useSSE";
 import { useLLMStore } from "@/store/llmStore";
@@ -43,6 +48,26 @@ import {
   type WorldGeneratorConceptCard,
 } from "./components/generator/worldGeneratorShared";
 import { useWorldGeneratorDerivedState } from "./components/generator/useWorldGeneratorDerivedState";
+
+const WORLD_GENERATION_RUN_STORAGE_KEY = "world-generator-generation-run-id";
+
+function readCheckpointDetails(error: unknown): { generationRunId: string; stage?: string } | null {
+  const response = (error as ApiHttpError | undefined)?.details;
+  if (!response || typeof response !== "object") {
+    return null;
+  }
+  const details = (response as { details?: unknown }).details;
+  if (!details || typeof details !== "object") {
+    return null;
+  }
+  const record = details as Record<string, unknown>;
+  return typeof record.generationRunId === "string"
+    ? {
+      generationRunId: record.generationRunId,
+      stage: typeof record.stage === "string" ? record.stage : undefined,
+    }
+    : null;
+}
 export default function WorldGenerator() {
   const llm = useLLMStore();
   const navigate = useNavigate();
@@ -82,6 +107,60 @@ export default function WorldGenerator() {
     WORLD_SKELETON_PRESET_COUNTS.standard,
   );
   const [skeleton, setSkeleton] = useState<WorldSkeletonGenerationPayload | null>(null);
+  const [generationRunId, setGenerationRunId] = useState<string | null>(null);
+  const [checkpointSummary, setCheckpointSummary] = useState<WorldSkeletonGenerationCheckpointSummary | null>(null);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+
+  const showSkeletonPreview = useCallback((payload: WorldSkeletonGenerationPayload | null | undefined) => {
+    setSkeleton(payload ?? null);
+    setGenerationError(null);
+    setCheckpointSummary(null);
+    setGenerationRunId(null);
+    const completedRunId = payload?.generationRunId?.trim();
+    if (completedRunId) {
+      window.localStorage.setItem(WORLD_GENERATION_RUN_STORAGE_KEY, completedRunId);
+    } else {
+      window.localStorage.removeItem(WORLD_GENERATION_RUN_STORAGE_KEY);
+    }
+    setStep(3);
+  }, []);
+
+  const clearCheckpoint = () => {
+    setGenerationRunId(null);
+    setCheckpointSummary(null);
+    setGenerationError(null);
+    window.localStorage.removeItem(WORLD_GENERATION_RUN_STORAGE_KEY);
+  };
+
+  useEffect(() => {
+    const storedRunId = window.localStorage.getItem(WORLD_GENERATION_RUN_STORAGE_KEY);
+    const summaryRequest = storedRunId
+      ? getWorldSkeletonGenerationSummary(storedRunId).catch(() => getLatestUnfinishedWorldSkeletonGeneration())
+      : getLatestUnfinishedWorldSkeletonGeneration();
+    void summaryRequest
+      .then(async (response) => {
+        const summary = response.data;
+        if (!summary) {
+          window.localStorage.removeItem(WORLD_GENERATION_RUN_STORAGE_KEY);
+          return;
+        }
+        if (summary.status === "succeeded") {
+          const completed = await recoverWorldSkeleton(summary.runId);
+          showSkeletonPreview(completed.data);
+          return;
+        }
+        setGenerationRunId(summary.runId);
+        setCheckpointSummary(summary);
+        setStep(2);
+      })
+      .catch(() => {
+        // Keep the local run id so a temporary network failure can be retried from this page.
+        if (storedRunId) {
+          setGenerationRunId(storedRunId);
+          setStep(2);
+        }
+      });
+  }, [showSkeletonPreview]);
 
   const {
     genreTreeQuery,
@@ -118,6 +197,7 @@ export default function WorldGenerator() {
     setPropertyDetails({});
     setInspirationSourceMeta(null);
     setSkeleton(null);
+    clearCheckpoint();
   };
   const analyzeStream = useSSE({
     onDone: async (fullContent) => {
@@ -246,8 +326,37 @@ export default function WorldGenerator() {
       return response.data;
     },
     onSuccess: (payload) => {
-      setSkeleton(payload ?? null);
-      setStep(3);
+      showSkeletonPreview(payload);
+    },
+    onError: (error) => {
+      const checkpoint = readCheckpointDetails(error);
+      setGenerationError(error instanceof Error ? error.message : "世界骨架生成失败。");
+      if (checkpoint) {
+        setGenerationRunId(checkpoint.generationRunId);
+        window.localStorage.setItem(WORLD_GENERATION_RUN_STORAGE_KEY, checkpoint.generationRunId);
+        void getWorldSkeletonGenerationSummary(checkpoint.generationRunId).then((response) => {
+          setCheckpointSummary(response.data ?? null);
+        }).catch(() => undefined);
+      }
+    },
+  });
+  const recoverSkeletonMutation = useMutation({
+    mutationFn: async () => {
+      if (!generationRunId) {
+        throw new Error("没有可恢复的世界生成记录。");
+      }
+      return recoverWorldSkeleton(generationRunId);
+    },
+    onSuccess: (response) => {
+      showSkeletonPreview(response.data);
+    },
+    onError: (error) => {
+      const checkpoint = readCheckpointDetails(error);
+      setGenerationError(error instanceof Error ? error.message : "继续生成失败。");
+      if (checkpoint) {
+        setGenerationRunId(checkpoint.generationRunId);
+        window.localStorage.setItem(WORLD_GENERATION_RUN_STORAGE_KEY, checkpoint.generationRunId);
+      }
     },
   });
   const finalizeMutation = useMutation({
@@ -270,6 +379,7 @@ export default function WorldGenerator() {
     },
     onSuccess: async (response) => {
       const createdId = response.data?.id;
+      clearCheckpoint();
       await queryClient.invalidateQueries({ queryKey: queryKeys.worlds.all });
       if (createdId) {
         await queryClient.invalidateQueries({ queryKey: queryKeys.worlds.detail(createdId) });
@@ -281,10 +391,12 @@ export default function WorldGenerator() {
     setSkeletonPreset(preset);
     setSkeletonCounts(WORLD_SKELETON_PRESET_COUNTS[preset]);
     setSkeleton(null);
+    clearCheckpoint();
   };
   const handleCountChange = (key: keyof WorldSkeletonGenerationCounts, value: number) => {
     setSkeletonCounts((prev) => ({ ...prev, [key]: value }));
     setSkeleton(null);
+    clearCheckpoint();
   };
   return (
     <div className="space-y-4">
@@ -389,6 +501,11 @@ export default function WorldGenerator() {
               onPresetChange={handlePresetChange}
               onCountChange={handleCountChange}
               onGenerateSkeleton={() => generateSkeletonMutation.mutate()}
+              recoveryRunId={generationRunId}
+              checkpointSummary={checkpointSummary}
+              generationError={generationError}
+              recovering={recoverSkeletonMutation.isPending}
+              onRecover={() => recoverSkeletonMutation.mutate()}
             />
           ) : null}
 

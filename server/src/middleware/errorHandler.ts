@@ -233,6 +233,9 @@ export function errorHandler(
 
   if (error instanceof AppError) {
     const detail = typeof error.details === "string" ? error.details : undefined;
+    const metadata = error.details && typeof error.details === "object"
+      ? error.details
+      : undefined;
     setRequestErrorMessage(res, error.message, detail);
     if (error.statusCode >= 500) {
       logServerError(req, error);
@@ -241,6 +244,7 @@ export function errorHandler(
       success: false,
       error: error.message,
       message: detail,
+      ...(metadata ? { details: metadata } : {}),
     });
     return;
   }

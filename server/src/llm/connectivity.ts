@@ -11,7 +11,6 @@ import {
   MODEL_ROUTE_TASK_TYPES,
   resolveModel,
   toStructuredOutputStrategy,
-  upsertModelRouteConfig,
 } from "./modelRouter";
 import { invokeStructuredLlmDetailed, summarizeStructuredOutputFailure } from "./structuredInvoke";
 import {
@@ -373,26 +372,6 @@ async function testModelRoutes(taskTypes: readonly ModelRouteTaskType[] = MODEL_
       route.structuredResponseFormat,
     ].join("::");
     const result = await dedupedChecks.get(key)!;
-    const effectiveProtocol = result.structured?.requestProtocol ?? result.plain?.requestProtocol ?? route.requestProtocol;
-    const effectiveFormat = (
-      result.structured?.strategy === "json_schema"
-      || result.structured?.strategy === "json_object"
-      || result.structured?.strategy === "prompt_json"
-    )
-      ? result.structured.strategy
-      : route.structuredResponseFormat;
-    const shouldPersistProbeResult = result.structured?.ok === true
-      && (effectiveProtocol !== route.requestProtocol || effectiveFormat !== route.structuredResponseFormat);
-    if (shouldPersistProbeResult) {
-      await upsertModelRouteConfig(route.taskType, {
-        provider: route.provider,
-        model: route.model,
-        temperature: route.temperature,
-        maxTokens: route.maxTokens,
-        requestProtocol: effectiveProtocol,
-        structuredResponseFormat: effectiveFormat,
-      });
-    }
     return {
       taskType: route.taskType,
       provider: route.provider,

@@ -1,4 +1,5 @@
 import type {
+  WorldSkeletonGenerationCheckpointSummary,
   WorldSkeletonGenerationCounts,
   WorldSkeletonPreset,
 } from "@ai-novel/shared/types/worldWizard";
@@ -46,6 +47,11 @@ interface WorldGeneratorStepTwoProps {
   onPresetChange: (preset: WorldSkeletonPreset) => void;
   onCountChange: (key: keyof WorldSkeletonGenerationCounts, value: number) => void;
   onGenerateSkeleton: () => void;
+  recoveryRunId?: string | null;
+  checkpointSummary?: WorldSkeletonGenerationCheckpointSummary | null;
+  generationError?: string | null;
+  recovering?: boolean;
+  onRecover?: () => void;
 }
 
 export default function WorldGeneratorStepTwo(props: WorldGeneratorStepTwoProps) {
@@ -56,7 +62,24 @@ export default function WorldGeneratorStepTwo(props: WorldGeneratorStepTwoProps)
     onPresetChange,
     onCountChange,
     onGenerateSkeleton,
+    recoveryRunId,
+    checkpointSummary,
+    generationError,
+    recovering = false,
+    onRecover,
   } = props;
+
+  const stageLabels: Record<string, string> = {
+    profile: "世界概念",
+    rules: "核心规则",
+    factions: "势力关系",
+    locations: "关键地点",
+    relations: "地图与关系",
+    presentation: "故事入口",
+  };
+  const latestStage = checkpointSummary?.latestStage
+    ? stageLabels[checkpointSummary.latestStage] ?? checkpointSummary.latestStage
+    : "基础结构";
 
   return (
     <div className="space-y-4">
@@ -121,6 +144,20 @@ export default function WorldGeneratorStepTwo(props: WorldGeneratorStepTwoProps)
       <Button onClick={onGenerateSkeleton} disabled={generating}>
         {generating ? "生成世界骨架中..." : "生成世界骨架"}
       </Button>
+
+      {recoveryRunId ? (
+        <div className="space-y-2 rounded-md bg-muted/30 p-4 text-sm">
+          <div className="font-medium">
+            {checkpointSummary?.status === "failed"
+              ? `生成在「${latestStage}」阶段暂停，已保留已完成内容。`
+              : "发现一条未完成的世界生成记录，已保留已完成内容。"}
+          </div>
+          {generationError ? <div className="text-xs text-muted-foreground">{generationError}</div> : null}
+          <Button variant="secondary" onClick={onRecover} disabled={recovering || !onRecover}>
+            {recovering ? "继续生成中..." : "从已完成阶段继续"}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -34,6 +34,7 @@ export interface WorldStructureSectionPromptInput {
   promptSource: string;
   currentStructure: unknown;
   currentBindingSupport: unknown;
+  stageConstraints?: string;
 }
 
 export interface WorldAxiomSuggestionPromptInput {

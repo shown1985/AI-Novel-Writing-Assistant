@@ -1,0 +1,202 @@
+name: Windows Desktop Candidate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "codex/windows-installer-*"
+
+permissions:
+  contents: read
+
+jobs:
+  package-windows-x64:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    env:
+      AI_NOVEL_LOCAL_DESKTOP_BUILD: "true"
+      AI_NOVEL_RELEASE_CHANNEL: beta
+      AI_NOVEL_GITHUB_OWNER: shown1985
+      AI_NOVEL_GITHUB_REPO: AI-Novel-Writing-Assistant
+    steps:
+      - name: Verify candidate source
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REPOSITORY -ne 'shown1985/AI-Novel-Writing-Assistant') {
+            throw "Candidate builds are restricted to the fork repository."
+          }
+          if ($env:GITHUB_REF_TYPE -ne 'branch' -or $env:GITHUB_REF_NAME -notlike 'codex/windows-installer-*') {
+            throw "Candidate builds require a codex/windows-installer-* branch."
+          }
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.6.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install desktop icon tooling
+        run: python -m pip install --disable-pip-version-check pillow
+
+      - name: Regenerate desktop icon assets
+        run: python desktop/scripts/generate-desktop-icons.py
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build and stage desktop app
+        run: pnpm stage:desktop
+
+      - name: Verify database migrations with isolated fixtures
+        run: pnpm --filter @ai-novel/server exec node --test tests/prismaMigrationCompleteness.test.js tests/runtimeMigrations.test.js
+
+      - name: Build unsigned NSIS installer
+        id: package_installer
+        run: pnpm dist:desktop:nsis:reuse-stage
+
+      - name: Verify packaged desktop layout
+        id: package_layout
+        run: node desktop/scripts/verify-desktop-package.cjs --platform win32 --arch x64
+
+      - name: Verify isolated install and reinstall
+        id: installer_smoke
+        run: node desktop/scripts/verify-desktop-installer.cjs
+
+      - name: Diagnose installer failure
+        if: failure() && steps.installer_smoke.outcome == 'failure'
+        shell: pwsh
+        run: |
+          $install = 'desktop/build/installer-smoke/install'
+          if (Test-Path -LiteralPath $install) {
+            Get-ChildItem -LiteralPath $install -Force |
+              Select-Object Name, Length, LastWriteTimeUtc |
+              Format-Table -AutoSize
+            $files = @(Get-ChildItem -LiteralPath $install -Recurse -File -ErrorAction SilentlyContinue)
+            Write-Output "Partial install file count: $($files.Count)"
+            Write-Output "Installed app executable exists: $(Test-Path -LiteralPath (Join-Path $install 'Biz Novel Studio.exe'))"
+            if ($files.Count -gt 0) {
+              $longest = $files | Sort-Object { $_.FullName.Length } -Descending | Select-Object -First 1
+              Write-Output "Longest installed path length: $($longest.FullName.Length)"
+            }
+          }
+          Get-WinEvent -FilterHashtable @{
+            LogName = 'Application'
+            StartTime = (Get-Date).AddMinutes(-15)
+            Id = 1000, 1001
+          } -ErrorAction SilentlyContinue |
+            Where-Object { $_.Message -like '*Biz Novel Studio*' } |
+            Select-Object -First 8 TimeCreated, Id, ProviderName, Message |
+            Format-List
+          $version = (Get-Content 'desktop/package.json' -Raw | ConvertFrom-Json).version
+          $installer = Join-Path 'desktop/build/dist' "Biz Novel Studio-$version-setup-x64.exe"
+          if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
+            throw 'The built NSIS installer is missing from the diagnostic runner.'
+          }
+          $installer = (Resolve-Path -LiteralPath $installer).Path
+          $probeDir = Join-Path $env:RUNNER_TEMP 'desktop-installer-cdb-probe'
+          if (Test-Path -LiteralPath $probeDir) {
+            throw 'The isolated CDB probe directory already exists.'
+          }
+          $debuggerRoot = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\Debuggers'
+          $cdb = @(
+            (Join-Path $debuggerRoot 'x86\cdb.exe'),
+            (Join-Path $debuggerRoot 'x64\cdb.exe')
+          ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          if (-not $cdb) {
+            throw 'Windows Desktop Debugger cdb.exe was not found on the runner.'
+          }
+          $start = [System.Diagnostics.ProcessStartInfo]::new()
+          $start.FileName = $cdb
+          $start.WorkingDirectory = $env:RUNNER_TEMP
+          $start.UseShellExecute = $false
+          $start.RedirectStandardOutput = $true
+          $start.RedirectStandardError = $true
+          foreach ($argument in @('-o', '-G', '-hd', '-xd', 'av', '-c', 'g; .exr -1; .ecxr; kv; q', $installer, '/S', "/D=$probeDir")) {
+            [void]$start.ArgumentList.Add($argument)
+          }
+          $process = [System.Diagnostics.Process]::Start($start)
+          $stdout = $process.StandardOutput.ReadToEndAsync()
+          $stderr = $process.StandardError.ReadToEndAsync()
+          if (-not $process.WaitForExit(180000)) {
+            $process.Kill($true)
+            throw 'CDB installer diagnosis exceeded three minutes.'
+          }
+          $output = $stdout.GetAwaiter().GetResult()
+          $stderr.GetAwaiter().GetResult() | Out-Null
+          if ($output -notmatch '(?i)ExceptionCode:\s*c0000005' -or $output -notmatch 'ExceptionAddress:') {
+            throw "CDB did not capture an unhandled access violation (exit code $($process.ExitCode))."
+          }
+          $matches = @($output -split "`r?`n" | Where-Object {
+            $_ -match 'Access violation|ExceptionAddress:|ExceptionCode:|[A-Za-z0-9_.-]+![A-Za-z0-9_?@.$+-]+'
+          } | Select-Object -First 30)
+          if ($matches.Count -eq 0) {
+            throw "CDB exited without a fault module summary (exit code $($process.ExitCode))."
+          }
+          $matches | ForEach-Object { $_.Trim() }
+          Write-Output "CDB exit code: $($process.ExitCode)"
+
+      - name: Prepare candidate download
+        id: prepare_candidate
+        if: always() && steps.package_installer.outcome == 'success' && steps.package_layout.outcome == 'success' && (steps.installer_smoke.outcome == 'success' || steps.installer_smoke.outcome == 'failure')
+        shell: pwsh
+        env:
+          INSTALLER_SMOKE_OUTCOME: ${{ steps.installer_smoke.outcome }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dist = 'desktop/build/dist'
+          $output = 'desktop/build/candidate-download'
+          $version = (Get-Content 'desktop/package.json' -Raw | ConvertFrom-Json).version
+          $expectedName = "Biz Novel Studio-$version-setup-x64.exe"
+          $installer = Join-Path $dist $expectedName
+          if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
+            throw "Expected NSIS installer was not found: $expectedName"
+          }
+          New-Item -ItemType Directory -Path $output -Force | Out-Null
+          Copy-Item -LiteralPath $installer -Destination (Join-Path $output $expectedName)
+          $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $expectedName" | Set-Content -LiteralPath (Join-Path $output 'SHA256SUMS.txt') -Encoding ascii
+          $buildInfo = [ordered]@{
+            repository = $env:GITHUB_REPOSITORY
+            branch = $env:GITHUB_REF_NAME
+            commit = $env:GITHUB_SHA
+            version = $version
+            channel = 'beta'
+            localCandidate = $true
+            signed = $false
+            installer = $expectedName
+            installerSha256 = $hash
+            installerSmokeOutcome = $env:INSTALLER_SMOKE_OUTCOME
+            readyForAcceptance = ($env:INSTALLER_SMOKE_OUTCOME -eq 'success')
+          }
+          $buildInfo | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'build-info.json') -Encoding utf8
+
+      - name: Upload Windows x64 candidate
+        if: always() && steps.prepare_candidate.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-x64-${{ github.sha }}
+          path: |
+            desktop/build/candidate-download/*-setup-x64.exe
+            desktop/build/candidate-download/SHA256SUMS.txt
+            desktop/build/candidate-download/build-info.json
+          if-no-files-found: error
+          retention-days: 14

@@ -122,10 +122,11 @@ test("gateway delegates novel theme world generation through novel world service
     temperature: 0.4,
     storyMacroContext: undefined,
     bookContractContext: undefined,
+    openingOnly: undefined,
   }]);
 });
 
-test("gateway builds context through story slice service and persists slice to novel world", async () => {
+test("gateway builds context from the instance without repeating slice persistence", async () => {
   const calls = [];
   const slice = buildSlice();
   const gateway = new WorldContextGateway(
@@ -136,20 +137,10 @@ test("gateway builds context through story slice service and persists slice to n
       },
     },
     {
-      ensureFromLegacyNovel: async (novelId) => {
-        calls.push({ type: "ensureFromLegacyNovel", novelId });
-        return {
-          id: "novel-world-1",
-          novelId,
-        };
-      },
-      persistStorySlice: async (novelId, persistedSlice) => {
-        calls.push({ type: "persistStorySlice", novelId, slice: persistedSlice });
-      },
       getByNovelId: async (novelId) => {
         calls.push({ type: "getByNovelId", novelId });
         return {
-          id: "fallback-novel-world",
+          id: "novel-world-1",
           novelId,
         };
       },
@@ -165,7 +156,7 @@ test("gateway builds context through story slice service and persists slice to n
   assert.equal(block.purpose, "chapter");
   assert.match(block.promptBlock, /章节生成必须遵守本书世界/);
   assert.deepEqual(calls, [{
-    type: "ensureFromLegacyNovel",
+    type: "getByNovelId",
     novelId: "novel-1",
   }, {
     type: "ensureStoryWorldSlice",
@@ -174,9 +165,127 @@ test("gateway builds context through story slice service and persists slice to n
       builderMode: "runtime",
       storyInput: "第一卷发生在北境。",
     },
-  }, {
-    type: "persistStorySlice",
-    novelId: "novel-1",
-    slice,
   }]);
+});
+
+test("gateway assembles all five purposes from the same current slice without persistence", async () => {
+  const slice = buildSlice();
+  const calls = [];
+  const gateway = new WorldContextGateway(
+    {
+      ensureStoryWorldSlice: async (_novelId, options) => {
+        calls.push({ type: "ensure", options });
+        return slice;
+      },
+    },
+    {
+      getByNovelId: async () => ({ id: "novel-world-1", novelId: "novel-1" }),
+      persistStorySlice: async () => {
+        throw new Error("gateway must not persist the slice");
+      },
+    },
+  );
+
+  for (const purpose of ["outline", "character", "chapter", "bible", "optimize"]) {
+    const block = await gateway.getWorldContextBlock("novel-1", { purpose });
+    assert.equal(block.novelWorldId, "novel-world-1");
+    assert.equal(block.purpose, purpose);
+    assert.equal(block.rawSlice, slice);
+  }
+  assert.deepEqual(calls.map((call) => call.options.builderMode), [
+    "outline",
+    "runtime",
+    "runtime",
+    "bible",
+    "runtime",
+  ]);
+});
+
+test("gateway never assembles a stale force-refresh result", async () => {
+  const calls = [];
+  let refreshCount = 0;
+  const gateway = new WorldContextGateway(
+    {
+      ensureStoryWorldSlice: async () => {
+        calls.push("ensure");
+        return buildSlice();
+      },
+      refreshWorldSlice: async () => {
+        calls.push("refresh");
+        refreshCount += 1;
+        return { slice: buildSlice(), isStale: refreshCount === 1 };
+      },
+    },
+    {
+      getByNovelId: async () => ({ id: "novel-world-1", novelId: "novel-1" }),
+    },
+  );
+
+  assert.equal(await gateway.getWorldContextBlock("novel-1", {
+    purpose: "chapter",
+    forceRefresh: true,
+  }), null);
+  const current = await gateway.getWorldContextBlock("novel-1", {
+    purpose: "chapter",
+    forceRefresh: true,
+  });
+  assert.equal(current.rawSlice.coreWorldFrame, buildSlice().coreWorldFrame);
+  assert.deepEqual(calls, ["refresh", "refresh"]);
+});
+
+test("gateway returns null for a no-world ensure or refresh and hasActiveWorld follows usable view", async () => {
+  const calls = [];
+  let instanceReads = 0;
+  const gateway = new WorldContextGateway(
+    {
+      ensureStoryWorldSlice: async () => {
+        calls.push("ensure");
+        return null;
+      },
+      refreshWorldSlice: async () => {
+        calls.push("refresh");
+        return {
+          hasWorld: false,
+          worldId: null,
+          worldName: null,
+          slice: null,
+          overrides: {},
+          availableRules: [],
+          availableForces: [],
+          availableLocations: [],
+          storyInputSource: null,
+          isStale: false,
+        };
+      },
+      getWorldSliceView: async () => ({
+        hasWorld: false,
+        worldId: null,
+        worldName: null,
+        slice: null,
+        overrides: {},
+        availableRules: [],
+        availableForces: [],
+        availableLocations: [],
+        storyInputSource: null,
+        isStale: false,
+      }),
+    },
+    {
+      getByNovelId: async () => {
+        instanceReads += 1;
+        if (instanceReads <= 2) {
+          return null;
+        }
+        throw new Error("hasActiveWorld must use the slice view");
+      },
+    },
+  );
+
+  assert.equal(await gateway.getWorldContextBlock("novel-1", { purpose: "chapter" }), null);
+  assert.equal(await gateway.getWorldContextBlock("novel-1", {
+    purpose: "chapter",
+    forceRefresh: true,
+  }), null);
+  assert.equal(await gateway.hasActiveWorld("novel-1"), false);
+  assert.deepEqual(calls, ["ensure", "refresh"]);
 });

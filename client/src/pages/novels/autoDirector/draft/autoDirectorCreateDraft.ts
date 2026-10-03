@@ -3,6 +3,10 @@ import {
   type DirectorRunMode,
   type DirectorWorldSetupMode,
 } from "@ai-novel/shared/types/novelDirector";
+import {
+  parseCreativeCarryoverContract,
+  type CreativeCarryoverContract,
+} from "@ai-novel/shared/types/creativeCarryoverContract";
 import type { NovelBasicFormState } from "../../novelBasicInfo.shared";
 import type { AutoDirectorCreateStageKey } from "../directorCreateStages";
 
@@ -19,6 +23,7 @@ interface StorageLike {
 }
 
 export interface AutoDirectorCreateDraftScopeInput {
+  sourceWorldId?: string;
   marketBriefId?: string;
   referenceMode?: string;
   referenceBookAnalysisId?: string;
@@ -36,6 +41,7 @@ export interface AutoDirectorCreateDraft {
   runMode: DirectorRunMode;
   worldSetupMode: DirectorWorldSetupMode;
   selectedStyleProfileId: string;
+  creativeCarryoverContract?: CreativeCarryoverContract | null;
   savedAt: string;
 }
 
@@ -47,6 +53,7 @@ export interface AutoDirectorCreateDraftInput {
   runMode: DirectorRunMode;
   worldSetupMode: DirectorWorldSetupMode;
   selectedStyleProfileId: string;
+  creativeCarryoverContract?: CreativeCarryoverContract | null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -62,13 +69,21 @@ function draftStorageKey(scopeKey: string): string {
 }
 
 export function buildAutoDirectorCreateDraftScope(input: AutoDirectorCreateDraftScopeInput): string {
-  return [
+  const legacyScope = [
     input.marketBriefId,
     input.referenceMode,
     input.referenceBookAnalysisId,
     input.referenceDocumentId,
     input.initialStyleProfileId,
   ].map((value) => encodeURIComponent(value?.trim() || "none")).join("|");
+  return input.sourceWorldId?.trim()
+    ? `${legacyScope}|world:${encodeURIComponent(input.sourceWorldId.trim())}`
+    : legacyScope;
+}
+
+export function resolveInitialWorldId(sourceWorldId: string, savedWorldId: string | undefined, hasDraft: boolean, hasTask: boolean): string {
+  if (hasTask || hasDraft) return savedWorldId ?? "";
+  return sourceWorldId;
 }
 
 export function toRecoverableAutoDirectorCreateStage(
@@ -96,6 +111,9 @@ export function saveAutoDirectorCreateDraft(
     runMode: input.runMode,
     worldSetupMode: input.worldSetupMode,
     selectedStyleProfileId: input.selectedStyleProfileId,
+    ...(input.creativeCarryoverContract === undefined ? {} : {
+      creativeCarryoverContract: input.creativeCarryoverContract,
+    }),
     savedAt: new Date().toISOString(),
   };
 
@@ -144,6 +162,9 @@ export function loadAutoDirectorCreateDraft(
       runMode: value.runMode as DirectorRunMode,
       worldSetupMode: value.worldSetupMode,
       selectedStyleProfileId: value.selectedStyleProfileId,
+      ...(value.creativeCarryoverContract === undefined ? {} : {
+        creativeCarryoverContract: parseCreativeCarryoverContract(value.creativeCarryoverContract),
+      }),
       savedAt: value.savedAt,
     };
   } catch {

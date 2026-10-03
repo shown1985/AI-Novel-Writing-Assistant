@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Globe2, Trash2 } from "lucide-react";
@@ -34,14 +34,22 @@ import {
   updateWorldStructure,
   useWorldLibraryItem,
 } from "@/api/world";
+import type { ApiHttpError } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import { toast } from "@/components/ui/toast";
 import { useLLMStore } from "@/store/llmStore";
 import { useSSE } from "@/hooks/useSSE";
 import { featureFlags } from "@/config/featureFlags";
+import type { WorldBindingSupport, WorldStructuredData } from "@ai-novel/shared/types/world";
 import {
   parseConsistencyReport,
 } from "./worldConsistencyUi";
+import {
+  createWorldAxiomsOperationId,
+  createWorldAxiomsSavePayload,
+  shouldResetWorldAxiomsOperation,
+  shouldRetryWorldAxiomsSave,
+} from "./worldAxiomSave";
 import WorldAssetsTab from "./components/workspace/WorldAssetsTab";
 import WorldAxiomsCard from "./components/workspace/WorldAxiomsCard";
 import WorldConsistencyTab from "./components/workspace/WorldConsistencyTab";
@@ -56,6 +64,19 @@ import {
   type LayerKey,
   type RefineAttribute,
 } from "./components/workspace/worldWorkspaceShared";
+import {
+  createWorldStructureSaveIntent,
+  isCurrentWorldStructureRead,
+  isCurrentWorldStructureResponse,
+  shouldRetryWorldStructureSave,
+  structurePayloadKey,
+  worldStructurePayloadKeyFromPersistedWorld,
+  worldStructureSaveGuardForError,
+  type PendingWorldStructureOperation,
+  type WorldStructureSaveGuard,
+  type WorldStructureSaveOutcome,
+  type WorldStructureSavePayload,
+} from "./worldStructureSave";
 
 export default function WorldWorkspace() {
   const navigate = useNavigate();
@@ -82,6 +103,31 @@ export default function WorldWorkspace() {
   const [refineLevel, setRefineLevel] = useState<"light" | "deep">("light");
   const [activeTab, setActiveTab] = useState("structure");
   const [advancedStructureOpen, setAdvancedStructureOpen] = useState(false);
+  const axiomsOperationIdRef = useRef<string | null>(null);
+  const structureOperationIdRef = useRef<string | null>(null);
+  const structureOperationIntentRef = useRef<PendingWorldStructureOperation | null>(null);
+  const currentWorldIdRef = useRef(id);
+  const structureReadRequestTokenRef = useRef(0);
+  const [structureSaveNotice, setStructureSaveNotice] = useState<string | null>(null);
+  const [structureSaveGuard, setStructureSaveGuard] = useState<WorldStructureSaveGuard>("none");
+  const [replayServerPayloadKey, setReplayServerPayloadKey] = useState<string | null>(null);
+  const [explicitReadPayloadKey, setExplicitReadPayloadKey] = useState<string | null>(null);
+
+  currentWorldIdRef.current = id;
+
+  useEffect(() => {
+    axiomsOperationIdRef.current = null;
+  }, [id]);
+
+  useEffect(() => {
+    structureReadRequestTokenRef.current += 1;
+    structureOperationIdRef.current = null;
+    structureOperationIntentRef.current = null;
+    setStructureSaveNotice(null);
+    setStructureSaveGuard("none");
+    setReplayServerPayloadKey(null);
+    setExplicitReadPayloadKey(null);
+  }, [id]);
 
   const worldDetailQuery = useQuery({
     queryKey: queryKeys.worlds.detail(id),
@@ -139,18 +185,21 @@ export default function WorldWorkspace() {
   );
   const visibleDeepeningQuestions = useMemo(() => {
     const list = world?.deepeningQA ?? [];
-    const actionable = list.filter((question) => question.status !== "integrated");
-    return (actionable.length > 0 ? actionable : list).slice(0, 3);
+    return list.filter((question) => question.status !== "integrated").slice(0, 3);
   }, [world?.deepeningQA]);
+  const integratedDeepeningQuestionCount = useMemo(
+    () => (world?.deepeningQA ?? []).filter((question) => question.status === "integrated").length,
+    [world?.deepeningQA],
+  );
 
-  const invalidateWorld = async () => {
+  const invalidateWorld = async (worldId = id) => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.worlds.all }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.worlds.detail(id) }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.worlds.structure(id) }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.worlds.overview(id) }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.worlds.visualization(id) }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.worlds.snapshots(id) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.worlds.detail(worldId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.worlds.structure(worldId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.worlds.overview(worldId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.worlds.visualization(worldId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.worlds.snapshots(worldId) }),
     ]);
   };
 
@@ -168,15 +217,15 @@ export default function WorldWorkspace() {
   });
   const generateAllLayersMutation = useMutation({
     mutationFn: () => generateAllWorldLayers(id, { provider: llm.provider, model: llm.model, temperature: 0.7 }),
-    onSuccess: invalidateWorld,
+    onSuccess: () => invalidateWorld(),
   });
   const saveLayerMutation = useMutation({
     mutationFn: (payload: { layerKey: LayerKey; content: string }) => updateWorldLayer(id, payload.layerKey, payload.content),
-    onSuccess: invalidateWorld,
+    onSuccess: () => invalidateWorld(),
   });
   const confirmLayerMutation = useMutation({
     mutationFn: (layerKey: LayerKey) => confirmWorldLayer(id, layerKey),
-    onSuccess: invalidateWorld,
+    onSuccess: () => invalidateWorld(),
   });
   const deepeningQuestionMutation = useMutation({
     mutationFn: () => generateWorldDeepeningQuestions(id, { provider: llm.provider, model: llm.model }),
@@ -209,19 +258,96 @@ export default function WorldWorkspace() {
   });
   const consistencyMutation = useMutation({
     mutationFn: () => checkWorldConsistency(id, { provider: llm.provider, model: llm.model }),
-    onSuccess: invalidateWorld,
+    onSuccess: () => invalidateWorld(),
   });
   const patchIssueMutation = useMutation({
     mutationFn: (payload: { issueId: string; status: "open" | "resolved" | "ignored" }) =>
       patchWorldConsistencyIssue(id, payload.issueId, payload.status),
-    onSuccess: invalidateWorld,
+    onSuccess: () => invalidateWorld(),
   });
   const saveStructureMutation = useMutation({
-    mutationFn: (payload: Parameters<typeof updateWorldStructure>[1]) => updateWorldStructure(id, payload),
+    mutationFn: (payload: WorldStructureSavePayload) => updateWorldStructure(payload.worldId, {
+      structure: payload.structure,
+      bindingSupport: payload.bindingSupport,
+      operationId: payload.operationId,
+      expectedContentRevision: payload.expectedContentRevision,
+    }),
+    retry: (failureCount, error) => shouldRetryWorldStructureSave(error as ApiHttpError, failureCount),
+    onSuccess: async (response, payload) => {
+      if (!isCurrentWorldStructureResponse(id, payload.worldId) || structureOperationIdRef.current !== payload.operationId) {
+        return;
+      }
+      const outcome: WorldStructureSaveOutcome = response.data?.maintenance?.state === "replayed"
+        ? "replayed"
+        : "committed";
+      const serverPayloadKey = outcome === "replayed" && response.data?.world
+        ? worldStructurePayloadKeyFromPersistedWorld(response.data.world)
+        : null;
+      structureOperationIdRef.current = null;
+      structureOperationIntentRef.current = null;
+      setReplayServerPayloadKey(serverPayloadKey);
+      setExplicitReadPayloadKey(null);
+      setStructureSaveGuard(serverPayloadKey ? "replayed" : outcome === "replayed" ? "read_required" : "none");
+      if (outcome === "replayed") {
+        setStructureSaveNotice("该保存操作已在服务器确认，当前世界内容以服务器版本为准。");
+      } else if (response.data?.snapshotStatus === "failed") {
+        setStructureSaveNotice("世界内容已保存，历史快照未完成。");
+      } else {
+        setStructureSaveNotice(null);
+      }
+      await invalidateWorld(payload.worldId);
+    },
+    onError: (error, payload) => {
+      if (!isCurrentWorldStructureResponse(id, payload.worldId) || structureOperationIdRef.current !== payload.operationId) {
+        return;
+      }
+      const apiError = error as ApiHttpError;
+      const guard = worldStructureSaveGuardForError(apiError);
+      if (guard === "conflict") {
+        structureOperationIdRef.current = null;
+        structureOperationIntentRef.current = null;
+        setStructureSaveGuard("conflict");
+        setStructureSaveNotice("世界内容已变化，当前草稿已保留；请先重新读取当前内容，再决定是否提交。");
+      } else if (guard === "read_required") {
+        structureOperationIdRef.current = null;
+        structureOperationIntentRef.current = null;
+        setStructureSaveGuard("read_required");
+        setStructureSaveNotice("保存需要当前世界版本，请重新读取世界内容后再提交。");
+      } else if (guard === "unknown") {
+        setStructureSaveGuard("unknown");
+        setStructureSaveNotice("保存状态待确认；请使用同一份草稿再次保存以确认结果。");
+      }
+    },
   });
   const saveAxiomsMutation = useMutation({
-    mutationFn: (axioms: string[]) => updateWorldAxioms(id, axioms),
-    onSuccess: invalidateWorld,
+    mutationFn: (payload: {
+      worldId: string;
+      axioms: string[];
+      operationId: string;
+      expectedContentRevision: number;
+    }) => updateWorldAxioms(payload.worldId, payload.axioms, {
+      operationId: payload.operationId,
+      expectedContentRevision: payload.expectedContentRevision,
+    }),
+    retry: (failureCount, error) => {
+      return shouldRetryWorldAxiomsSave(error as ApiHttpError, failureCount);
+    },
+    onSuccess: async (_response, payload) => {
+      if (payload.worldId !== id || axiomsOperationIdRef.current !== payload.operationId) {
+        return;
+      }
+      axiomsOperationIdRef.current = null;
+      await invalidateWorld();
+    },
+    onError: (error, payload) => {
+      if (
+        payload.worldId === id
+        && axiomsOperationIdRef.current === payload.operationId
+        && shouldResetWorldAxiomsOperation(error as ApiHttpError)
+      ) {
+        axiomsOperationIdRef.current = null;
+      }
+    },
   });
   const backfillStructureMutation = useMutation({
     mutationFn: () => backfillWorldStructure(id, { provider: llm.provider, model: llm.model }),
@@ -238,7 +364,7 @@ export default function WorldWorkspace() {
   });
   const snapshotRestoreMutation = useMutation({
     mutationFn: (snapshotId: string) => restoreWorldSnapshot(id, snapshotId),
-    onSuccess: invalidateWorld,
+    onSuccess: () => invalidateWorld(),
   });
   const snapshotDiffMutation = useMutation({
     mutationFn: () => diffWorldSnapshots(id, diffFrom, diffTo),
@@ -281,7 +407,78 @@ export default function WorldWorkspace() {
     },
   });
 
-  const refineSSE = useSSE({ onDone: invalidateWorld });
+  const saveStructure = async (
+    structure: WorldStructuredData,
+    bindingSupport: WorldBindingSupport,
+  ): Promise<WorldStructureSaveOutcome> => {
+    if (!world || !id || !Number.isInteger(world.contentRevision)) {
+      setStructureSaveNotice("需要先读取当前世界版本，才能保存结构。");
+      throw new Error("World content revision is unavailable.");
+    }
+    const { payload, pending } = createWorldStructureSaveIntent({
+      worldId: id,
+      structure,
+      bindingSupport,
+      currentContentRevision: world.contentRevision,
+    }, structureOperationIntentRef.current);
+    const operationId = payload.operationId;
+    structureOperationIdRef.current = operationId;
+    structureOperationIntentRef.current = pending;
+    const response = await saveStructureMutation.mutateAsync(payload);
+    return response.data?.maintenance?.state === "replayed" ? "replayed" : "committed";
+  };
+
+  const reloadSavedStructure = async () => {
+    if (!id) {
+      return;
+    }
+    const requestedWorldId = id;
+    const requestToken = structureReadRequestTokenRef.current + 1;
+    structureReadRequestTokenRef.current = requestToken;
+    try {
+      const [structureResponse] = await Promise.all([
+        structureQuery.refetch(),
+        worldDetailQuery.refetch(),
+      ]);
+      const payload = structureResponse.data?.data;
+      if (!isCurrentWorldStructureRead({
+        currentWorldId: currentWorldIdRef.current ?? "",
+        requestedWorldId,
+        currentRequestToken: structureReadRequestTokenRef.current,
+        requestToken,
+      })) {
+        return;
+      }
+      if (!payload || payload.worldId !== requestedWorldId) {
+        setStructureSaveGuard("read_required");
+        setStructureSaveNotice("暂时无法读取已保存的世界内容，请稍后再试。");
+        return;
+      }
+      structureOperationIdRef.current = null;
+      structureOperationIntentRef.current = null;
+      setReplayServerPayloadKey(null);
+      setExplicitReadPayloadKey(structurePayloadKey(payload.structure, payload.bindingSupport));
+      setStructureSaveGuard("none");
+      setStructureSaveNotice(null);
+    } catch {
+      if (!isCurrentWorldStructureRead({
+        currentWorldId: currentWorldIdRef.current ?? "",
+        requestedWorldId,
+        currentRequestToken: structureReadRequestTokenRef.current,
+        requestToken,
+      })) {
+        return;
+      }
+      setStructureSaveGuard("read_required");
+      setStructureSaveNotice("暂时无法读取已保存的世界内容，请稍后再试。");
+    }
+  };
+
+  const handleReplayServerPayloadAdopted = useCallback(() => {
+    setStructureSaveGuard("none");
+  }, []);
+
+  const refineSSE = useSSE({ onDone: () => invalidateWorld() });
 
   const handleExport = async (format: "markdown" | "json") => {
     const response = await exportWorldData(id, format);
@@ -380,12 +577,15 @@ export default function WorldWorkspace() {
             <WorldHandbookEditor
               initialPayload={structureQuery.data?.data}
               savePending={saveStructureMutation.isPending}
+              saveNotice={structureSaveNotice}
+              saveGuard={structureSaveGuard}
+              replayServerPayloadKey={replayServerPayloadKey}
+              explicitReadPayloadKey={explicitReadPayloadKey}
+              onReplayServerPayloadAdopted={handleReplayServerPayloadAdopted}
+              onReloadSavedStructure={reloadSavedStructure}
               backfillPending={backfillStructureMutation.isPending}
               generatePending={generateStructureMutation.isPending}
-              onSave={async (structure, bindingSupport) => {
-                await saveStructureMutation.mutateAsync({ structure, bindingSupport });
-                await invalidateWorld();
-              }}
+              onSave={saveStructure}
               onBackfill={async () => {
                 const response = await backfillStructureMutation.mutateAsync();
                 await invalidateWorld();
@@ -427,18 +627,33 @@ export default function WorldWorkspace() {
                 <WorldAxiomsCard
                   rawAxioms={world?.axioms}
                   savePending={saveAxiomsMutation.isPending}
-                  onSave={(axioms) => saveAxiomsMutation.mutate(axioms)}
+                  onSave={(axioms) => {
+                    if (!world || !Number.isInteger(world.contentRevision)) {
+                      return;
+                    }
+                    const payload = createWorldAxiomsSavePayload(
+                      axioms,
+                      world.contentRevision,
+                      axiomsOperationIdRef.current,
+                      createWorldAxiomsOperationId,
+                    );
+                    axiomsOperationIdRef.current = payload.operationId;
+                    saveAxiomsMutation.mutate({ ...payload, worldId: id });
+                  }}
                 />
               ) : null}
               <WorldStructureTab
                 initialPayload={structureQuery.data?.data}
                 savePending={saveStructureMutation.isPending}
+                saveNotice={structureSaveNotice}
+                saveGuard={structureSaveGuard}
+                replayServerPayloadKey={replayServerPayloadKey}
+                explicitReadPayloadKey={explicitReadPayloadKey}
+                onReplayServerPayloadAdopted={handleReplayServerPayloadAdopted}
+                onReloadSavedStructure={reloadSavedStructure}
                 backfillPending={backfillStructureMutation.isPending}
                 generatePending={generateStructureMutation.isPending}
-                onSave={async (structure, bindingSupport) => {
-                  await saveStructureMutation.mutateAsync({ structure, bindingSupport });
-                  await invalidateWorld();
-                }}
+                onSave={saveStructure}
                 onBackfill={async () => {
                   const response = await backfillStructureMutation.mutateAsync();
                   await invalidateWorld();
@@ -509,6 +724,7 @@ export default function WorldWorkspace() {
         <TabsContent value="deepening">
           <WorldDeepeningTab
             questions={visibleDeepeningQuestions}
+            integratedQuestionCount={integratedDeepeningQuestionCount}
             answerDrafts={answerDrafts}
             setAnswerDrafts={setAnswerDrafts}
             llmQuickOptions={llmQuickOptions}

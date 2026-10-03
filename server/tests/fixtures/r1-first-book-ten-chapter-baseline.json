@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "r1-first-book-ten-chapter-v1",
+  "description": "Release 1 第一本书：从一句想法到十章、恢复、局部质量债、资料更新和 TXT 导出的确定性基线。",
+  "execution": {
+    "regressionMode": "deterministic_mock",
+    "provider": "deterministic_mock",
+    "model": "r1-02-script-v1",
+    "temporarySqlite": true,
+    "networkAllowed": false,
+    "paidModelCallsExpected": 0,
+    "realModelSample": {
+      "includedInRegression": false,
+      "requiresExplicitApproval": true,
+      "requiresBudget": true,
+      "recordsSeparately": true
+    }
+  },
+  "idea": "城市停电后，第一次独自值夜班的地铁检修员发现末班车仍在运送被遗忘的记忆。",
+  "book": {
+    "title": "零点回声线",
+    "description": "新手检修员沿着停运线路寻找失踪乘客，也逐步确认城市用记忆维持供电的秘密。",
+    "targetAudience": "喜欢都市悬疑与轻科幻的读者",
+    "bookSellingPoint": "封闭地铁、记忆票据与新手检修员的连续十夜追踪",
+    "estimatedChapterCount": 10
+  },
+  "directorPreparation": {
+    "workflowTaskId": "r1_02_director_task",
+    "checkpointType": "chapter_pipeline_ready",
+    "checkpointSummary": "十章标题、主角、世界和书级承诺已保存，可开始章节流水线。"
+  },
+  "interruption": {
+    "chapterOrder": 6,
+    "issueCode": "runtime.model_unavailable",
+    "expectedStatus": "waiting_recovery",
+    "expectedSavedChapterOrders": [1, 2, 3, 4, 5],
+    "resumeAction": "resume_pipeline_job"
+  },
+  "qualityDebt": {
+    "chapterOrder": 8,
+    "issueCode": "quality.chapter_below_threshold",
+    "terminalAction": "defer_and_continue",
+    "expectedBookProgress": "continues_to_chapter_10"
+  },
+  "worldUpdate": {
+    "field": "conflicts",
+    "value": "零点列车每带走一段记忆，城市供电就延长一夜；主角决定停止这笔交换。"
+  },
+  "characterUpdate": {
+    "name": "林澈",
+    "currentState": "已确认零点列车以乘客记忆换取城市供电",
+    "currentGoal": "在下一次停电前终止记忆交易并救回失踪乘客"
+  },
+  "chapters": [
+    { "order": 1, "title": "停运后的末班车", "content": "停电后的零点，林澈在封闭站台看见一列没有编号的末班车缓缓进站。" },
+    { "order": 2, "title": "空白车票", "content": "车厢里只留下一张空白车票，背面却写着失踪乘客昨夜的记忆。" },
+    { "order": 3, "title": "检修日志里的陌生字迹", "content": "林澈翻出旧日志，发现每次全城停电都有人提前记录零点列车的到站时间。" },
+    { "order": 4, "title": "被删去的站名", "content": "线路图上被刮去的第十三站重新亮起，广播要求林澈交出最珍贵的一段记忆。" },
+    { "order": 5, "title": "第一位归客", "content": "一名失踪乘客回到站台，却完全不记得自己的女儿，只记得城市从未停电。" },
+    { "order": 6, "title": "中断的零点信号", "content": "远程信号突然中断，林澈保住前五夜的记录后，从第六夜的保存边界重新接续调查。" },
+    { "order": 7, "title": "记忆变电所", "content": "林澈在废弃换乘厅找到记忆变电所，确认零点列车正把乘客往事转换成电力。" },
+    { "order": 8, "title": "代价未清的选择", "content": "林澈救下一段记忆，却没能解释供电缺口；这项局部质量债被记录，但调查继续。" },
+    { "order": 9, "title": "全城熄灯倒计时", "content": "城市进入熄灯倒计时，林澈把列车规则和失踪名单交给仍愿意相信他的同伴。" },
+    { "order": 10, "title": "零点之后", "content": "林澈让零点列车停在第十三站，失踪乘客带着残缺记忆回家，城市第一次学会承受黑夜。" }
+  ],
+  "stages": [
+    {
+      "id": "idea",
+      "factSource": "NovelIntentVersion.originalExpression",
+      "expectedStatus": "accepted",
+      "sourceRoute": "/novels/auto-director",
+      "sourceAction": "提交一句想法并确认开书意图",
+      "failureRecovery": "保留输入并在自动导演来源页重新提交"
+    },
+    {
+      "id": "director_preparation",
+      "factSource": "NovelWorkflowTask.checkpointType + StoryMacroPlan + BookContract + Chapter",
+      "expectedStatus": "chapter_pipeline_ready",
+      "sourceRoute": "/novels/{novelId}/edit",
+      "sourceAction": "检查导演准备结果并开始章节流水线",
+      "failureRecovery": "从已保存导演检查点继续，不重建已存在的小说"
+    },
+    {
+      "id": "chapter_run",
+      "factSource": "GenerationJob + Chapter + ChapterArtifactSyncCheckpoint",
+      "expectedStatus": "running_then_waiting_recovery",
+      "sourceRoute": "/novels/{novelId}/edit",
+      "sourceAction": "运行第 1 至 10 章",
+      "failureRecovery": "保留已越过正文资产边界的章节"
+    },
+    {
+      "id": "interruption_recovery",
+      "factSource": "GenerationJob.pendingManualRecovery + completedCount",
+      "expectedStatus": "resumed_then_succeeded",
+      "sourceRoute": "/novels/{novelId}/edit",
+      "sourceAction": "在小说工作台恢复同一流水线任务",
+      "failureRecovery": "仍停留在来源页并保持已保存章节不变"
+    },
+    {
+      "id": "local_quality_debt",
+      "factSource": "Chapter.riskFlags.qualityLoop + QualityReport + GenerationJob.payload",
+      "expectedStatus": "defer_and_continue",
+      "sourceRoute": "/novels/{novelId}/chapters/{chapterId}",
+      "sourceAction": "查看第 8 章待优化项",
+      "failureRecovery": "正文可读时记录局部债并继续剩余章节"
+    },
+    {
+      "id": "world_character_update",
+      "factSource": "World + Character",
+      "expectedStatus": "persisted",
+      "sourceRoute": "/novels/{novelId}/edit",
+      "sourceAction": "在本书工作台更新世界冲突与主角目标",
+      "failureRecovery": "更新失败不改变十章正文，可在来源模块重试"
+    },
+    {
+      "id": "txt_export",
+      "factSource": "NovelExportService ordered Chapter projection",
+      "expectedStatus": "ten_chapters_in_order",
+      "sourceRoute": "/novels/{novelId}/edit",
+      "sourceAction": "导出整本 TXT",
+      "failureRecovery": "修复导出问题后重试，不重新生成正文"
+    }
+  ]
+}

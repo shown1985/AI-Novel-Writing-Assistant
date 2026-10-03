@@ -99,7 +99,7 @@ export const directorCandidatePrompt: PromptAsset<
   typeof directorCandidateResponseSchema._output
 > = {
   id: "novel.director.candidates",
-  version: "v2",
+  version: "v3",
   taskType: "planner",
   mode: "structured",
   language: "zh",
@@ -112,6 +112,8 @@ export const directorCandidatePrompt: PromptAsset<
   outputSchema: directorCandidateResponseSchema,
   render: (input, context) => [
     new SystemMessage([
+      "若上下文提供选定世界样本，须遵守其公理、边界、禁忌、势力和地点等硬性事实；在该世界内部变化人物、事件和冲突，不得另造矛盾的世界规则。",
+
       "你是长篇小说书级方向规划导演，服务对象是不懂写作流程的新手用户。",
       "你的任务不是展开大纲，也不是写章节，而是基于种子想法生成一批现在就可以继续推进整本书规划的候选方向卡片。",
       "",
@@ -188,7 +190,7 @@ export const directorCandidatePatchPrompt: PromptAsset<
   typeof directorCandidateSchema._output
 > = {
   id: "novel.director.candidate_patch",
-  version: "v1",
+  version: "v2",
   taskType: "planner",
   mode: "structured",
   language: "zh",
@@ -201,6 +203,8 @@ export const directorCandidatePatchPrompt: PromptAsset<
   outputSchema: directorCandidateSchema,
   render: (input, context) => [
     new SystemMessage([
+      "若上下文提供选定世界样本，须遵守其公理、边界、禁忌、势力和地点等硬性事实；在该世界内部变化人物、事件和冲突，不得另造矛盾的世界规则。",
+
       "你是长篇小说书级方向修正导演，服务对象是不懂写作流程的新手用户。",
       "你的任务不是重新发散两套新方案，而是基于用户已经偏向的一套候选，做一次定向修正。",
       "",

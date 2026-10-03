@@ -16,6 +16,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import WorldFactionsSection from "./structure/WorldFactionsSection";
 import WorldRelationsSection from "./structure/WorldRelationsSection";
+import {
+  shouldAdoptWorldStructurePayload,
+  structurePayloadKey,
+  type WorldStructureSaveGuard,
+  type WorldStructureSaveOutcome,
+} from "../../worldStructureSave";
 
 const SECTION_OPTIONS: Array<{ value: WorldStructureSectionKey; label: string }> = [
   { value: "profile", label: "世界概要" },
@@ -39,9 +45,15 @@ function parseTextList(value: string): string[] {
 export default function WorldStructureTab(props: {
   initialPayload?: WorldStructurePayload;
   savePending: boolean;
+  saveNotice?: string | null;
+  saveGuard?: WorldStructureSaveGuard;
+  replayServerPayloadKey?: string | null;
+  explicitReadPayloadKey?: string | null;
+  onReplayServerPayloadAdopted: () => void;
+  onReloadSavedStructure: () => Promise<void>;
   backfillPending: boolean;
   generatePending: boolean;
-  onSave: (structure: WorldStructuredData, bindingSupport: WorldBindingSupport) => Promise<void>;
+  onSave: (structure: WorldStructuredData, bindingSupport: WorldBindingSupport) => Promise<WorldStructureSaveOutcome>;
   onBackfill: () => Promise<{ structure: WorldStructuredData; bindingSupport: WorldBindingSupport } | undefined>;
   onGenerate: (
     section: WorldStructureSectionKey,
@@ -49,20 +61,81 @@ export default function WorldStructureTab(props: {
     bindingSupport: WorldBindingSupport,
   ) => Promise<{ structure: WorldStructuredData; bindingSupport: WorldBindingSupport } | undefined>;
 }) {
-  const { initialPayload, savePending, backfillPending, generatePending, onSave, onBackfill, onGenerate } = props;
+  const {
+    initialPayload,
+    savePending,
+    saveNotice,
+    saveGuard = "none",
+    replayServerPayloadKey = null,
+    explicitReadPayloadKey = null,
+    onReplayServerPayloadAdopted,
+    onReloadSavedStructure,
+    backfillPending,
+    generatePending,
+    onSave,
+    onBackfill,
+    onGenerate,
+  } = props;
   const [activeSection, setActiveSection] = useState<WorldStructureSectionKey>("profile");
   const [draftStructure, setDraftStructure] = useState<WorldStructuredData | null>(initialPayload?.structure ?? null);
   const [draftBindingSupport, setDraftBindingSupport] = useState<WorldBindingSupport | null>(
     initialPayload?.bindingSupport ?? null,
   );
-
+  const initialPayloadKey = structurePayloadKey(initialPayload?.structure, initialPayload?.bindingSupport);
+  const [syncedPayloadKey, setSyncedPayloadKey] = useState(initialPayloadKey);
+  const [syncedWorldId, setSyncedWorldId] = useState(initialPayload?.worldId ?? null);
+  const [replaySyncedPayloadKey, setReplaySyncedPayloadKey] = useState<string | null>(null);
+  const [explicitReadSyncedPayloadKey, setExplicitReadSyncedPayloadKey] = useState<string | null>(null);
   useEffect(() => {
     if (!initialPayload) {
       return;
     }
+    const incomingPayloadKey = structurePayloadKey(initialPayload.structure, initialPayload.bindingSupport);
+    const replaySyncConsumed = Boolean(
+      replayServerPayloadKey && replaySyncedPayloadKey === replayServerPayloadKey,
+    );
+    const explicitReadConsumed = Boolean(
+      explicitReadPayloadKey && explicitReadSyncedPayloadKey === explicitReadPayloadKey,
+    );
+    if (!shouldAdoptWorldStructurePayload({
+      syncedWorldId,
+      incomingWorldId: initialPayload.worldId,
+      incomingPayloadKey,
+      draftPayloadKey: structurePayloadKey(draftStructure, draftBindingSupport),
+      syncedPayloadKey,
+      saveGuard,
+      replayServerPayloadKey,
+      replaySyncConsumed,
+      explicitReadPayloadKey,
+      explicitReadConsumed,
+    })) {
+      return;
+    }
     setDraftStructure(initialPayload.structure);
     setDraftBindingSupport(initialPayload.bindingSupport);
-  }, [initialPayload]);
+    setSyncedPayloadKey(incomingPayloadKey);
+    setSyncedWorldId(initialPayload.worldId);
+    if (replayServerPayloadKey && !replaySyncConsumed && replayServerPayloadKey === incomingPayloadKey) {
+      setReplaySyncedPayloadKey(replayServerPayloadKey);
+      onReplayServerPayloadAdopted();
+    }
+    if (explicitReadPayloadKey && !explicitReadConsumed && explicitReadPayloadKey === incomingPayloadKey) {
+      setExplicitReadSyncedPayloadKey(explicitReadPayloadKey);
+    }
+  }, [
+    draftBindingSupport,
+    draftStructure,
+    explicitReadPayloadKey,
+    explicitReadSyncedPayloadKey,
+    initialPayload,
+    initialPayloadKey,
+    replayServerPayloadKey,
+    replaySyncedPayloadKey,
+    onReplayServerPayloadAdopted,
+    saveGuard,
+    syncedPayloadKey,
+    syncedWorldId,
+  ]);
 
   const hasStructuredData = Boolean(initialPayload?.hasStructuredData);
   const factionNameById = useMemo(
@@ -108,6 +181,16 @@ export default function WorldStructureTab(props: {
               </Button>
             ))}
           </div>
+          {saveNotice ? (
+            <div role="status" aria-live="polite" className="flex flex-wrap items-center gap-2 text-sm text-amber-700">
+              <span>{saveNotice}</span>
+              {saveGuard === "conflict" || saveGuard === "unknown" || saveGuard === "read_required" || saveGuard === "replayed" ? (
+                <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => void onReloadSavedStructure()} disabled={savePending}>
+                  放弃当前草稿并读取已保存内容
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
           <div className="flex flex-wrap gap-2">
             <Button
               variant="secondary"
@@ -135,7 +218,20 @@ export default function WorldStructureTab(props: {
             >
               {generatePending ? "补全中..." : "AI 补全当前区块"}
             </Button>
-            <Button onClick={() => void onSave(draftStructure, draftBindingSupport)} disabled={savePending}>
+            <Button
+              onClick={async () => {
+                try {
+                  const outcome = await onSave(draftStructure, draftBindingSupport);
+                  if (outcome !== "replayed") {
+                    setSyncedPayloadKey(structurePayloadKey(draftStructure, draftBindingSupport));
+                    setSyncedWorldId(initialPayload?.worldId ?? null);
+                  }
+                } catch {
+                  // Keep the local draft visible after a conflict or an unknown result.
+                }
+              }}
+              disabled={savePending}
+            >
               {savePending ? "保存中..." : "保存结构"}
             </Button>
           </div>

@@ -199,10 +199,6 @@ export class WorldContextGateway {
   ) {}
 
   async hasActiveWorld(novelId: string): Promise<boolean> {
-    const novelWorld = await this.novelWorldService.ensureFromLegacyNovel(novelId);
-    if (novelWorld) {
-      return true;
-    }
     const view = await this.worldSliceService.getWorldSliceView(novelId);
     return view.hasWorld;
   }
@@ -211,26 +207,36 @@ export class WorldContextGateway {
     novelId: string,
     options: WorldContextGatewayOptions,
   ): Promise<WorldContextBlock | null> {
-    const novelWorld = await this.novelWorldService.ensureFromLegacyNovel(novelId);
+    const novelWorld = await this.novelWorldService.getByNovelId(novelId);
     const builderMode = mapPurposeToBuilderMode(options.purpose);
-    const slice = options.forceRefresh
-      ? (await this.worldSliceService.refreshWorldSlice(novelId, {
+    let slice: StoryWorldSlice | null;
+    if (options.forceRefresh) {
+      const refreshed = await this.worldSliceService.refreshWorldSlice(novelId, {
         builderMode,
         storyInput: options.storyInput,
         provider: options.provider,
         model: options.model,
         temperature: options.temperature,
-      })).slice
-      : await this.worldSliceService.ensureStoryWorldSlice(novelId, {
+      });
+      // A refresh result is consumable only after the conditional cache write
+      // committed. Stale observations are for inspection, never context.
+      slice = refreshed.slice && !refreshed.isStale ? refreshed.slice : null;
+    } else {
+      slice = await this.worldSliceService.ensureStoryWorldSlice(novelId, {
         builderMode,
         storyInput: options.storyInput,
       });
+    }
 
     if (!slice) {
       return null;
     }
-    await this.novelWorldService.persistStorySlice(novelId, slice);
+    // Slice service is the sole cache writer. The second read is only needed
+    // when a legacy call created the instance during ensure/refresh.
     const persistedNovelWorld = novelWorld ?? await this.novelWorldService.getByNovelId(novelId);
+    if (!persistedNovelWorld) {
+      return null;
+    }
 
     return buildWorldContextBlockFromSlice({
       slice,

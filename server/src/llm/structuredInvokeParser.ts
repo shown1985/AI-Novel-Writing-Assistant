@@ -1,5 +1,5 @@
 import { z, type ZodError, type ZodType } from "zod";
-import type { LLMProvider } from "@ai-novel/shared/types/llm";
+import type { LLMProvider, ReasoningEffort } from "@ai-novel/shared/types/llm";
 import type { ModelRouteRequestProtocol } from "@ai-novel/shared/types/novel";
 import type { TaskType } from "./modelRouter";
 import { relaxGeneratedContentSchema } from "./generatedContentSchema";
@@ -18,6 +18,8 @@ import {
 import { extractJSONValue } from "../services/novel/novelP0Utils";
 import type { PromptInvocationMeta } from "../prompting/core/promptTypes";
 import type { LlmTokenUsageSnapshot } from "./usageTracking";
+import type { ModelAttemptCandidate } from "../platform/llm/provenance";
+import type { ModelAttemptExecutionEvidence } from "../platform/llm/provenance/attempts/contracts";
 
 export interface StructuredInvokeResult<T> {
   data: T;
@@ -25,6 +27,10 @@ export interface StructuredInvokeResult<T> {
   repairAttempts: number;
   diagnostics: StructuredOutputDiagnostics;
   tokenUsage?: LlmTokenUsageSnapshot | null;
+  /** Internal-only handle finalized after product validation chooses a candidate. */
+  modelAttemptCandidate?: ModelAttemptCandidate | null;
+  modelAttemptUsage?: LlmTokenUsageSnapshot | null;
+  attemptEvidence?: ModelAttemptExecutionEvidence;
 }
 
 export interface StructuredInvokeRawParseInput<T> {
@@ -43,6 +49,8 @@ export interface StructuredInvokeRawParseInput<T> {
   requestProtocol?: ModelRouteRequestProtocol;
   label: string;
   maxRepairAttempts?: number;
+  /** Only single-transport calls classify an unparseable zero-repair response as malformed_json. */
+  classifyZeroRepairParseFailure?: boolean;
   promptMeta?: PromptInvocationMeta;
   onRepairOutputDelta?: (content: string) => void;
   strategy: StructuredOutputStrategy;
@@ -50,6 +58,10 @@ export interface StructuredInvokeRawParseInput<T> {
   fallbackAvailable?: boolean;
   fallbackUsed?: boolean;
   reasoningForcedOff?: boolean;
+  reasoningChars?: number;
+  reasoningEnabled?: boolean;
+  reasoningEffort?: ReasoningEffort;
+  modelAttemptCandidate?: ModelAttemptCandidate | null;
 }
 
 function tryFixTruncatedJson(raw: string): string {
@@ -251,6 +263,7 @@ export function logStructuredInvokeEvent(input: {
   taskType?: TaskType;
   latencyMs?: number;
   rawChars?: number;
+  reasoningChars?: number;
   repairAttempt?: number;
   strategy?: StructuredOutputStrategy;
   errorCategory?: StructuredOutputErrorCategory | null;
@@ -270,6 +283,7 @@ export function logStructuredInvokeEvent(input: {
       typeof input.repairAttempt === "number" ? `repairAttempt=${input.repairAttempt}` : "",
       typeof input.latencyMs === "number" ? `latencyMs=${input.latencyMs}` : "",
       typeof input.rawChars === "number" ? `rawChars=${input.rawChars}` : "",
+      typeof input.reasoningChars === "number" ? `reasoningChars=${input.reasoningChars}` : "",
       input.fallbackUsed ? "fallbackUsed=true" : "",
       input.reasoningForcedOff ? "reasoningForcedOff=true" : "",
     ].filter(Boolean).join(" "),
@@ -371,10 +385,24 @@ export async function parseStructuredLlmRawContentDetailed<T>(
     fallbackUsed: input.fallbackUsed,
   });
   if (!input.rawContent.trim()) {
+    const category = classifyStructuredOutputFailure({
+      rawContent: input.rawContent,
+      tokenUsage: input.tokenUsage,
+      maxTokens: input.maxTokens,
+      reasoningChars: input.reasoningChars,
+    });
+    const message = category === "reasoning_budget_exhausted"
+      ? `[${input.label}] 模型将输出额度用于思考，未返回结构化正文。请降低思考深度后重试。`
+      : category === "output_truncated"
+        ? `[${input.label}] 模型输出在完成前达到额度上限。请降低生成规模或增加输出预算后重试。`
+        : `[${input.label}] 模型没有返回可用内容，无法执行结构校验或 JSON 修复。`;
     throw buildStructuredError({
-      message: `[${input.label}] 模型没有返回可用内容，无法执行结构校验或 JSON 修复。`,
-      category: "transport_error",
-      retryWithNextStrategy: input.strategy !== "prompt_json",
+      message,
+      category,
+      // A plain empty response (no reasoning/budget evidence) can come from a vendor that does not
+      // honor the native structured mode; fall back to the next strategy. Budget exhaustion and
+      // truncation keep stopping so the user gets an actionable hint instead of repeated calls.
+      retryWithNextStrategy: category === "empty_content" && input.strategy !== "prompt_json",
       strategy: input.strategy,
       profile: input.profile,
       reasoningForcedOff: input.reasoningForcedOff,
@@ -388,17 +416,21 @@ export async function parseStructuredLlmRawContentDetailed<T>(
 
   const maxRepairAttempts = input.maxRepairAttempts ?? 1;
   if (parseErrorMessage) {
+    await input.modelAttemptCandidate?.finalizeSucceeded(input.tokenUsage, "not_adopted");
     for (let attempt = 1; attempt <= maxRepairAttempts; attempt += 1) {
       try {
+        const repaired = await repairWithLlm<T>({
+          ...input,
+          schema: runtimeSchema,
+        }, input.rawContent, parseErrorMessage, attempt, getRepairHelpers<T>());
         return {
-          data: await repairWithLlm<T>({
-            ...input,
-            schema: runtimeSchema,
-          }, input.rawContent, parseErrorMessage, attempt, getRepairHelpers<T>()),
+          data: repaired.data,
           repairUsed: true,
           repairAttempts: attempt,
           diagnostics,
           tokenUsage: input.tokenUsage ?? null,
+          modelAttemptCandidate: repaired.modelAttemptCandidate,
+          modelAttemptUsage: repaired.tokenUsage,
         };
       } catch (repairError) {
         if (attempt >= maxRepairAttempts) {
@@ -417,6 +449,20 @@ export async function parseStructuredLlmRawContentDetailed<T>(
         }
       }
     }
+    // Single-transport calls have a zero repair budget: a non-empty response
+    // that cannot be parsed is malformed JSON, not a schema miss. Other
+    // zero-repair callers keep the legacy schema-validation classification.
+    if (input.classifyZeroRepairParseFailure === true) {
+      throw buildStructuredError({
+        message: `[${input.label}] JSON 解析失败，且本次调用不允许 JSON 修复。错误：${parseErrorMessage}`,
+        category: "malformed_json",
+        strategy: input.strategy,
+        profile: input.profile,
+        reasoningForcedOff: input.reasoningForcedOff,
+        fallbackAvailable: input.fallbackAvailable,
+        fallbackUsed: input.fallbackUsed,
+      });
+    }
   }
 
   const first = runtimeSchema.safeParse(parsed);
@@ -427,6 +473,8 @@ export async function parseStructuredLlmRawContentDetailed<T>(
       repairAttempts: 0,
       diagnostics,
       tokenUsage: input.tokenUsage ?? null,
+      modelAttemptCandidate: input.modelAttemptCandidate ?? null,
+      modelAttemptUsage: input.tokenUsage ?? null,
     };
   }
 
@@ -448,6 +496,8 @@ export async function parseStructuredLlmRawContentDetailed<T>(
       repairAttempts: 0,
       diagnostics,
       tokenUsage: input.tokenUsage ?? null,
+      modelAttemptCandidate: input.modelAttemptCandidate ?? null,
+      modelAttemptUsage: input.tokenUsage ?? null,
     };
   }
 
@@ -469,21 +519,27 @@ export async function parseStructuredLlmRawContentDetailed<T>(
       repairAttempts: 0,
       diagnostics,
       tokenUsage: input.tokenUsage ?? null,
+      modelAttemptCandidate: input.modelAttemptCandidate ?? null,
+      modelAttemptUsage: input.tokenUsage ?? null,
     };
   }
 
   let zodError: ZodError = first.error;
+  await input.modelAttemptCandidate?.finalizeSucceeded(input.tokenUsage, "not_adopted");
   for (let attempt = 1; attempt <= maxRepairAttempts; attempt += 1) {
     try {
+      const repaired = await repairWithLlm<T>({
+        ...input,
+        schema: runtimeSchema,
+      }, input.rawContent, `Zod 校验错误：\n${formatZodErrors(zodError)}`, attempt, getRepairHelpers<T>());
       return {
-        data: await repairWithLlm<T>({
-          ...input,
-          schema: runtimeSchema,
-        }, input.rawContent, `Zod 校验错误：\n${formatZodErrors(zodError)}`, attempt, getRepairHelpers<T>()),
+        data: repaired.data,
         repairUsed: true,
         repairAttempts: attempt,
         diagnostics,
         tokenUsage: input.tokenUsage ?? null,
+        modelAttemptCandidate: repaired.modelAttemptCandidate,
+        modelAttemptUsage: repaired.tokenUsage,
       };
     } catch (error) {
       if (attempt >= maxRepairAttempts) {

@@ -28,10 +28,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useLLMStore } from "@/store/llmStore";
+import { resetDiagnosticReadinessAfterConfigurationChange } from "@/pages/settings/diagnostics";
 import {
   shouldInitializeProviderSelection,
   shouldShowFirstNovelHandoff,
 } from "./creationSetupState";
+import CurrentModelReasoningSettings from "./CurrentModelReasoningSettings";
 
 interface QuickSetupDialogProps {
   open: boolean;
@@ -76,10 +78,12 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
   const [customModels, setCustomModels] = useState<string[]>([]);
   const [customModelsMessage, setCustomModelsMessage] = useState("");
   const [showAllProviderChoices, setShowAllProviderChoices] = useState(false);
+  const [showConnectionWizard, setShowConnectionWizard] = useState(false);
 
   useEffect(() => {
     if (props.open && props.forceConfiguration) {
       setStep(1);
+      setShowConnectionWizard(false);
     }
   }, [props.forceConfiguration, props.open]);
 
@@ -130,18 +134,24 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
   const completeMutation = useMutation({
     mutationFn: (payload: CompleteQuickSetupRequest) => completeQuickSetup(payload),
     onSuccess: async (response) => {
-      if (response.data) {
-        llmStore.setSelection({
-          provider: response.data.provider,
-          model: response.data.model,
-        });
-      }
+      if (!response.data) return;
+      // The provider list is refreshed before changing the global selection.
+      // Otherwise LLMSelector can briefly see the old provider cache and
+      // persist its fallback (usually Ollama) over the newly configured one.
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: queryKeys.settings.apiKeys, type: "active" }),
+        queryClient.refetchQueries({ queryKey: queryKeys.settings.llmSelection, type: "active" }),
+      ]);
+      llmStore.setSelection({
+        provider: response.data.provider,
+        model: response.data.model,
+      });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.settings.quickSetup }),
         queryClient.invalidateQueries({ queryKey: queryKeys.settings.apiKeys }),
         queryClient.invalidateQueries({ queryKey: queryKeys.settings.llmSelection }),
         queryClient.invalidateQueries({ queryKey: queryKeys.settings.modelRoutes }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.settings.modelRouteConnectivity }),
+        resetDiagnosticReadinessAfterConfigurationChange(queryClient, queryKeys.settings.modelRouteReadiness),
         queryClient.invalidateQueries({ queryKey: queryKeys.onboarding.firstNovel }),
       ]);
     },
@@ -207,6 +217,15 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
     configurationSucceeded: completeMutation.isSuccess,
     forceConfiguration: props.forceConfiguration === true,
   });
+  const currentProvider = llmStore.hasHydratedSelection && llmStore.provider
+    ? llmStore.provider : props.status?.selectedProvider ?? null;
+  const currentModel = llmStore.hasHydratedSelection && llmStore.model
+    ? llmStore.model : props.status?.selectedModel ?? null;
+  const showCurrentSettings = Boolean(
+    props.forceConfiguration
+    && !showConnectionWizard
+    && props.status?.providers.some((provider) => provider.id === currentProvider && provider.configured),
+  );
 
   const submit = () => {
     setStep(3);
@@ -220,7 +239,7 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
     });
   };
 
-  const footer = props.loading || props.error || (props.status?.readyForCreation && !props.forceConfiguration)
+  const footer = props.loading || props.error || showCurrentSettings || (props.status?.readyForCreation && !props.forceConfiguration)
     ? null
     : step === 1
       ? (
@@ -261,12 +280,12 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <AppDialogContent
         className="max-w-3xl"
-        title="让 AI 创作环境先跑起来"
-        description="只配置一个文本模型，系统会自动准备规划、正文、审校和修复所需的任务路由。"
+        title={showCurrentSettings ? "模型设置" : "让 AI 创作环境先跑起来"}
+        description={showCurrentSettings ? "查看当前模型，调整这个模型连接的推理强度。" : "只配置一个文本模型，系统会自动准备规划、正文、审校和修复所需的任务路由。"}
         footer={footer}
         footerClassName="gap-2"
       >
-        <div className="mb-6 grid grid-cols-3 gap-2">
+        {!showCurrentSettings ? <div className="mb-6 grid grid-cols-3 gap-2">
           {[
             { index: 1, label: "选择厂商" },
             { index: 2, label: "连接模型" },
@@ -284,7 +303,7 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
               </div>
             </div>
           ))}
-        </div>
+        </div> : null}
 
         {props.loading ? (
           <div className="flex min-h-56 items-center justify-center text-sm text-muted-foreground">
@@ -299,6 +318,13 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
             </div>
             <Button variant="outline" onClick={props.onRetry}>重新加载</Button>
           </div>
+        ) : showCurrentSettings ? (
+          <CurrentModelReasoningSettings
+            key={currentProvider}
+            provider={currentProvider}
+            selectedModel={currentModel}
+            onReconfigure={() => { setStep(1); setShowConnectionWizard(true); }}
+          />
         ) : props.status?.readyForCreation && !props.forceConfiguration && !completeMutation.isSuccess ? (
           <div className="flex min-h-56 flex-col items-center justify-center gap-4 text-center">
             <CheckCircle2 className="h-10 w-10 text-emerald-600" />
@@ -331,14 +357,14 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
                   )}
                   onClick={() => chooseProvider(provider)}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
+                  <div className="flex min-w-0 items-start justify-between gap-3">
+                    <div className="min-w-0">
                       <div className="font-semibold">{provider.name}</div>
                       <div className="mt-1 text-xs leading-5 text-muted-foreground">{providerDescription(provider)}</div>
                     </div>
                     {form.provider === provider.id
-                      ? <Badge>已选择</Badge>
-                      : provider.configured ? <Badge variant="outline">已有配置</Badge> : null}
+                      ? <Badge className="shrink-0 whitespace-nowrap">已选择</Badge>
+                      : provider.configured ? <Badge className="shrink-0 whitespace-nowrap" variant="outline">已有配置</Badge> : null}
                   </div>
                 <div className="mt-3 text-xs text-muted-foreground">推荐模型：{provider.currentModel || provider.defaultModel}</div>
               </button>

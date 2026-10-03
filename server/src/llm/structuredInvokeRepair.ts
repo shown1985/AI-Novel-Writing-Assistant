@@ -1,14 +1,19 @@
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { toJSONSchema, type ZodError, type ZodType } from "zod";
-import type { LLMProvider } from "@ai-novel/shared/types/llm";
+import type { LLMProvider, ReasoningEffort } from "@ai-novel/shared/types/llm";
 import type { ModelRouteRequestProtocol } from "@ai-novel/shared/types/novel";
-import { getLLM } from "./factory";
+import { getLLM, getResolvedLLMClientOptionsFromInstance } from "./factory";
 import { runWithEnforcedTimeout } from "./invokeTimeout";
 import { logStructuredRepairSession } from "./repairLogging";
 import type { TaskType } from "./modelRouter";
 import type { StructuredOutputStrategy } from "./structuredOutput";
 import { toText } from "../services/novel/novelP0Utils";
 import type { PromptInvocationMeta } from "../prompting/core/promptTypes";
+import { extractLlmTokenUsage, mergeStreamTokenUsage, type LlmTokenUsageSnapshot } from "./usageTracking";
+import {
+  startModelTransportAttempt,
+  type ModelAttemptCandidate,
+} from "../platform/llm/provenance";
 
 export interface StructuredRepairInput<T> {
   provider?: LLMProvider;
@@ -24,6 +29,15 @@ export interface StructuredRepairInput<T> {
   schema: ZodType<T>;
   promptMeta?: PromptInvocationMeta;
   onRepairOutputDelta?: (content: string) => void;
+  reasoningEnabled?: boolean;
+  reasoningEffort?: ReasoningEffort;
+  fallbackUsed?: boolean;
+}
+
+export interface StructuredRepairResult<T> {
+  data: T;
+  tokenUsage: LlmTokenUsageSnapshot | null;
+  modelAttemptCandidate: ModelAttemptCandidate | null;
 }
 
 interface ArrayLengthRepairHint {
@@ -154,7 +168,7 @@ export async function repairWithLlm<T>(
   validationError: string,
   repairAttempt: number,
   helpers: RepairHelpers<T>,
-): Promise<T> {
+): Promise<StructuredRepairResult<T>> {
   helpers.logStructuredInvokeEvent({
     event: "repair_start",
     label: input.label,
@@ -171,6 +185,8 @@ export async function repairWithLlm<T>(
     model: input.model,
     temperature: 0.15,
     maxTokens: input.maxTokens,
+    reasoningEnabled: input.reasoningEnabled,
+    reasoningEffort: input.reasoningEffort,
     timeoutMs: input.timeoutMs,
     taskType: input.taskType ?? "planner",
     requestProtocol: input.requestProtocol,
@@ -181,6 +197,15 @@ export async function repairWithLlm<T>(
     } : undefined,
     executionMode: "structured",
     structuredStrategy: "prompt_json",
+  });
+  const resolved = getResolvedLLMClientOptionsFromInstance(llm);
+  const modelAttemptCandidate = await startModelTransportAttempt({
+    provider: resolved?.provider ?? input.provider ?? "unknown",
+    model: resolved?.model ?? input.model ?? "unknown",
+    modelRoute: resolved?.modelRoute ?? null,
+    structuredStrategy: "prompt_json",
+    role: "json_repair",
+    routeTier: input.fallbackUsed ? "fallback" : "primary",
   });
 
   const repairSystem = [
@@ -245,6 +270,8 @@ export async function repairWithLlm<T>(
   });
 
   const startedAt = Date.now();
+  let transportCompleted = false;
+  let tokenUsage: LlmTokenUsageSnapshot | null = null;
   try {
     const invokeOptions: Record<string, unknown> = {};
     if (input.signal) {
@@ -264,7 +291,9 @@ export async function repairWithLlm<T>(
           const delta = toText(chunk.content);
           content += delta;
           input.onRepairOutputDelta?.(delta);
+          tokenUsage = mergeStreamTokenUsage(tokenUsage, extractLlmTokenUsage(chunk));
         }
+        transportCompleted = true;
         return content;
       },
     });
@@ -313,7 +342,7 @@ export async function repairWithLlm<T>(
           repairAttempt,
           strategy: "prompt_json",
         });
-        return unwrapped.data;
+        return { data: unwrapped.data, tokenUsage, modelAttemptCandidate };
       }
 
       const normalized = helpers.normalizeOversizedArrays(repairParse.parsed, final.error, input.schema);
@@ -327,12 +356,17 @@ export async function repairWithLlm<T>(
           repairAttempt,
           strategy: "prompt_json",
         });
-        return normalized.data;
+        return { data: normalized.data, tokenUsage, modelAttemptCandidate };
       }
       throw new Error(`[${input.label}] JSON repair 后仍未通过 Schema 校验。错误：${helpers.formatZodErrors(final.error)}`);
     }
-    return final.data;
+    return { data: final.data, tokenUsage, modelAttemptCandidate };
   } catch (error) {
+    if (transportCompleted) {
+      await modelAttemptCandidate?.finalizeSucceeded(tokenUsage, "not_adopted");
+    } else {
+      await modelAttemptCandidate?.finalizeFailed(error, input.signal);
+    }
     logStructuredRepairSession({
       event: "repair_error",
       label: input.label,

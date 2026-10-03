@@ -5,7 +5,7 @@ import type {
 } from "@ai-novel/shared/types/task";
 
 export interface ListTasksFilters {
-  kind?: "book_analysis" | "novel_pipeline" | "knowledge_document" | "image_generation" | "agent_run" | "novel_workflow" | "style_extraction";
+  kind?: "book_analysis" | "novel_pipeline" | "knowledge_document" | "image_generation" | "agent_run" | "novel_workflow" | "style_extraction" | "world_generation";
   status?: TaskStatus;
   keyword?: string;
   limit?: number;
@@ -68,6 +68,15 @@ export const STYLE_EXTRACTION_TASK_STEPS = [
   { key: "building_profile", label: "整理保留策略" },
   { key: "saving_profile", label: "自动保存写法" },
   { key: "finalizing", label: "收尾" },
+] as const;
+
+export const WORLD_GENERATION_TASK_STEPS = [
+  { key: "profile", label: "世界概念" },
+  { key: "rules", label: "核心规则" },
+  { key: "factions", label: "势力关系" },
+  { key: "locations", label: "关键地点" },
+  { key: "relations", label: "地图与关系" },
+  { key: "presentation", label: "故事入口" },
 ] as const;
 
 export const NOVEL_WORKFLOW_STAGE_STEPS = [

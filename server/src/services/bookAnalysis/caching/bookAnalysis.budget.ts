@@ -30,9 +30,20 @@ function readUsageTokens(usage: LlmTokenUsageSnapshot | null | undefined): numbe
 }
 
 export class BookAnalysisBudgetGuard {
+  // Serializes concurrent onSectionFinished calls on this guard instance so the
+  // read-then-write token accounting below cannot lose an increment when callers
+  // (e.g. generateAllCandidates' parallel workers) share a single guard instance.
+  private queue: Promise<void> = Promise.resolve();
+
   constructor(private readonly analysisId: string) {}
 
   async onSectionFinished(usage: LlmTokenUsageSnapshot | null | undefined): Promise<void> {
+    const run = this.queue.catch(() => undefined).then(() => this.applyUsage(usage));
+    this.queue = run.catch(() => undefined);
+    return run;
+  }
+
+  private async applyUsage(usage: LlmTokenUsageSnapshot | null | undefined): Promise<void> {
     const tokenCount = readUsageTokens(usage);
     // Prisma increment on NULL yields NULL — read first and compute manually as fallback.
     const current = await prisma.bookAnalysis.findUnique({

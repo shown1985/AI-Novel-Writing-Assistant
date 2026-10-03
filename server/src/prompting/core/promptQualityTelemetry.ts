@@ -1,6 +1,7 @@
 import type { LLMProvider } from "@ai-novel/shared/types/llm";
 import type { TaskType } from "../../llm/modelRouter";
 import type { LlmTokenUsageSnapshot } from "../../llm/usageTracking";
+import type { LlmRequestBudgetSnapshot } from "../../llm/requestBudget";
 import type { PromptMode } from "./promptTypes";
 
 export type PromptQualityEventName =
@@ -12,9 +13,11 @@ export type PromptQualityEventName =
 
 export type PromptQualityFailureKind =
   | "llm_error"
+  | "request_too_large"
   | "schema_repair_failed"
   | "post_validate_failed"
   | "empty_output"
+  | "budget_exceeded"
   | "unknown";
 
 export interface PromptQualityEvent {
@@ -39,6 +42,7 @@ export interface PromptQualityEvent {
   emptyOutput?: boolean;
   failureKind?: PromptQualityFailureKind;
   tokenUsage?: LlmTokenUsageSnapshot | null;
+  requestBudget?: LlmRequestBudgetSnapshot;
 }
 
 export interface PromptQualitySnapshotEntry {
@@ -71,6 +75,11 @@ export interface PromptQualitySnapshotEntry {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  budgetObservedCount: number;
+  budgetNearLimitCount: number;
+  budgetExceededCount: number;
+  requestTooLargeCount: number;
+  totalEstimatedRenderedInputTokens: number;
   failuresByKind: Record<PromptQualityFailureKind, number>;
 }
 
@@ -126,11 +135,18 @@ function createAggregate(event: PromptQualityEvent, key: string): MutablePromptQ
     promptTokens: 0,
     completionTokens: 0,
     totalTokens: 0,
+    budgetObservedCount: 0,
+    budgetNearLimitCount: 0,
+    budgetExceededCount: 0,
+    requestTooLargeCount: 0,
+    totalEstimatedRenderedInputTokens: 0,
     failuresByKind: {
       llm_error: 0,
+      request_too_large: 0,
       schema_repair_failed: 0,
       post_validate_failed: 0,
       empty_output: 0,
+      budget_exceeded: 0,
       unknown: 0,
     },
     latencySamples: 0,
@@ -163,6 +179,19 @@ export function recordPromptQualityEvent(event: PromptQualityEvent): void {
       aggregate.totalEstimatedInputTokens = applyNumericMetric(aggregate.totalEstimatedInputTokens, event.estimatedInputTokens);
       aggregate.totalRenderedPromptChars = applyNumericMetric(aggregate.totalRenderedPromptChars, event.renderedPromptChars);
       aggregate.totalOutputChars = applyNumericMetric(aggregate.totalOutputChars, event.outputChars);
+      if (event.requestBudget) {
+        aggregate.budgetObservedCount += 1;
+        aggregate.totalEstimatedRenderedInputTokens = applyNumericMetric(
+          aggregate.totalEstimatedRenderedInputTokens,
+          event.requestBudget.estimatedInputTokens,
+        );
+        if (event.requestBudget.status === "near_limit") {
+          aggregate.budgetNearLimitCount += 1;
+        }
+        if (event.requestBudget.status === "exceeds_limit") {
+          aggregate.budgetExceededCount += 1;
+        }
+      }
       applyTokenUsage(aggregate, event.tokenUsage);
       if (typeof event.latencyMs === "number" && Number.isFinite(event.latencyMs)) {
         aggregate.totalLatencyMs += Math.max(0, Math.round(event.latencyMs));
@@ -189,7 +218,11 @@ export function recordPromptQualityEvent(event: PromptQualityEvent): void {
       aggregate.completedCount += 1;
     } else if (event.event === "failed") {
       aggregate.failedCount += 1;
-      aggregate.failuresByKind[event.failureKind ?? "unknown"] += 1;
+      const failureKind = event.failureKind ?? "unknown";
+      aggregate.failuresByKind[failureKind] += 1;
+      if (failureKind === "request_too_large") {
+        aggregate.requestTooLargeCount += 1;
+      }
     } else if (event.event === "semantic_retry_start") {
       aggregate.semanticRetryStartCount += 1;
     } else if (event.event === "semantic_retry_done") {

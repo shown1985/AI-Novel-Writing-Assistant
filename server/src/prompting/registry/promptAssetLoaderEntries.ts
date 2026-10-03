@@ -18,8 +18,12 @@ export const promptAssetLoaderEntries: PromptAssetLoaderEntry[] = [
     load: () => require("../prompts/novel/writingPlatformRecommendation.prompts").writingPlatformRecommendationPrompt as UnknownPromptAsset,
   },
   {
-    key: "creation.intent.interpret@v2",
+    key: "creation.intent.interpret@v3",
     load: () => require("../prompts/creation/creationIntent.prompts").creationIntentInterpretPrompt as UnknownPromptAsset,
+  },
+  {
+    key: "creation.direction.replace@v1",
+    load: () => require("../prompts/creation/creationIntent.prompts").creationDirectionReplacePrompt as UnknownPromptAsset,
   },
   {
     key: "novel.short_story.plan@v2",
@@ -194,6 +198,10 @@ export const promptAssetLoaderEntries: PromptAssetLoaderEntry[] = [
     load: () => require("../prompts/comic/comic.prompts").comicPanelScriptPrompt as UnknownPromptAsset,
   },
   {
+    key: "comic.factExtraction@v1",
+    load: () => require("../prompts/comic/comic.prompts").comicFactExtractionPrompt as UnknownPromptAsset,
+  },
+  {
     key: "planner.book.plan@v1",
     load: () => require("../prompts/planner/plannerPlan.prompts").plannerBookPlanPrompt as UnknownPromptAsset,
   },
@@ -214,16 +222,20 @@ export const promptAssetLoaderEntries: PromptAssetLoaderEntry[] = [
     load: () => require("../prompts/rag/contextualChunk.prompts").ragContextualChunkPrompt as UnknownPromptAsset,
   },
   {
-    key: "novel.director.candidates@v2",
+    key: "novel.director.candidates@v3",
     load: () => require("../prompts/novel/directorPlanning.prompts").directorCandidatePrompt as UnknownPromptAsset,
   },
   {
-    key: "novel.director.candidate_patch@v1",
+    key: "novel.director.candidate_patch@v2",
     load: () => require("../prompts/novel/directorPlanning.prompts").directorCandidatePatchPrompt as UnknownPromptAsset,
   },
   {
     key: "novel.director.book_contract@v1",
     load: () => require("../prompts/novel/directorPlanning.prompts").directorBookContractPrompt as UnknownPromptAsset,
+  },
+  {
+    key: "novel.creative_carryover.contract@v1",
+    load: () => require("../prompts/novel/creativeCarryoverContract.prompts").creativeCarryoverContractPrompt as UnknownPromptAsset,
   },
   {
     key: "novel.director.blueprint@v1",
@@ -270,7 +282,7 @@ export const promptAssetLoaderEntries: PromptAssetLoaderEntry[] = [
     load: () => require("../prompts/novel/coreGeneration.prompts").novelBeatPrompt as UnknownPromptAsset,
   },
   {
-    key: "novel.chapterHook.generate@v1",
+    key: "novel.chapterHook.generate@v2",
     load: () => require("../prompts/novel/coreGeneration.prompts").novelChapterHookPrompt as UnknownPromptAsset,
   },
   {
@@ -358,7 +370,7 @@ export const promptAssetLoaderEntries: PromptAssetLoaderEntry[] = [
     load: () => require("../prompts/novel/characterResource.prompts").characterResourceExtractionPrompt as UnknownPromptAsset,
   },
   {
-    key: "novel.character.castOptions@v2",
+    key: "novel.character.castOptions@v3",
     load: () => require("../prompts/novel/characterPreparation.prompts").characterCastOptionPrompt as UnknownPromptAsset,
   },
   {
@@ -370,11 +382,11 @@ export const promptAssetLoaderEntries: PromptAssetLoaderEntry[] = [
     load: () => require("../prompts/novel/characterPreparation.prompts").characterCastOptionNormalizePrompt as UnknownPromptAsset,
   },
   {
-    key: "novel.character.castAuto@v1",
+    key: "novel.character.castAuto@v2",
     load: () => require("../prompts/novel/characterPreparation.prompts").characterCastAutoPrompt as UnknownPromptAsset,
   },
   {
-    key: "novel.character.castAuto.members@v1",
+    key: "novel.character.castAuto.members@v2",
     load: () => require("../prompts/novel/characterPreparation.autoFallback.prompts").characterCastAutoMembersPrompt as UnknownPromptAsset,
   },
   {
@@ -390,7 +402,7 @@ export const promptAssetLoaderEntries: PromptAssetLoaderEntry[] = [
     load: () => require("../prompts/novel/characterPreparation.prompts").characterCastAutoNormalizePrompt as UnknownPromptAsset,
   },
   {
-    key: "novel.character.supplemental@v1",
+    key: "novel.character.supplemental@v2",
     load: () => require("../prompts/novel/characterPreparation.prompts").supplementalCharacterPrompt as UnknownPromptAsset,
   },
   {
@@ -490,15 +502,15 @@ export const promptAssetLoaderEntries: PromptAssetLoaderEntry[] = [
     load: () => require("../prompts/novel/completion/compactBook.prompts").compactBookEndingAuditPrompt as UnknownPromptAsset,
   },
   {
-    key: "novel.director.idea_inspiration@v3",
+    key: "novel.director.idea_inspiration@v5",
     load: () => require("../prompts/novel/ideaInspiration.prompts").directorIdeaInspirationPrompt as UnknownPromptAsset,
   },
   {
-    key: "novel.director.idea_constellation_options@v3",
+    key: "novel.director.idea_constellation_options@v4",
     load: () => require("../prompts/novel/ideaConstellation/ideaConstellation.prompts").directorIdeaConstellationOptionsPrompt as UnknownPromptAsset,
   },
   {
-    key: "novel.director.idea_constellation_compose@v2",
+    key: "novel.director.idea_constellation_compose@v3",
     load: () => require("../prompts/novel/ideaConstellation/ideaConstellation.prompts").directorIdeaConstellationComposePrompt as UnknownPromptAsset,
   },
   {
@@ -526,7 +538,7 @@ export const promptAssetLoaderEntries: PromptAssetLoaderEntry[] = [
     load: () => require("../prompts/storyWorldSlice/storyWorldSlice.prompts").storyWorldSlicePrompt as UnknownPromptAsset,
   },
   {
-    key: "style.detection@v1",
+    key: "style.detection@v2",
     load: () => require("../prompts/style/style.prompts").styleDetectionPrompt as UnknownPromptAsset,
   },
   {
@@ -538,7 +550,7 @@ export const promptAssetLoaderEntries: PromptAssetLoaderEntry[] = [
     load: () => require("../prompts/style/style.prompts").styleGenerationPrompt as UnknownPromptAsset,
   },
   {
-    key: "style.rewrite@v1",
+    key: "style.rewrite@v2",
     load: () => require("../prompts/style/style.prompts").styleRewritePrompt as UnknownPromptAsset,
   },
   {
@@ -594,6 +606,10 @@ export const promptAssetLoaderEntries: PromptAssetLoaderEntry[] = [
     load: () => require("../prompts/world/worldDraft.prompts").worldSkeletonGenerationPrompt as UnknownPromptAsset,
   },
   {
+    key: "world.skeleton.present@v1",
+    load: () => require("../prompts/world/worldDraft.prompts").worldSkeletonPresentationPrompt as UnknownPromptAsset,
+  },
+  {
     key: "world.draft.refine@v1",
     load: () => require("../prompts/world/worldDraft.prompts").worldDraftRefinePrompt as UnknownPromptAsset,
   },
@@ -642,7 +658,7 @@ export const promptAssetLoaderEntries: PromptAssetLoaderEntry[] = [
     load: () => require("../prompts/world/world.prompts").worldStructureBackfillPrompt as UnknownPromptAsset,
   },
   {
-    key: "novel.world.generate_from_theme@v2",
+    key: "novel.world.generate_from_theme@v3",
     load: () => require("../prompts/world/world.prompts").novelThemeWorldGenerationPrompt as UnknownPromptAsset,
   },
   {

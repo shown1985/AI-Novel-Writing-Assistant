@@ -19,6 +19,7 @@ import OutlineTab from "../components/OutlineTab";
 import PipelineTab from "../components/PipelineTab";
 import StoryMacroPlanTab from "../components/StoryMacroPlanTab";
 import StructuredOutlineTab from "../components/StructuredOutlineTab";
+import SingleBookPrimaryActionPanel from "../components/SingleBookPrimaryActionPanel";
 import VersionHistoryTab from "../components/VersionHistoryTab";
 import type { NovelEditViewProps } from "../components/NovelEditView.types";
 import {
@@ -50,6 +51,8 @@ export default function MobileNovelEditView(props: NovelEditViewProps) {
     characterTab,
     takeover,
     taskDrawer,
+    singleBookDisplay,
+    singleBookPrimaryAction,
     activeStepTakeoverEntry,
   } = props;
   const [isToolsOpen, setIsToolsOpen] = useState(false);
@@ -64,8 +67,6 @@ export default function MobileNovelEditView(props: NovelEditViewProps) {
   const isTakeoverLoading = takeover?.mode === "loading";
   const hideTakeoverEntry = takeover?.mode === "running" || takeover?.mode === "waiting";
   const pendingResourceProposalCount = taskDrawer?.resourceProposals?.length ?? 0;
-  const totalChapters = chapterTab.chapters.length;
-  const generatedChapters = chapterTab.chapters.filter((item) => Boolean(item.content?.trim())).length;
   const pendingRepairs = pipelineTab.chapterReports.filter(
     (item) => item.overall < pipelineTab.pipelineForm.qualityThreshold,
   ).length;
@@ -124,6 +125,13 @@ export default function MobileNovelEditView(props: NovelEditViewProps) {
           <div className="min-w-0">
             <h1 className="truncate text-lg font-semibold text-foreground">{novelTitle}</h1>
             <p className="mt-0.5 text-xs text-muted-foreground">{statusText}</p>
+            <p className="mt-1 text-xs font-medium text-foreground">{singleBookDisplay.severity.title}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {singleBookDisplay.savedProgress.label} · {singleBookDisplay.bookTarget.label}
+            </p>
+            {singleBookDisplay.qualityDebtCount > 0 ? (
+              <p className="mt-1 text-xs text-muted-foreground">局部质量项 {singleBookDisplay.qualityDebtCount} 条，不影响后续章节继续推进</p>
+            ) : null}
           </div>
           <Dialog open={isToolsOpen} onOpenChange={setIsToolsOpen}>
             <DialogTrigger asChild>
@@ -140,7 +148,8 @@ export default function MobileNovelEditView(props: NovelEditViewProps) {
                 <div className="grid grid-cols-3 gap-2">
                   <div className="rounded-xl border border-border/70 bg-muted/20 p-3">
                     <div className="text-xs text-muted-foreground">章节</div>
-                    <div className="mt-1 font-semibold">{generatedChapters}/{Math.max(totalChapters, 1)}</div>
+                    <div className="mt-1 font-semibold">{singleBookDisplay.savedProgress.value ?? "—"}</div>
+                    <div className="mt-1 text-[11px] text-muted-foreground">{singleBookDisplay.bookTarget.label}</div>
                   </div>
                   <div className="rounded-xl border border-border/70 bg-muted/20 p-3">
                     <div className="text-xs text-muted-foreground">待修复</div>
@@ -232,6 +241,11 @@ export default function MobileNovelEditView(props: NovelEditViewProps) {
       </header>
 
       <main className="space-y-3 pt-3">
+        <SingleBookPrimaryActionPanel
+          display={singleBookDisplay}
+          control={singleBookPrimaryAction}
+        />
+
         {!hideTakeoverEntry ? (
           <div className="rounded-xl border border-border/70 bg-muted/20 p-3">
             {isTakeoverLoading ? (

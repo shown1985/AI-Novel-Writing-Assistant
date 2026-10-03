@@ -38,6 +38,7 @@ const UPDATER_CHANNEL = "desktop:updater-state-changed";
 let mainWindow: BrowserWindow | null = null;
 let splashWindow: BrowserWindow | null = null;
 let stopServer: (() => Promise<void>) | null = null;
+let desktopServerPort: number | null = null;
 let updaterController: DesktopUpdaterController | null = null;
 let rendererReady = false;
 let appShellReady = false;
@@ -94,7 +95,23 @@ function initializeDesktopUpdaterController(): void {
     updateChannel: resolveDesktopUpdateChannel(),
     isPackaged: app.isPackaged,
     isPortable: isPortableDesktopRuntime(),
+    isLocalBuild: isLocalDesktopBuild(),
   });
+}
+
+function isLocalDesktopBuild(): boolean {
+  if (!app.isPackaged) {
+    return false;
+  }
+
+  try {
+    const packageJsonPath = path.join(app.getAppPath(), "package.json");
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+    return packageJson.aiNovelLocalBuild === true;
+  } catch (error) {
+    logDesktopError("desktop.build-metadata", error);
+    return false;
+  }
 }
 
 function maybeScheduleUpdateCheck(delayMs?: number): void {
@@ -200,6 +217,22 @@ function createMainWindow(port: number): BrowserWindow {
     void window.loadFile(resolveRendererIndexHtml());
   }
 
+  return window;
+}
+
+function createAndTrackMainWindow(port: number): BrowserWindow {
+  rendererReady = false;
+  appShellReady = false;
+  mainWindowShown = false;
+
+  const window = createMainWindow(port);
+  mainWindow = window;
+  window.on("closed", () => {
+    if (mainWindow === window) {
+      mainWindow = null;
+      mainWindowShown = false;
+    }
+  });
   return window;
 }
 
@@ -371,11 +404,8 @@ async function bootstrapDesktopApp(): Promise<void> {
   }
 
   const port = await resolveDesktopServerPort({ isPackaged: app.isPackaged });
-  mainWindow = createMainWindow(port);
-  mainWindow.on("closed", () => {
-    mainWindow = null;
-    mainWindowShown = false;
-  });
+  desktopServerPort = port;
+  createAndTrackMainWindow(port);
 
   appendBootstrapStage("server-starting", `Starting desktop server on 127.0.0.1:${port}.`);
   updateBootstrapProgress();
@@ -613,6 +643,17 @@ app.on("second-instance", () => {
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
+  }
+});
+
+app.on("activate", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    focusExistingWindow();
+    return;
+  }
+
+  if (desktopServerPort != null) {
+    createAndTrackMainWindow(desktopServerPort);
   }
 });
 

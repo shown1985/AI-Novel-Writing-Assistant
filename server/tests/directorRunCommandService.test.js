@@ -70,7 +70,7 @@ function createCandidatesRequest(overrides = {}) {
   };
 }
 
-function createHarness(task = createTask(), pipelineJob = null) {
+function createHarness(task = createTask(), currentLlmSelection = null, pipelineJob = null) {
   const commands = [];
   const bootstraps = [];
   const requeued = [];
@@ -257,10 +257,10 @@ function createHarness(task = createTask(), pipelineJob = null) {
   };
   prisma.novelWorkflowTask.findUnique = async ({ where }) => where.id === task.id
     ? {
-        novelId: task.novelId,
-        pendingManualRecovery: task.pendingManualRecovery ?? false,
-        seedPayloadJson: task.seedPayloadJson ?? null,
-      }
+      novelId: task.novelId,
+      pendingManualRecovery: task.pendingManualRecovery,
+      seedPayloadJson: task.seedPayloadJson ?? null,
+    }
     : null;
   prisma.novelWorkflowTask.updateMany = async (args) => {
     taskUpdates.push(args);
@@ -310,7 +310,7 @@ function createHarness(task = createTask(), pipelineJob = null) {
     jobUpdates,
     directorEvents,
     taskUpdates,
-    service: new DirectorCommandService(workflowService),
+    service: new DirectorCommandService(workflowService, async () => currentLlmSelection),
     restore() {
       Object.assign(prisma.directorRunCommand, originalDirectorRunCommand);
       Object.assign(prisma.novelWorkflowTask, originalNovelWorkflowTask);
@@ -455,6 +455,38 @@ test("director command service queues candidate generation as a serialized comma
   }
 });
 
+test("director command service uses the server selection for candidate task payloads", async () => {
+  const harness = createHarness(
+    createTask({
+      novelId: null,
+      status: "queued",
+    }),
+    {
+      provider: "custom_opencode_go",
+      model: "glm-5.3-flash",
+      temperature: 0.4,
+    },
+  );
+  try {
+    const accepted = await harness.service.enqueueGenerateCandidatesCommand(createCandidatesRequest({
+      provider: "ollama",
+      model: "glm-5.3-flash",
+      temperature: 0.7,
+    }));
+
+    assert.equal(accepted.status, "queued");
+    const commandPayload = JSON.parse(harness.commands[0].payloadJson).candidatesRequest;
+    assert.equal(commandPayload.provider, "custom_opencode_go");
+    assert.equal(commandPayload.model, "glm-5.3-flash");
+    assert.equal(commandPayload.temperature, 0.7);
+    const seedPayload = harness.bootstraps[0].seedPayload;
+    assert.equal(seedPayload.provider, "custom_opencode_go");
+    assert.equal(seedPayload.model, "glm-5.3-flash");
+  } finally {
+    harness.restore();
+  }
+});
+
 test("director command service reuses active candidate generation commands", async () => {
   const harness = createHarness(createTask({
     novelId: null,
@@ -510,6 +542,69 @@ test("director command service queues policy updates without directly mutating r
   }
 });
 
+test("director command service applies the full-book autopilot contract and keeps explicit quality toggles", async () => {
+  const harness = createHarness(createTask({
+    novelId: null,
+    status: "waiting_approval",
+  }));
+  try {
+    await harness.service.enqueueConfirmCandidateCommand(createConfirmRequest({
+      runMode: "full_book_autopilot",
+      autoExecutionPlan: {
+        mode: "volume",
+        volumeOrder: 1,
+        autoReview: false,
+        autoRepair: false,
+      },
+      autoApproval: {
+        enabled: false,
+        approvalPointCodes: ["candidate_direction_confirmed"],
+      },
+    }));
+
+    const payload = JSON.parse(harness.commands[0].payloadJson);
+    assert.equal(payload.confirmRequest.runMode, "full_book_autopilot");
+    assert.deepEqual(payload.confirmRequest.autoExecutionPlan, {
+      mode: "book",
+      autoReview: false,
+      autoRepair: false,
+    });
+    assert.equal(payload.confirmRequest.autoApproval.enabled, true);
+    assert.ok(payload.confirmRequest.autoApproval.approvalPointCodes.includes("chapter_execution_continue"));
+    assert.ok(payload.confirmRequest.autoApproval.approvalPointCodes.includes("replan_continue"));
+    assert.deepEqual(harness.bootstraps[0].seedPayload.autoExecutionPlan, {
+      mode: "book",
+      autoReview: false,
+      autoRepair: false,
+    });
+    assert.equal(harness.bootstraps[0].seedPayload.autoApproval.enabled, true);
+  } finally {
+    harness.restore();
+  }
+});
+
+
+test("director command service keeps review and repair on by default under the full-book autopilot contract", async () => {
+  const harness = createHarness(createTask({
+    novelId: null,
+    status: "waiting_approval",
+  }));
+  try {
+    await harness.service.enqueueConfirmCandidateCommand(createConfirmRequest({
+      runMode: "full_book_autopilot",
+      autoExecutionPlan: { mode: "volume", volumeOrder: 1 },
+    }));
+
+    const payload = JSON.parse(harness.commands[0].payloadJson);
+    assert.deepEqual(payload.confirmRequest.autoExecutionPlan, {
+      mode: "book",
+      autoReview: true,
+      autoRepair: true,
+    });
+  } finally {
+    harness.restore();
+  }
+});
 test("director command service preserves an explicit chapter range while applying full-book autopilot approval", async () => {
   const harness = createHarness(createTask({
     novelId: null,
@@ -547,6 +642,46 @@ test("director command service preserves an explicit chapter range while applyin
       autoReview: false,
       autoRepair: false,
     });
+    assert.equal(harness.bootstraps[0].seedPayload.autoApproval.enabled, true);
+  } finally {
+    harness.restore();
+  }
+});
+
+test("director command service keeps an explicit rolling chapter target under the full-book autopilot contract", async () => {
+  const harness = createHarness(createTask({
+    novelId: null,
+    status: "waiting_approval",
+  }));
+  try {
+    await harness.service.enqueueConfirmCandidateCommand(createConfirmRequest({
+      runMode: "full_book_autopilot",
+      autoExecutionPlan: {
+        mode: "chapter_range",
+        endOrder: 10,
+        autoReview: false,
+        autoRepair: false,
+      },
+      autoApproval: {
+        enabled: false,
+        approvalPointCodes: ["candidate_direction_confirmed"],
+      },
+    }));
+
+    const payload = JSON.parse(harness.commands[0].payloadJson);
+    assert.equal(payload.confirmRequest.runMode, "full_book_autopilot");
+    assert.deepEqual(payload.confirmRequest.autoExecutionPlan, {
+      mode: "chapter_range",
+      endOrder: 10,
+      autoReview: false,
+      autoRepair: false,
+    });
+    assert.equal(payload.confirmRequest.autoApproval.enabled, true);
+    assert.ok(payload.confirmRequest.autoApproval.approvalPointCodes.includes("chapter_execution_continue"));
+    assert.deepEqual(
+      harness.bootstraps[0].seedPayload.autoExecutionPlan,
+      payload.confirmRequest.autoExecutionPlan,
+    );
     assert.equal(harness.bootstraps[0].seedPayload.autoApproval.enabled, true);
   } finally {
     harness.restore();
@@ -735,7 +870,7 @@ test("director command stale recovery reattaches to a linked pipeline without sp
       autoExecution: { pipelineJobId: "job-1" },
     }),
   });
-  const harness = createHarness(task, {
+  const harness = createHarness(task, null, {
     id: "job-1",
     novelId: "novel-1",
     status: "running",
@@ -809,7 +944,7 @@ test("director command stale recovery preserves a linked pipeline manual pause",
       autoExecution: { pipelineJobId: "job-1" },
     }),
   });
-  const harness = createHarness(task, {
+  const harness = createHarness(task, null, {
     id: "job-1",
     novelId: "novel-1",
     status: "queued",
@@ -838,28 +973,41 @@ test("director command stale recovery preserves a linked pipeline manual pause",
 });
 
 test("director command stale recovery never clears an existing task manual pause", async () => {
-  const harness = createHarness(createTask({
-    status: "running",
-    pendingManualRecovery: false,
-    lastError: null,
-  }));
-  try {
-    await harness.service.enqueueContinueCommand("task-1");
-    harness.commands[0].status = "running";
-    harness.commands[0].leaseOwner = "worker-a";
-    harness.commands[0].attempt = 1;
-    harness.commands[0].leaseExpiresAt = new Date("2026-04-29T12:00:00.000Z");
-    harness.task.pendingManualRecovery = true;
-    harness.task.lastError = "质量优先策略等待人工恢复。";
+  for (const pipelineJobId of [null, "missing-job"]) {
+    const harness = createHarness(createTask({
+      status: "running",
+      pendingManualRecovery: false,
+      lastError: null,
+      ...(pipelineJobId ? {
+        seedPayloadJson: JSON.stringify({
+          issueGovernanceVersion: 1,
+          issuePolicy: { maxAutomaticRetries: 1, issueActions: {} },
+          issuePolicySource: "global",
+          runMode: "full_book_autopilot",
+          autoExecution: { pipelineJobId },
+        }),
+      } : {}),
+    }));
+    try {
+      await harness.service.enqueueContinueCommand("task-1");
+      harness.commands[0].status = "running";
+      harness.commands[0].leaseOwner = "worker-a";
+      harness.commands[0].attempt = 1;
+      harness.commands[0].leaseExpiresAt = new Date("2026-04-29T12:00:00.000Z");
+      harness.task.pendingManualRecovery = true;
+      harness.task.lastError = "质量优先策略等待人工恢复。";
 
-    await harness.service.recoverStaleLeases(new Date("2026-04-29T12:01:00.000Z"));
+      await harness.service.recoverStaleLeases(new Date("2026-04-29T12:01:00.000Z"));
 
-    assert.equal(harness.commands[0].status, "stale");
-    assert.equal(harness.task.pendingManualRecovery, true);
-    assert.equal(harness.task.lastError, "质量优先策略等待人工恢复。");
-    assert.equal(harness.requeued.length, 0);
-  } finally {
-    harness.restore();
+      assert.equal(harness.commands[0].status, "stale");
+      assert.equal(harness.commands[0].leaseOwner, null);
+      assert.equal(harness.commands[0].attempt, 1);
+      assert.equal(harness.task.pendingManualRecovery, true);
+      assert.equal(harness.task.lastError, "质量优先策略等待人工恢复。");
+      assert.equal(harness.requeued.length, 0);
+    } finally {
+      harness.restore();
+    }
   }
 });
 

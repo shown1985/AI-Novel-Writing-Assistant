@@ -146,6 +146,7 @@ export class AgentRuntime {
       let planner;
       try {
         planner = await createStructuredPlan({
+          sessionId: input.sessionId,
           goal: input.goal,
           messages: input.messages ?? [],
           contextMode: input.contextMode,
@@ -209,6 +210,7 @@ export class AgentRuntime {
         planner.actions,
         {
           contextMode: input.contextMode,
+          sessionId: input.sessionId,
           novelId: input.novelId,
           provider: input.provider,
           model: input.model,
@@ -289,6 +291,7 @@ export class AgentRuntime {
         replayActions,
         {
           contextMode: metadata.contextMode,
+          sessionId: detail.run.sessionId,
           novelId: detail.run.novelId ?? undefined,
           provider: metadata.provider,
           model: metadata.model,

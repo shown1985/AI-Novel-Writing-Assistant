@@ -71,7 +71,7 @@ test("old workflow seeds default to AI recommendation and explicit choices persi
 
 test("world and character prompts preserve the three-mode contract", () => {
   const root = path.resolve(__dirname, "..");
-  const worldPrompt = fs.readFileSync(path.join(root, "src/prompting/prompts/world/world.prompts.ts"), "utf8");
+  const worldPrompt = fs.readFileSync(path.join(root, "src/prompting/prompts/world/generation/worldGeneration.prompts.ts"), "utf8");
   const characterPrompt = fs.readFileSync(path.join(root, "src/prompting/prompts/novel/characterPreparation.prompts.ts"), "utf8");
   const planningRuntime = fs.readFileSync(path.join(root, "src/services/novel/director/workflowStepRuntime/directorPlanningStepModules.ts"), "utf8");
 

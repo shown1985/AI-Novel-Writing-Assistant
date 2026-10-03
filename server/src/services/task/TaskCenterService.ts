@@ -17,6 +17,7 @@ import { ImageTaskAdapter } from "./adapters/ImageTaskAdapter";
 import { NovelWorkflowTaskAdapter } from "./adapters/NovelWorkflowTaskAdapter";
 import { PipelineTaskAdapter } from "./adapters/PipelineTaskAdapter";
 import { StyleExtractionTaskAdapter } from "./adapters/StyleExtractionTaskAdapter";
+import { WorldGenerationTaskAdapter } from "./adapters/WorldGenerationTaskAdapter";
 import { collectWorkflowLinkedPipelineIds } from "./taskCenterVisibility";
 import {
   compareTaskSummary,
@@ -37,6 +38,7 @@ const overviewTaskKinds: TaskKind[] = [
   "agent_run",
   "novel_workflow",
   "style_extraction",
+  "world_generation",
 ];
 
 export class TaskCenterService {
@@ -56,6 +58,8 @@ export class TaskCenterService {
 
   private readonly styleExtractionAdapter = new StyleExtractionTaskAdapter();
 
+  private readonly worldGenerationAdapter = new WorldGenerationTaskAdapter();
+
   async getOverview(): Promise<TaskOverviewSummary> {
     const archivedIdsByKind = await getArchivedTaskIdsByKind(overviewTaskKinds);
     const archivedBookIds = archivedIdsByKind.get("book_analysis") ?? [];
@@ -65,6 +69,7 @@ export class TaskCenterService {
     const archivedAgentIds = archivedIdsByKind.get("agent_run") ?? [];
     const archivedWorkflowIds = archivedIdsByKind.get("novel_workflow") ?? [];
     const archivedStyleExtractionIds = archivedIdsByKind.get("style_extraction") ?? [];
+    const archivedWorldGenerationIds = archivedIdsByKind.get("world_generation") ?? [];
 
     const [
       bookRows,
@@ -74,6 +79,7 @@ export class TaskCenterService {
       agentRows,
       workflowRows,
       styleExtractionRows,
+      worldGenerationRows,
       bookRecoveryCount,
       pipelineRecoveryCount,
       imageRecoveryCount,
@@ -132,6 +138,13 @@ export class TaskCenterService {
         },
         _count: { _all: true },
       }),
+      prisma.worldGenerationRun.groupBy({
+        by: ["status"],
+        where: {
+          ...(archivedWorldGenerationIds.length ? { id: { notIn: archivedWorldGenerationIds } } : {}),
+        },
+        _count: { _all: true },
+      }),
       prisma.bookAnalysis.count({
         where: {
           status: { in: ["queued", "running"] },
@@ -179,7 +192,7 @@ export class TaskCenterService {
       recoveryCandidateCount: bookRecoveryCount + pipelineRecoveryCount + imageRecoveryCount + workflowRecoveryCount + styleExtractionRecoveryCount,
     };
 
-    for (const rows of [bookRows, pipelineRows, knowledgeRows, imageRows, agentRows, workflowRows, styleExtractionRows]) {
+    for (const rows of [bookRows, pipelineRows, knowledgeRows, imageRows, agentRows, workflowRows, styleExtractionRows, worldGenerationRows]) {
       for (const row of rows) {
         const count = row._count._all;
         if (row.status === "queued") {
@@ -205,7 +218,7 @@ export class TaskCenterService {
     const keyword = normalizeKeyword(filters.keyword);
     const cursorPayload = parseCursor(filters.cursor);
 
-    const [bookTasks, novelTasks, knowledgeTasks, imageTasks, agentTasks, workflowTasks, styleExtractionTasks] = await Promise.all([
+    const [bookTasks, novelTasks, knowledgeTasks, imageTasks, agentTasks, workflowTasks, styleExtractionTasks, worldGenerationTasks] = await Promise.all([
       filters.kind && filters.kind !== "book_analysis"
         ? Promise.resolve<UnifiedTaskSummary[]>([])
         : this.bookAdapter.list({ status: filters.status, keyword, take: sourceTake }),
@@ -227,6 +240,9 @@ export class TaskCenterService {
       filters.kind && filters.kind !== "style_extraction"
         ? Promise.resolve<UnifiedTaskSummary[]>([])
         : this.styleExtractionAdapter.list({ status: filters.status, keyword, take: sourceTake }),
+      filters.kind && filters.kind !== "world_generation"
+        ? Promise.resolve<UnifiedTaskSummary[]>([])
+        : this.worldGenerationAdapter.list({ status: filters.status, keyword, take: sourceTake }),
     ]);
 
     const linkedPipelineIds = filters.kind === "novel_pipeline"
@@ -236,7 +252,7 @@ export class TaskCenterService {
       ? novelTasks
       : novelTasks.filter((task) => !linkedPipelineIds.has(task.id));
 
-    const merged = [...bookTasks, ...visibleNovelTasks, ...knowledgeTasks, ...imageTasks, ...agentTasks, ...workflowTasks, ...styleExtractionTasks]
+    const merged = [...bookTasks, ...visibleNovelTasks, ...knowledgeTasks, ...imageTasks, ...agentTasks, ...workflowTasks, ...styleExtractionTasks, ...worldGenerationTasks]
       .sort(compareTaskSummary);
     const filteredByCursor = cursorPayload
       ? merged.filter((item) => isAfterCursor(item, cursorPayload))
@@ -268,6 +284,9 @@ export class TaskCenterService {
     }
     if (kind === "style_extraction") {
       return this.styleExtractionAdapter.detail(id);
+    }
+    if (kind === "world_generation") {
+      return this.worldGenerationAdapter.detail(id);
     }
     return this.imageAdapter.detail(id);
   }
@@ -307,6 +326,9 @@ export class TaskCenterService {
     if (kind === "style_extraction") {
       return this.styleExtractionAdapter.retry(id);
     }
+    if (kind === "world_generation") {
+      return this.worldGenerationAdapter.retry(id);
+    }
     throw new AppError(`Unsupported task kind: ${kind}`, 400);
   }
 
@@ -332,6 +354,9 @@ export class TaskCenterService {
     if (kind === "style_extraction") {
       return this.styleExtractionAdapter.cancel(id);
     }
+    if (kind === "world_generation") {
+      return this.worldGenerationAdapter.cancel(id);
+    }
     throw new AppError(`Unsupported task kind: ${kind}`, 400);
   }
 
@@ -356,6 +381,9 @@ export class TaskCenterService {
     }
     if (kind === "style_extraction") {
       return this.styleExtractionAdapter.archive(id);
+    }
+    if (kind === "world_generation") {
+      return this.worldGenerationAdapter.archive(id);
     }
     throw new AppError(`Unsupported task kind: ${kind}`, 400);
   }

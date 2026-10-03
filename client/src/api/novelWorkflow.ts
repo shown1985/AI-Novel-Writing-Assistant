@@ -8,7 +8,7 @@ import type {
   NovelWorkflowStage,
 } from "@ai-novel/shared/types/novelWorkflow";
 import type { TaskStatus, UnifiedTaskDetail } from "@ai-novel/shared/types/task";
-import { apiClient } from "./client";
+import { apiClient, type ApiHttpError } from "./client";
 
 export async function bootstrapNovelWorkflow(payload: {
   workflowTaskId?: string;
@@ -19,6 +19,26 @@ export async function bootstrapNovelWorkflow(payload: {
 }) {
   const { data } = await apiClient.post<ApiResponse<UnifiedTaskDetail | null>>("/novel-workflows/bootstrap", payload);
   return data;
+}
+
+export async function getNovelWorkflowTaskDetail(workflowTaskId: string) {
+  try {
+    const { data } = await apiClient.get<ApiResponse<UnifiedTaskDetail | null>>(
+      `/novel-workflows/${workflowTaskId}`,
+      { silentErrorStatuses: [404] },
+    );
+    return data;
+  } catch (error) {
+    const httpError = error as ApiHttpError;
+    if (httpError.status === 404) {
+      return {
+        success: true,
+        data: null,
+        message: "Workflow task not found.",
+      } satisfies ApiResponse<UnifiedTaskDetail | null>;
+    }
+    throw error;
+  }
 }
 
 export async function continueNovelWorkflow(directorTaskId: string, payload?: {
