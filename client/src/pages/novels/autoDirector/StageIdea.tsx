@@ -11,7 +11,7 @@ import { ArrowRight, Layers3, Route, Sparkles, X } from "lucide-react";
 import { flattenGenreTreeOptions, type GenreTreeNode } from "@/api/genre";
 import { flattenStoryModeTreeOptions, type StoryModeTreeNode } from "@/api/storyMode";
 import { Button } from "@/components/ui/button";
-import NovelAutoDirectorIdeaInspirationPanel from "../components/NovelAutoDirectorIdeaInspirationPanel";
+import { IdeaInspirationDialog } from "./ideaInspiration";
 import OnboardingTip from "@/components/onboarding/OnboardingTip";
 import StoryModeProfileDetails from "@/components/storyModes/StoryModeProfileDetails";
 import CreationFoundationPickerDialog from "./CreationFoundationPickerDialog";
@@ -29,7 +29,9 @@ interface StageIdeaProps {
   idea: string;
   onIdeaChange: (value: string) => void;
   ideaInspirations: DirectorIdeaInspiration[];
+  ideaInspirationLiveRequest: { key: string; startedAt: number; completedAt?: number } | null;
   isGeneratingIdeaInspirations: boolean;
+  ideaInspirationError: string;
   onGenerateIdeaInspirations: () => void;
   ideaConstellationOptions: DirectorIdeaConstellationOption[];
   isGeneratingIdeaConstellationOptions: boolean;
@@ -97,7 +99,9 @@ export default function StageIdea({
   idea,
   onIdeaChange,
   ideaInspirations,
+  ideaInspirationLiveRequest,
   isGeneratingIdeaInspirations,
+  ideaInspirationError,
   onGenerateIdeaInspirations,
   ideaConstellationOptions,
   isGeneratingIdeaConstellationOptions,
@@ -127,6 +131,7 @@ export default function StageIdea({
 }: StageIdeaProps) {
   const reducedMotion = useReducedMotion();
   const [showInspirations, setShowInspirations] = useState(false);
+  const [inspirationSource, setInspirationSource] = useState<{ idea: string; worldName: string } | null>(null);
   const [constellationDialogOpen, setConstellationDialogOpen] = useState(false);
   const [genreDialogOpen, setGenreDialogOpen] = useState(false);
   const [storyModeDialogOpen, setStoryModeDialogOpen] = useState(false);
@@ -205,10 +210,9 @@ export default function StageIdea({
 
   const handleShowInspirations = () => {
     if (worldSelectionLoading || worldSelectionUnavailable) return;
+    setInspirationSource({ idea: idea.trim(), worldName: selectedWorld?.name ?? "" });
     setShowInspirations(true);
-    if (ideaInspirations.length === 0 && !isGeneratingIdeaInspirations) {
-      onGenerateIdeaInspirations();
-    }
+    onGenerateIdeaInspirations();
   };
 
   return (
@@ -339,6 +343,7 @@ export default function StageIdea({
             </div>
           ) : null}
         </div>
+        <p className="px-1 pt-3 text-xs text-muted-foreground">生成开局时，AI 会结合你的输入、所选世界和创作偏好。</p>
         <div className="flex flex-col gap-3 pt-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -351,16 +356,15 @@ export default function StageIdea({
               <Sparkles className="h-4 w-4" />
               打开故事星图
             </Button>
-            {selectedWorldId && !worldSelectionUnavailable ? <Button type="button" size="sm" onClick={handleShowInspirations} disabled={isGeneratingIdeaInspirations || worldSelectionLoading}>
-              {isGeneratingIdeaInspirations ? "正在准备几个想法..." : "基于这个世界给我几个想法"}
-            </Button> : <button
+            <Button
               type="button"
-              className="text-sm text-muted-foreground transition hover:text-foreground disabled:opacity-50"
+              size="sm"
+              variant={selectedWorldId ? "default" : "outline"}
               onClick={handleShowInspirations}
               disabled={isGeneratingIdeaInspirations || worldSelectionLoading || worldSelectionUnavailable}
             >
-              {isGeneratingIdeaInspirations ? "正在准备几个想法..." : "直接给我几个想法"}
-            </button>}
+              {isGeneratingIdeaInspirations ? "正在准备开局想法..." : idea.trim() ? "按我的想法生成开局" : selectedWorldId ? "基于这个世界找开局" : "帮我找几个开局"}
+            </Button>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <button
@@ -379,21 +383,20 @@ export default function StageIdea({
         </div>
       </motion.div>
 
-      {showInspirations && (ideaInspirations.length > 0 || isGeneratingIdeaInspirations) ? (
-        <motion.div
-          initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: reducedMotion ? 0 : 0.18 }}
-          className="w-full"
-        >
-          <NovelAutoDirectorIdeaInspirationPanel
-            ideas={ideaInspirations}
-            isGenerating={isGeneratingIdeaInspirations}
-            onGenerate={onGenerateIdeaInspirations}
-            onUseIdea={useIdeaInspiration}
-          />
-        </motion.div>
-      ) : null}
+      <IdeaInspirationDialog
+        open={showInspirations}
+        onOpenChange={setShowInspirations}
+        source={inspirationSource}
+        ideas={ideaInspirations}
+        liveRequest={ideaInspirationLiveRequest}
+        isGenerating={isGeneratingIdeaInspirations}
+        error={ideaInspirationError}
+        onGenerate={() => {
+          setInspirationSource({ idea: idea.trim(), worldName: selectedWorld?.name ?? "" });
+          onGenerateIdeaInspirations();
+        }}
+        onUseIdea={useIdeaInspiration}
+      />
 
       <StoryConstellationDialog
         open={constellationDialogOpen}

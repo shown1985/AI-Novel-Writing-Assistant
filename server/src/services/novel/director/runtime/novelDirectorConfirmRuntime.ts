@@ -1,4 +1,9 @@
 import {
+  CREATIVE_CARRYOVER_CONTRACT_SCHEMA_VERSION,
+  parseAdoptedCreativeCarryoverContractForSource,
+  serializeCreativeCarryoverContract,
+} from "@ai-novel/shared/types/creativeCarryoverContract";
+import {
   DEFAULT_DIRECTOR_STARTUP_PREPARATION,
   isFullBookAutopilotRunMode,
 } from "@ai-novel/shared/types/novelDirector";
@@ -232,6 +237,15 @@ export class NovelDirectorConfirmRuntime {
               itemLabel: "正在创建小说项目",
               progress: DIRECTOR_PROGRESS.novelCreate,
             });
+            const adoptedCarryover = parseAdoptedCreativeCarryoverContractForSource(
+              parseSeedPayload<DirectorWorkflowSeedPayload>(workflowTask.seedPayloadJson)?.creativeCarryoverContract,
+              {
+                mode: resolvedInput.writingMode === "continuation" ? "continuation" : "adaptation",
+                bookAnalysisId: resolvedInput.writingMode === "continuation"
+                  ? resolvedInput.continuationBookAnalysisId
+                  : resolvedInput.referenceBookAnalysisId,
+              },
+            );
             const novel = await this.deps.novelContextService.createNovel({
               title,
               description,
@@ -264,6 +278,12 @@ export class NovelDirectorConfirmRuntime {
               continuationBookAnalysisSections: resolvedInput.continuationBookAnalysisSections ?? undefined,
               referenceBookAnalysisId: resolvedInput.referenceBookAnalysisId ?? undefined,
               referenceBookAnalysisSections: resolvedInput.referenceBookAnalysisSections ?? undefined,
+              creativeCarryoverContractJson: adoptedCarryover
+                ? serializeCreativeCarryoverContract(adoptedCarryover)
+                : null,
+              creativeCarryoverContractSchemaVersion: adoptedCarryover
+                ? CREATIVE_CARRYOVER_CONTRACT_SCHEMA_VERSION
+                : null,
             });
             await this.deps.workflowService.attachNovelToTask(workflowTask.id, novel.id, "project_setup");
             return novel;

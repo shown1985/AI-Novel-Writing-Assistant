@@ -1,5 +1,7 @@
 import type {
   ResolvedStyleContext,
+  StyleContract,
+  StyleContractSection,
   StyleProfile,
   StyleSanitizedGenerationProfile,
 } from "@ai-novel/shared/types/styleEngine";
@@ -181,6 +183,44 @@ function splitGuidanceLines(text: string): string[] {
     .slice(0, MAX_GUIDANCE_LINES);
 }
 
+function redactContractSection(
+  section: StyleContractSection,
+  forbiddenEntities: string[],
+): StyleContractSection {
+  return {
+    ...section,
+    summary: section.summary ? redactForbiddenEntities(section.summary, forbiddenEntities) : section.summary,
+    lines: section.lines.map((line) => redactForbiddenEntities(line, forbiddenEntities)),
+    text: redactForbiddenEntities(section.text, forbiddenEntities),
+  };
+}
+
+// Redacts source-work entity names (character names, titles, book titles, ...) out of the
+// compiled style contract itself, so every downstream consumer that reads
+// compiledBlocks.contract for the chapter-writing prompt (style_contract context block,
+// chapter acceptance, rewrite candidates, ...) automatically receives sanitized text instead
+// of having to opt into the separate sanitizedGenerationProfile.writingGuidance list.
+function redactStyleContract(
+  contract: StyleContract | null | undefined,
+  forbiddenEntities: string[],
+): StyleContract | null {
+  if (!contract) {
+    return null;
+  }
+  if (forbiddenEntities.length === 0) {
+    return contract;
+  }
+  return {
+    ...contract,
+    narrative: redactContractSection(contract.narrative, forbiddenEntities),
+    character: redactContractSection(contract.character, forbiddenEntities),
+    language: redactContractSection(contract.language, forbiddenEntities),
+    rhythm: redactContractSection(contract.rhythm, forbiddenEntities),
+    antiAi: redactContractSection(contract.antiAi, forbiddenEntities),
+    selfCheck: redactContractSection(contract.selfCheck, forbiddenEntities),
+  };
+}
+
 export function sanitizeStyleContextForGeneration(
   context: ResolvedStyleContext,
   now: Date = new Date(),
@@ -205,8 +245,13 @@ export function sanitizeStyleContextForGeneration(
     sanitizedAt: now.toISOString(),
     strategy: "deterministic",
   };
+  const redactedContract = redactStyleContract(context.compiledBlocks?.contract, forbiddenEntities);
+  const compiledBlocks = context.compiledBlocks && redactedContract
+    ? { ...context.compiledBlocks, contract: redactedContract }
+    : context.compiledBlocks;
   return {
     ...context,
+    compiledBlocks,
     sanitizedGenerationProfile,
   };
 }

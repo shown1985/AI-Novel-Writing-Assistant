@@ -59,6 +59,9 @@ import {
 import { useNovelAutoDirectorCandidateMutations } from "../components/useNovelAutoDirectorCandidateMutations";
 import { hasCreationFoundationChanged } from "./creationFoundationPickerState";
 import type { AutoDirectorCreateDraft } from "./draft/autoDirectorCreateDraft";
+import { ideaInspirationContextKey, isCurrentIdeaInspirationRequest } from "./ideaInspiration";
+import type { CreativeCarryoverContract } from "@ai-novel/shared/types/creativeCarryoverContract";
+import { parseCreativeCarryoverContract } from "@ai-novel/shared/types/creativeCarryoverContract";
 
 interface UseAutoDirectorCreateControllerInput {
   marketBriefId?: string;
@@ -80,6 +83,9 @@ interface UseAutoDirectorCreateControllerInput {
   initialDraft?: AutoDirectorCreateDraft | null;
   workflowTaskId?: string;
   restoredTask?: UnifiedTaskDetail | null;
+  creativeCarryoverContract?: CreativeCarryoverContract | null;
+  requireCreativeCarryoverAdopted?: boolean;
+  onCreativeCarryoverContractChange?: (contract: CreativeCarryoverContract | null) => void;
   onWorkflowTaskChange?: (workflowTaskId: string) => void;
   onBasicFormChange: (patch: Partial<NovelBasicFormState>) => void;
 }
@@ -106,6 +112,9 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
     initialDraft,
     workflowTaskId: workflowTaskIdProp,
     restoredTask,
+    creativeCarryoverContract,
+    requireCreativeCarryoverAdopted = false,
+    onCreativeCarryoverContractChange,
     onWorkflowTaskChange,
     onBasicFormChange,
     marketBriefId,
@@ -130,6 +139,8 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
     initialStyleProfileId || initialDraft?.selectedStyleProfileId || "",
   );
   const [ideaInspirations, setIdeaInspirations] = useState<DirectorIdeaInspiration[]>([]);
+  const [ideaInspirationCompletion, setIdeaInspirationCompletion] = useState<{ key: string; completedAt: number } | null>(null);
+  const ideaInspirationRequestIdRef = useRef(0);
   const [ideaConstellationOptions, setIdeaConstellationOptions] = useState<DirectorIdeaConstellationOption[]>([]);
   const [candidatePatchFeedbacks, setCandidatePatchFeedbacks] = useState<Record<string, string>>({});
   const [titlePatchFeedbacks, setTitlePatchFeedbacks] = useState<Record<string, string>>({});
@@ -141,6 +152,7 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
   });
   const [issuePolicy, setIssuePolicy] = useState<DirectorIssuePolicy | null>(null);
   const confirmSubmitLockedRef = useRef(false);
+  const restoredTaskHydrationIdRef = useRef<string | null>(null);
   const autoApprovalDraft = useDirectorAutoApprovalDraft(true);
   const { applySnapshot: applyAutoApprovalSnapshot } = autoApprovalDraft;
 
@@ -163,9 +175,11 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
   }, [initialStyleProfileId]);
 
   useEffect(() => {
-    if (!restoredTask || restoredTask.meta.lane !== "auto_director") {
+    if (!restoredTask || restoredTask.meta.lane !== "auto_director"
+      || restoredTaskHydrationIdRef.current === restoredTask.id) {
       return;
     }
+    restoredTaskHydrationIdRef.current = restoredTask.id;
     const seedPayload = extractDirectorTaskSeedPayloadFromMeta(restoredTask.meta);
     if (restoredTask.id && restoredTask.id !== workflowTaskId) {
       setWorkflowTaskId(restoredTask.id);
@@ -189,8 +203,12 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
     if (typeof seedPayload?.styleProfileId === "string") {
       setSelectedStyleProfileId(seedPayload.styleProfileId);
     }
+    const restoredContract = parseCreativeCarryoverContract(seedPayload?.creativeCarryoverContract);
+    if (restoredContract) {
+      onCreativeCarryoverContractChange?.(restoredContract);
+    }
     setWorldSetupMode("auto_generate");
-  }, [applyAutoApprovalSnapshot, restoredTask, workflowTaskId]);
+  }, [applyAutoApprovalSnapshot, onCreativeCarryoverContractChange, restoredTask, workflowTaskId]);
 
   const directorBasicForm = useMemo(
     () => patchNovelBasicForm(basicForm, {
@@ -208,7 +226,6 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
   useEffect(() => {
     if (previousWorldIdRef.current === directorBasicForm.worldId) return;
     previousWorldIdRef.current = directorBasicForm.worldId;
-    setIdeaInspirations([]);
     setIdeaConstellationOptions([]);
   }, [directorBasicForm.worldId]);
 
@@ -275,16 +292,76 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
     };
   };
 
+  const ideaInspirationContext = ideaInspirationContextKey({
+    idea,
+    worldId: directorBasicForm.worldId,
+    genreId: directorBasicForm.genreId,
+    primaryStoryModeId: directorBasicForm.primaryStoryModeId,
+    secondaryStoryModeId: directorBasicForm.secondaryStoryModeId,
+  });
+  const currentIdeaInspirationContextRef = useRef(ideaInspirationContext);
+  if (currentIdeaInspirationContextRef.current !== ideaInspirationContext) {
+    currentIdeaInspirationContextRef.current = ideaInspirationContext;
+    ideaInspirationRequestIdRef.current += 1;
+  }
   const ideaInspirationMutation = useMutation({
-    mutationFn: ({ payload }: { generation: number; payload: ReturnType<typeof buildIdeaContextPayload> }) => generateDirectorIdeaInspirations(payload),
+    mutationFn: ({ payload, liveItemKey }: {
+      requestId: number;
+      context: string;
+      payload: ReturnType<typeof buildIdeaContextPayload>;
+      liveItemKey: string;
+      startedAt: number;
+    }) => generateDirectorIdeaInspirations(payload, liveItemKey),
     onSuccess: (response, variables) => {
-      if (variables.generation !== worldGenerationRef.current) return;
+      if (!isCurrentIdeaInspirationRequest(variables.requestId, ideaInspirationRequestIdRef.current, variables.context, currentIdeaInspirationContextRef.current)) return;
       setIdeaInspirations(response.data?.ideas ?? []);
     },
-    onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "生成起始想法失败，请稍后重试。");
+    onSettled: (_response, _error, variables) => {
+      if (!isCurrentIdeaInspirationRequest(variables.requestId, ideaInspirationRequestIdRef.current, variables.context, currentIdeaInspirationContextRef.current)) return;
+      setIdeaInspirationCompletion({ key: variables.liveItemKey, completedAt: Date.now() });
     },
   });
+  useEffect(() => {
+    setIdeaInspirations([]);
+    ideaInspirationMutation.reset();
+    // The request id is invalidated during render so even A → B → A cannot accept an old response.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ideaInspirationContext]);
+
+  const generateIdeaInspirations = () => {
+    const requestId = ++ideaInspirationRequestIdRef.current;
+    setIdeaInspirations([]);
+    ideaInspirationMutation.mutate({
+      requestId,
+      context: ideaInspirationContext,
+      payload: buildIdeaContextPayload(),
+      liveItemKey: crypto.randomUUID(),
+      startedAt: Date.now(),
+    });
+  };
+  const visibleIdeaInspirationRequest = ideaInspirationMutation.variables;
+  const ideaInspirationRequestIsCurrent = visibleIdeaInspirationRequest
+    && isCurrentIdeaInspirationRequest(
+      visibleIdeaInspirationRequest.requestId,
+      ideaInspirationRequestIdRef.current,
+      visibleIdeaInspirationRequest.context,
+      ideaInspirationContext,
+    );
+  const isGeneratingIdeaInspirations = Boolean(ideaInspirationRequestIsCurrent && ideaInspirationMutation.isPending);
+  const ideaInspirationLiveRequest = ideaInspirationRequestIsCurrent
+    ? {
+      key: visibleIdeaInspirationRequest.liveItemKey,
+      startedAt: visibleIdeaInspirationRequest.startedAt,
+      completedAt: ideaInspirationCompletion?.key === visibleIdeaInspirationRequest.liveItemKey
+        ? ideaInspirationCompletion.completedAt
+        : undefined,
+    }
+    : null;
+  const ideaInspirationError = ideaInspirationRequestIsCurrent && ideaInspirationMutation.isError
+    ? ideaInspirationMutation.error instanceof Error
+      ? ideaInspirationMutation.error.message
+      : "生成开局想法失败，请重试。"
+    : "";
 
   const ideaConstellationOptionsMutation = useMutation({
     mutationFn: ({ payload }: { generation: number; payload: ReturnType<typeof buildIdeaContextPayload> }) => generateDirectorIdeaConstellationOptions(payload),
@@ -383,7 +460,14 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
     }
   }, [directorTask, executionRequested]);
 
+  const assertCreativeCarryoverAdopted = () => {
+    if (requireCreativeCarryoverAdopted && !creativeCarryoverContract?.adopted) {
+      throw new Error("请先采用创作承接方案，再生成或确认书级方向。");
+    }
+  };
+
   const ensureWorkflowTask = async () => {
+    assertCreativeCarryoverAdopted();
     const nextIdea = requestIdea;
     if (!nextIdea) {
       throw new Error("请先补充起始想法，再继续生成或确认书级方向。");
@@ -412,6 +496,7 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
         issueGovernanceVersion: issuePolicy ? 1 : undefined,
         issuePolicy: issuePolicy ?? undefined,
         issuePolicySource: "global",
+        creativeCarryoverContract: creativeCarryoverContract ?? null,
       },
     });
     const taskId = response.data?.id ?? "";
@@ -435,6 +520,7 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
   };
 
   const buildCandidateRequestPayload = (currentWorkflowTaskId: string) => {
+    assertCreativeCarryoverAdopted();
     if (!requestIdea) {
       throw new Error("请先补充起始想法，再继续生成或确认书级方向。");
     }
@@ -475,6 +561,7 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
 
   const confirmMutation = useMutation({
     mutationFn: async (payload: { candidate: DirectorCandidate; workflowTaskId?: string }) => {
+      assertCreativeCarryoverAdopted();
       const currentWorkflowTaskId = payload.workflowTaskId || await ensureWorkflowTask();
       if (!requestIdea) {
         throw new Error("请先补充起始想法，再继续生成或确认书级方向。");
@@ -587,7 +674,9 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
     setBatches((prev) => applyDirectorCandidateTitleOption(prev, batchId, candidateId, option));
   };
 
-  const canGenerate = idea.trim().length > 0 && !generateMutation.isPending;
+  const canGenerate = idea.trim().length > 0
+    && !generateMutation.isPending
+    && (!requireCreativeCarryoverAdopted || Boolean(creativeCarryoverContract?.adopted));
 
   const updateProductionFoundation = async (patch: Partial<{
     genreId: string;
@@ -695,8 +784,10 @@ export function useAutoDirectorCreateController(input: UseAutoDirectorCreateCont
     idea,
     setIdea,
     ideaInspirations,
-    isGeneratingIdeaInspirations: ideaInspirationMutation.isPending,
-    generateIdeaInspirations: () => ideaInspirationMutation.mutate({ generation: worldGenerationRef.current, payload: buildIdeaContextPayload() }),
+    ideaInspirationLiveRequest,
+    isGeneratingIdeaInspirations,
+    ideaInspirationError,
+    generateIdeaInspirations,
     ideaConstellationOptions,
     isGeneratingIdeaConstellationOptions: ideaConstellationOptionsMutation.isPending,
     generateIdeaConstellationOptions: () => ideaConstellationOptionsMutation.mutate({ generation: worldGenerationRef.current, payload: buildIdeaContextPayload() }),

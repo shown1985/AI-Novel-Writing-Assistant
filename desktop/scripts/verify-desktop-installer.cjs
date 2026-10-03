@@ -75,19 +75,30 @@ async function waitForPath(targetPath, timeoutMs) {
   throw new Error(`Timed out waiting for path ${targetPath}.`);
 }
 
-async function waitForLogSubstring(logPath, expectedSubstring, timeoutMs) {
+function captureLogOffset(logPath) {
+  return fs.existsSync(logPath) ? fs.statSync(logPath).size : 0;
+}
+
+function readLogSince(logPath, offset) {
+  if (!fs.existsSync(logPath)) {
+    return "";
+  }
+  const contents = fs.readFileSync(logPath);
+  const start = contents.length < offset ? 0 : offset;
+  return contents.subarray(start).toString("utf8");
+}
+
+async function waitForLogMessages(logPath, expectedMessages, timeoutMs, offset) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (fs.existsSync(logPath)) {
-      const contents = fs.readFileSync(logPath, "utf8");
-      if (contents.includes(expectedSubstring)) {
-        return contents;
-      }
+    const contents = readLogSince(logPath, offset);
+    if (expectedMessages.every((message) => contents.includes(message))) {
+      return contents;
     }
     await new Promise((resolve) => setTimeout(resolve, 750));
   }
 
-  throw new Error(`Timed out waiting for "${expectedSubstring}" in ${logPath}.`);
+  throw new Error(`Timed out waiting for fresh log messages ${expectedMessages.join(", ")} in ${logPath}.`);
 }
 
 function findShortcut(directory, nameFragment) {
@@ -193,10 +204,13 @@ async function main() {
     throw new Error("Start menu shortcut was not created by the NSIS installer.");
   }
 
+  const firstLogOffset = captureLogOffset(logPath);
   const firstRun = await launchInstalledApp(installedExePath);
-  await waitForLogSubstring(logPath, "main-window-shown", 90_000);
-  await waitForLogSubstring(logPath, "Desktop server is healthy", 90_000);
-  await killProcessTree(firstRun.pid);
+  try {
+    await waitForLogMessages(logPath, ["main-window-shown", "Desktop server is healthy"], 90_000, firstLogOffset);
+  } finally {
+    await killProcessTree(firstRun.pid);
+  }
 
   fs.writeFileSync(markerFile, "retain-desktop-user-data", "utf8");
   await uninstallSilently();
@@ -210,9 +224,13 @@ async function main() {
     throw new Error("Reinstall did not preserve the existing user data directory.");
   }
 
+  const secondLogOffset = captureLogOffset(logPath);
   const secondRun = await launchInstalledApp(installedExePath);
-  await waitForLogSubstring(logPath, "main-window-shown", 90_000);
-  await killProcessTree(secondRun.pid);
+  try {
+    await waitForLogMessages(logPath, ["main-window-shown", "Desktop server is healthy"], 90_000, secondLogOffset);
+  } finally {
+    await killProcessTree(secondRun.pid);
+  }
 
   console.log(`[verify:desktop:installer] desktop shortcut: ${desktopShortcut}`);
   console.log(`[verify:desktop:installer] start menu shortcut: ${startMenuShortcut}`);
@@ -220,7 +238,11 @@ async function main() {
   console.log("[verify:desktop:installer] silent install/uninstall/reinstall verification passed.");
 }
 
-main().catch((error) => {
-  console.error("[verify:desktop:installer] failed.", error);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((error) => {
+    console.error("[verify:desktop:installer] failed.", error);
+    process.exit(1);
+  });
+}
+
+module.exports = { captureLogOffset, readLogSince };

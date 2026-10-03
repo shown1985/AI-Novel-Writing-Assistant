@@ -6,7 +6,8 @@ const { resolveDirectorIdeaContext } = require("../dist/services/novel/director/
 const { marketRadarService } = require("../dist/modules/marketRadar/application/MarketRadarService.js");
 const promptRunner = require("../dist/prompting/core/promptRunner.js");
 const { StructuredOutputError } = require("../dist/llm/structuredOutput.js");
-const { NovelDirectorIdeaInspirationService } = require("../dist/services/novel/director/NovelDirectorIdeaInspirationService.js");
+const { NovelDirectorIdeaInspirationService } = require("../dist/services/novel/director/idea/NovelDirectorIdeaInspirationService.js");
+const { directorIdeaInspirationPrompt } = require("../dist/prompting/prompts/novel/ideaInspiration.prompts.js");
 const { NovelDirectorIdeaConstellationService } = require("../dist/services/novel/director/idea/NovelDirectorIdeaConstellationService.js");
 
 const base = { name: "云城", description: "云城旧约", structureJson: null, bindingSupportJson: null,
@@ -50,10 +51,25 @@ test("blank world avoids lookup and inspiration retry keeps one world snapshot",
   const oldPrompt = promptRunner.runStructuredPrompt;
   let reads = 0;
   const contexts = [];
+  const itemKeys = [];
   prisma.world.findUnique = async () => { reads++; return base; };
   marketRadarService.getBriefPromptBlock = async () => "";
   promptRunner.runStructuredPrompt = async (request) => {
     contexts.push(request.promptInput.contextSummary);
+    itemKeys.push(request.options.itemKey);
+    assert.equal(request.asset, directorIdeaInspirationPrompt);
+    assert.equal(request.asset.version, "v5");
+    const rendered = request.asset.render(request.promptInput).map((message) => message.content).join("\n");
+    assert.match(rendered, /当前输入框草稿：旧港守夜人阿澜要救出被议会扣押的妹妹；不要系统升级/);
+    assert.match(rendered, /选定世界样本：[\s\S]*议会和行会争夺旧港/);
+    assert.match(rendered, /五条想法都须保留其含义/);
+    assert.match(rendered, /当前输入框草稿为空/);
+    assert.match(rendered, /用户明确排除的系统、升级、爽文/);
+    assert.match(rendered, /用户明确指定的主角及其他创作要求不得为了制造差异而变更/);
+    assert.match(rendered, /输入框草稿为空时，可以让主角类型不同/);
+    assert.match(rendered, /若用户明确指定，则保留并从人物成长角度呈现/);
+    assert.match(rendered, /若用户明确指定其中任何设定，五条都要保留/);
+    assert.match(rendered, /若用户指定退婚、打脸或重生，须保留其设定/);
     if (contexts.length === 1) throw new StructuredOutputError({ message: "bad shape", category: "schema_mismatch", diagnostics: {} });
     return { output: { ideas: [{ angle: "爽点强钩子", text: "旧港开局", tags: ["旧港"] }] } };
   };
@@ -61,14 +77,40 @@ test("blank world avoids lookup and inspiration retry keeps one world snapshot",
     const blank = await resolveDirectorIdeaContext({ worldId: "" });
     assert.doesNotMatch(blank, /选定世界样本/);
     assert.equal(reads, 0);
-    const result = await new NovelDirectorIdeaInspirationService().generate({ worldId: "world-a" });
+    const result = await new NovelDirectorIdeaInspirationService().generate({ worldId: "world-a", currentIdea: "旧港守夜人阿澜要救出被议会扣押的妹妹；不要系统升级" }, { liveItemKey: "8dd25d81-775d-44ba-8c9d-c65377672727" });
     assert.equal(result.ideas[0].text, "旧港开局");
     assert.equal(reads, 1);
     assert.deepEqual(contexts[0], contexts[1]);
+    assert.deepEqual(itemKeys, ["8dd25d81-775d-44ba-8c9d-c65377672727", "8dd25d81-775d-44ba-8c9d-c65377672727"]);
+    assert.match(contexts[0], /当前输入框草稿：旧港守夜人阿澜要救出被议会扣押的妹妹；不要系统升级/);
     assert.match(contexts[0], /议会和行会争夺旧港/);
   } finally {
     prisma.world.findUnique = oldFind;
     marketRadarService.getBriefPromptBlock = oldBrief;
+    promptRunner.runStructuredPrompt = oldPrompt;
+  }
+});
+
+test("idea inspiration live item keys stay separate across requests and remain optional", async () => {
+  const oldPrompt = promptRunner.runStructuredPrompt;
+  const seen = [];
+  promptRunner.runStructuredPrompt = async (request) => {
+    seen.push(request.options.itemKey);
+    return { output: { ideas: [] } };
+  };
+  try {
+    const service = new NovelDirectorIdeaInspirationService();
+    await Promise.all([
+      service.generate({}, { liveItemKey: "5d4914b2-6e02-4a43-9e23-d4505171282e" }),
+      service.generate({}, { liveItemKey: "bdab61b6-14eb-4504-b774-b251ffbdb757" }),
+    ]);
+    await service.generate({});
+    assert.deepEqual(new Set(seen.slice(0, 2)), new Set([
+      "5d4914b2-6e02-4a43-9e23-d4505171282e",
+      "bdab61b6-14eb-4504-b774-b251ffbdb757",
+    ]));
+    assert.equal(seen[2], undefined);
+  } finally {
     promptRunner.runStructuredPrompt = oldPrompt;
   }
 });

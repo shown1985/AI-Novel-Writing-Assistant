@@ -198,6 +198,10 @@ export const promptAssetLoaderEntries: PromptAssetLoaderEntry[] = [
     load: () => require("../prompts/comic/comic.prompts").comicPanelScriptPrompt as UnknownPromptAsset,
   },
   {
+    key: "comic.factExtraction@v1",
+    load: () => require("../prompts/comic/comic.prompts").comicFactExtractionPrompt as UnknownPromptAsset,
+  },
+  {
     key: "planner.book.plan@v1",
     load: () => require("../prompts/planner/plannerPlan.prompts").plannerBookPlanPrompt as UnknownPromptAsset,
   },
@@ -228,6 +232,10 @@ export const promptAssetLoaderEntries: PromptAssetLoaderEntry[] = [
   {
     key: "novel.director.book_contract@v1",
     load: () => require("../prompts/novel/directorPlanning.prompts").directorBookContractPrompt as UnknownPromptAsset,
+  },
+  {
+    key: "novel.creative_carryover.contract@v1",
+    load: () => require("../prompts/novel/creativeCarryoverContract.prompts").creativeCarryoverContractPrompt as UnknownPromptAsset,
   },
   {
     key: "novel.director.blueprint@v1",
@@ -494,7 +502,7 @@ export const promptAssetLoaderEntries: PromptAssetLoaderEntry[] = [
     load: () => require("../prompts/novel/completion/compactBook.prompts").compactBookEndingAuditPrompt as UnknownPromptAsset,
   },
   {
-    key: "novel.director.idea_inspiration@v4",
+    key: "novel.director.idea_inspiration@v5",
     load: () => require("../prompts/novel/ideaInspiration.prompts").directorIdeaInspirationPrompt as UnknownPromptAsset,
   },
   {

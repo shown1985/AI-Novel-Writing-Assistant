@@ -399,9 +399,9 @@ export async function parseStructuredLlmRawContentDetailed<T>(
     throw buildStructuredError({
       message,
       category,
-      // A native JSON response may occasionally arrive empty even when the
-      // request itself succeeded. Retry the portable prompt-JSON strategy
-      // before escalating to the configured fallback model.
+      // A plain empty response (no reasoning/budget evidence) can come from a vendor that does not
+      // honor the native structured mode; fall back to the next strategy. Budget exhaustion and
+      // truncation keep stopping so the user gets an actionable hint instead of repeated calls.
       retryWithNextStrategy: category === "empty_content" && input.strategy !== "prompt_json",
       strategy: input.strategy,
       profile: input.profile,
