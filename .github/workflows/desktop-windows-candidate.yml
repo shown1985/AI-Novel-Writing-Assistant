@@ -106,6 +106,53 @@ jobs:
             Where-Object { $_.Message -like '*Biz Novel Studio*' } |
             Select-Object -First 8 TimeCreated, Id, ProviderName, Message |
             Format-List
+          $version = (Get-Content 'desktop/package.json' -Raw | ConvertFrom-Json).version
+          $installer = Join-Path 'desktop/build/dist' "Biz Novel Studio-$version-setup-x64.exe"
+          if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
+            throw 'The built NSIS installer is missing from the diagnostic runner.'
+          }
+          $installer = (Resolve-Path -LiteralPath $installer).Path
+          $probeDir = Join-Path $env:RUNNER_TEMP 'desktop-installer-cdb-probe'
+          if (Test-Path -LiteralPath $probeDir) {
+            throw 'The isolated CDB probe directory already exists.'
+          }
+          $debuggerRoot = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\Debuggers'
+          $cdb = @(
+            (Join-Path $debuggerRoot 'x86\cdb.exe'),
+            (Join-Path $debuggerRoot 'x64\cdb.exe')
+          ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          if (-not $cdb) {
+            throw 'Windows Desktop Debugger cdb.exe was not found on the runner.'
+          }
+          $start = [System.Diagnostics.ProcessStartInfo]::new()
+          $start.FileName = $cdb
+          $start.WorkingDirectory = $env:RUNNER_TEMP
+          $start.UseShellExecute = $false
+          $start.RedirectStandardOutput = $true
+          $start.RedirectStandardError = $true
+          foreach ($argument in @('-o', '-G', '-hd', '-xd', 'av', '-c', 'g; .exr -1; .ecxr; kv; q', $installer, '/S', "/D=$probeDir")) {
+            [void]$start.ArgumentList.Add($argument)
+          }
+          $process = [System.Diagnostics.Process]::Start($start)
+          $stdout = $process.StandardOutput.ReadToEndAsync()
+          $stderr = $process.StandardError.ReadToEndAsync()
+          if (-not $process.WaitForExit(180000)) {
+            $process.Kill($true)
+            throw 'CDB installer diagnosis exceeded three minutes.'
+          }
+          $output = $stdout.GetAwaiter().GetResult()
+          $stderr.GetAwaiter().GetResult() | Out-Null
+          if ($output -notmatch '(?i)ExceptionCode:\s*c0000005' -or $output -notmatch 'ExceptionAddress:') {
+            throw "CDB did not capture an unhandled access violation (exit code $($process.ExitCode))."
+          }
+          $matches = @($output -split "`r?`n" | Where-Object {
+            $_ -match 'Access violation|ExceptionAddress:|ExceptionCode:|[A-Za-z0-9_.-]+![A-Za-z0-9_?@.$+-]+'
+          } | Select-Object -First 30)
+          if ($matches.Count -eq 0) {
+            throw "CDB exited without a fault module summary (exit code $($process.ExitCode))."
+          }
+          $matches | ForEach-Object { $_.Trim() }
+          Write-Output "CDB exit code: $($process.ExitCode)"
 
       - name: Prepare candidate download
         id: prepare_candidate
