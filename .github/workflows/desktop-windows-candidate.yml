@@ -70,16 +70,49 @@ jobs:
         run: pnpm --filter @ai-novel/server exec node --test tests/prismaMigrationCompleteness.test.js tests/runtimeMigrations.test.js
 
       - name: Build unsigned NSIS installer
+        id: package_installer
         run: pnpm dist:desktop:nsis:reuse-stage
 
       - name: Verify packaged desktop layout
+        id: package_layout
         run: node desktop/scripts/verify-desktop-package.cjs --platform win32 --arch x64
 
       - name: Verify isolated install and reinstall
+        id: installer_smoke
         run: node desktop/scripts/verify-desktop-installer.cjs
 
-      - name: Prepare candidate download
+      - name: Diagnose installer failure
+        if: failure() && steps.installer_smoke.outcome == 'failure'
         shell: pwsh
+        run: |
+          $install = 'desktop/build/installer-smoke/install'
+          if (Test-Path -LiteralPath $install) {
+            Get-ChildItem -LiteralPath $install -Force |
+              Select-Object Name, Length, LastWriteTimeUtc |
+              Format-Table -AutoSize
+            $files = @(Get-ChildItem -LiteralPath $install -Recurse -File -ErrorAction SilentlyContinue)
+            Write-Output "Partial install file count: $($files.Count)"
+            Write-Output "Installed app executable exists: $(Test-Path -LiteralPath (Join-Path $install 'Biz Novel Studio.exe'))"
+            if ($files.Count -gt 0) {
+              $longest = $files | Sort-Object { $_.FullName.Length } -Descending | Select-Object -First 1
+              Write-Output "Longest installed path length: $($longest.FullName.Length)"
+            }
+          }
+          Get-WinEvent -FilterHashtable @{
+            LogName = 'Application'
+            StartTime = (Get-Date).AddMinutes(-15)
+            Id = 1000, 1001
+          } -ErrorAction SilentlyContinue |
+            Where-Object { $_.Message -like '*Biz Novel Studio*' } |
+            Select-Object -First 8 TimeCreated, Id, ProviderName, Message |
+            Format-List
+
+      - name: Prepare candidate download
+        id: prepare_candidate
+        if: always() && steps.package_installer.outcome == 'success' && steps.package_layout.outcome == 'success' && (steps.installer_smoke.outcome == 'success' || steps.installer_smoke.outcome == 'failure')
+        shell: pwsh
+        env:
+          INSTALLER_SMOKE_OUTCOME: ${{ steps.installer_smoke.outcome }}
         run: |
           $ErrorActionPreference = 'Stop'
           $dist = 'desktop/build/dist'
@@ -104,10 +137,13 @@ jobs:
             signed = $false
             installer = $expectedName
             installerSha256 = $hash
+            installerSmokeOutcome = $env:INSTALLER_SMOKE_OUTCOME
+            readyForAcceptance = ($env:INSTALLER_SMOKE_OUTCOME -eq 'success')
           }
           $buildInfo | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'build-info.json') -Encoding utf8
 
       - name: Upload Windows x64 candidate
+        if: always() && steps.prepare_candidate.outcome == 'success'
         uses: actions/upload-artifact@v7
         with:
           name: windows-x64-${{ github.sha }}
