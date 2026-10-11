@@ -12,7 +12,7 @@ import { z } from "zod";
 import { prisma } from "../db/prisma";
 import { setProviderSecretCache } from "../llm/factory";
 import { evictSharedLimiters } from "../llm/requestLimiter";
-import { filterHiddenModels, parseHiddenModels, refreshProviderModels, serializeHiddenModels } from "../llm/modelCatalog";
+import { filterHiddenModels, getKnownProviderModels, parseHiddenModels, refreshProviderModels, serializeHiddenModels } from "../llm/modelCatalog";
 import { llmProviderSchema } from "../llm/providerSchema";
 import { normalizeReasoningEffort, supportsReasoningEffort as supportsModelReasoningEffort } from "../llm/reasoning";
 import {
@@ -242,7 +242,9 @@ function buildBuiltInProviderStatus(
   const hiddenModels = parseHiddenModels(item?.hiddenModels);
   const fallbackModels = getFallbackModels(provider, configuredModel);
   const currentModel = configuredModel ?? fallbackModels[0] ?? "";
-  const models = filterHiddenModels(fallbackModels, hiddenModels, currentModel);
+  const models = filterHiddenModels(getKnownProviderModels(provider, {
+    baseURL: currentBaseURL, fallbackModel: currentModel,
+  }), hiddenModels, currentModel);
   const currentImageModel = imageModel ?? getDefaultImageModel(provider) ?? null;
   const isConfigured = requiresApiKey ? Boolean(effectiveKey && currentModel) : Boolean(currentModel && currentBaseURL);
   const supportsReasoningEffort = supportsModelReasoningEffort(provider, currentBaseURL, currentModel);
@@ -292,7 +294,9 @@ function buildCustomProviderStatus(item: {
   const currentBaseURL = normalizeOptionalText(item.baseURL) ?? "";
   const currentAuthMode = normalizeProviderAuthMode(item.authMode);
   const hiddenModels = parseHiddenModels(item.hiddenModels);
-  const models = filterHiddenModels(currentModel ? [currentModel] : [], hiddenModels, currentModel);
+  const models = filterHiddenModels(getKnownProviderModels(item.provider, {
+    baseURL: currentBaseURL, fallbackModel: currentModel,
+  }), hiddenModels, currentModel);
   const supportsReasoningEffort = supportsModelReasoningEffort(item.provider, currentBaseURL, currentModel);
   return {
     provider: item.provider,
@@ -659,7 +663,10 @@ router.put(
       evictSharedLimiters(provider);
 
       const hiddenModels = parseHiddenModels(data.hiddenModels);
-      let models = filterHiddenModels(getFallbackModels(provider, data.model ?? undefined), hiddenModels, data.model ?? undefined);
+      let models = filterHiddenModels(getKnownProviderModels(provider, {
+        baseURL: nextBaseURL ?? getProviderEnvBaseUrl(provider),
+        fallbackModel: effectiveCurrentModel,
+      }), hiddenModels, effectiveCurrentModel);
       let message = "厂商配置已保存。";
       try {
         models = filterHiddenModels(

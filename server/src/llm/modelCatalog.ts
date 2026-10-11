@@ -79,10 +79,21 @@ function getCachedModels(provider: LLMProvider, baseURL?: string): string[] | un
   }
   const expired = Date.now() - item.cachedAt > MODEL_CACHE_TTL_MS;
   if (expired) {
-    modelCache.delete(cacheKey);
     return undefined;
   }
   return item.models;
+}
+
+// Local projection uses the last successful catalog independently of refresh freshness.
+export function getKnownProviderModels(
+  provider: LLMProvider,
+  options: Pick<GetProviderModelsOptions, "baseURL" | "fallbackModel" | "fallbackModels" | "includeBuiltInFallback"> = {},
+): string[] {
+  const snapshot = modelCache.get(getCacheKey(provider, options.baseURL));
+  if (!snapshot) {
+    return getFallbackModels(provider, options);
+  }
+  return uniqueModels([...snapshot.models, ...(options.fallbackModels ?? []), options.fallbackModel ?? ""]);
 }
 
 function setCachedModels(provider: LLMProvider, models: string[], baseURL?: string): string[] {
