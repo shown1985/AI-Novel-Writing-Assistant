@@ -5,6 +5,7 @@ import type {
   ShortStoryQualityResult,
 } from "@ai-novel/shared/types/creationStudio";
 import { prisma } from "../../../../db/prisma";
+import { parseLLMModelIdentity } from "../../../../services/settings/LLMSelectionSettingsService";
 import { runStructuredPrompt } from "../../../../prompting/core/promptRunner";
 import {
   shortStoryFullAuditPrompt,
@@ -123,6 +124,7 @@ export class ShortStoryProductionService {
     }
     return {
       task,
+      llmSelection: parseLLMModelIdentity(parseJson<{ llmSelection?: unknown } | null>(task.seedPayloadJson, null)?.llmSelection),
       novel: task.novel,
       intentRow,
       intent: {
@@ -170,6 +172,7 @@ export class ShortStoryProductionService {
         productionFoundation: context.productionFoundation,
       },
       options: {
+        ...context.llmSelection,
         taskId: context.task.id,
         novelId: context.novel.id,
         stage: "short_story_plan",
@@ -269,6 +272,7 @@ export class ShortStoryProductionService {
           promptInput: writerInput,
           contextBlocks: buildShortStoryWriterContextBlocks({ ...writerInput, platform: context.platform }),
           options: {
+            ...context.llmSelection,
             taskId: context.task.id,
             novelId: context.novel.id,
             stage: "short_story_draft",
@@ -338,6 +342,7 @@ export class ShortStoryProductionService {
         productionFoundation: context.productionFoundation,
       },
       options: {
+        ...context.llmSelection,
         taskId: context.task.id,
         novelId: context.novel.id,
         stage: "short_story_review",
@@ -415,6 +420,7 @@ export class ShortStoryProductionService {
         productionFoundation: context.productionFoundation,
       },
       options: {
+        ...context.llmSelection,
         taskId: context.task.id,
         novelId: context.novel.id,
         stage: "short_story_review",

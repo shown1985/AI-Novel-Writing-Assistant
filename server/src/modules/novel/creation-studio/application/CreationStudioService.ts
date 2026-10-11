@@ -12,6 +12,7 @@ import type {
 import type { DirectorCandidate } from "@ai-novel/shared/types/novelDirector";
 import type { WritingPlatform, WritingPlatformPreference } from "@ai-novel/shared/types/writingPlatform";
 import { prisma } from "../../../../db/prisma";
+import { captureCurrentLLMModelIdentity, type LLMModelIdentity } from "../../../../services/settings/LLMSelectionSettingsService";
 import { AppError } from "../../../../middleware/errorHandler";
 import { runStructuredPrompt } from "../../../../prompting/core/promptRunner";
 import { creationDirectionReplacePrompt, creationIntentInterpretPrompt, requestedCreationDirectionCount } from "../../../../prompting/prompts/creation/creationIntent.prompts";
@@ -25,6 +26,7 @@ import { canClaimDirectionEdit, canClaimDirectionRegeneration, canRestorePriorDi
 
 interface CreationStudioSeed {
   idea: string;
+  llmSelection?: LLMModelIdentity;
   derivedFromNovelId?: string;
   currentIntentVersionId?: string;
   selectedDirectionId?: string;
@@ -87,6 +89,7 @@ export class CreationStudioService {
     if (!idea) {
       throw new AppError("请先写下你想创作的内容。", 400);
     }
+    const llmSelection = await captureCurrentLLMModelIdentity();
     const task = await this.workflowService.bootstrapTask({
       lane: "creation_studio",
       title: "把想法写成作品",
@@ -100,10 +103,11 @@ export class CreationStudioService {
       writingPlatformPreference: input.writingPlatformPreference,
       directionCount: input.preferredNarrativeForm === "short_story" ? input.directionCount ?? 4 : 2,
       source: "initial",
-    });
+    }, llmSelection);
   }
 
   async createDerivedLongForm(sourceNovelId: string): Promise<CreationStudioTaskProjection> {
+    const llmSelection = await captureCurrentLLMModelIdentity();
     const source = await prisma.novel.findUnique({
       where: { id: sourceNovelId },
       include: {
@@ -139,7 +143,7 @@ export class CreationStudioService {
       preferredNarrativeForm: "long_novel",
       targetWordCount: 200000,
       source: "derived",
-    });
+    }, llmSelection);
   }
 
   async regenerate(taskId: string, input: CreationStudioRegenerateRequest): Promise<CreationStudioTaskProjection> {
@@ -147,6 +151,7 @@ export class CreationStudioService {
   }
 
   private async regenerateUnlocked(taskId: string, input: CreationStudioRegenerateRequest): Promise<CreationStudioTaskProjection> {
+    const llmSelection = await captureCurrentLLMModelIdentity();
     this.assertTarget(input.narrativeForm, input.targetWordCount);
     const task = await this.requireCreationTask(taskId);
     const seed = parseSeedPayload<CreationStudioSeed>(task.seedPayloadJson);
@@ -181,11 +186,12 @@ export class CreationStudioService {
       writingPlatformPreference: input.writingPlatformPreference,
       directionCount: input.narrativeForm === "short_story" ? input.directionCount ?? 4 : 2,
       source: "regenerated",
-    });
+    }, llmSelection);
   }
 
   async replaceDirection(taskId: string, input: CreationStudioReplaceDirectionRequest): Promise<CreationStudioTaskProjection> {
     return this.withEditLock(taskId, async () => {
+      const llmSelection = await captureCurrentLLMModelIdentity();
       const task = await this.requireCreationTask(taskId);
       const seed = parseSeedPayload<CreationStudioSeed>(task.seedPayloadJson);
       if (task.novelId || task.status !== "waiting_approval" || !seed || !canClaimDirectionEdit(seed, input.intentVersionId)) {
@@ -211,7 +217,7 @@ export class CreationStudioService {
           otherDirections: others,
           feedback: input.feedback,
         },
-        options: { taskId, stage: "creation_intent", itemKey: `replace:${input.directionId}`, entrypoint: "creation_studio", temperature: 0.8 },
+        options: { ...llmSelection, taskId, stage: "creation_intent", itemKey: `replace:${input.directionId}`, entrypoint: "creation_studio", temperature: 0.8 },
       });
       const replacement = { ...generated.output, id: current.id };
       if (others.some((item) => item.title === replacement.title || item.premise === replacement.premise)) {
@@ -287,10 +293,13 @@ export class CreationStudioService {
   }
 
   async confirm(taskId: string, input: CreationStudioConfirmRequest): Promise<CreationStudioConfirmationResult> {
-    return this.withEditLock(taskId, () => this.confirmUnlocked(taskId, input));
+    return this.withEditLock(taskId, async () => {
+      const llmSelection = await captureCurrentLLMModelIdentity();
+      return this.confirmUnlocked(taskId, input, llmSelection);
+    });
   }
 
-  private async confirmUnlocked(taskId: string, input: CreationStudioConfirmRequest): Promise<CreationStudioConfirmationResult> {
+  private async confirmUnlocked(taskId: string, input: CreationStudioConfirmRequest, llmSelection: LLMModelIdentity | null): Promise<CreationStudioConfirmationResult> {
     const task = await this.requireCreationTask(taskId);
     const currentSeed = parseSeedPayload<CreationStudioSeed>(task.seedPayloadJson);
     if (!matchesCurrentDirectionVersion(currentSeed?.currentIntentVersionId, input.intentVersionId)) {
@@ -364,16 +373,16 @@ export class CreationStudioService {
         });
       } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-          return this.confirmUnlocked(taskId, input);
+          return this.confirmUnlocked(taskId, input, llmSelection);
         }
         throw error;
       }
     }
 
     if (input.narrativeForm === "short_story") {
-      return this.confirmShortStory(task.id, seed, intent.id, direction, input);
+      return this.confirmShortStory(task.id, seed, intent.id, direction, input, llmSelection);
     }
-    return this.confirmLongNovel(task.id, seed, intent.id, direction, input);
+    return this.confirmLongNovel(task.id, seed, intent.id, direction, input, llmSelection);
   }
 
   private async runInterpretation(taskId: string, input: {
@@ -384,7 +393,7 @@ export class CreationStudioService {
     writingPlatformPreference?: WritingPlatformPreference;
     directionCount?: 2 | 4 | 6;
     source: "initial" | "regenerated" | "derived";
-  }): Promise<CreationStudioTaskProjection> {
+  }, llmSelection: LLMModelIdentity | null): Promise<CreationStudioTaskProjection> {
     if (input.targetWordCount !== undefined) {
       const inferredForm = input.preferredNarrativeForm
         ?? (input.targetWordCount > 30000 ? "long_novel" : "short_story");
@@ -401,6 +410,7 @@ export class CreationStudioService {
         asset: creationIntentInterpretPrompt,
         promptInput: input,
         options: {
+          ...llmSelection,
           taskId,
           stage: "creation_intent",
           itemKey: "interpret",
@@ -413,6 +423,7 @@ export class CreationStudioService {
         throw new Error(`AI 应提供 ${expectedCount} 个创作方向。`);
       }
       const productionFoundation = generated.output.recommendedNarrativeForm === "long_novel" ? await novelCreateResourceRecommendationService.resolveRequired({
+        ...llmSelection,
         title: generated.output.directions[0].title,
         description: [
           generated.output.understanding,
@@ -495,11 +506,13 @@ export class CreationStudioService {
     intentVersionId: string,
     direction: CreationDirection,
     input: CreationStudioConfirmRequest,
+    llmSelection: LLMModelIdentity | null,
   ): Promise<CreationStudioConfirmationResult> {
     const novel = await (async () => {
       try {
         const platformSnapshot = await writingPlatformProfileService.snapshot(input.writingPlatform, "short_story");
         const foundation = await novelCreateResourceRecommendationService.resolveRequired({
+          ...llmSelection,
           title: direction.title,
           description: direction.premise,
           bookSellingPoint: direction.coreExperience,
@@ -560,6 +573,7 @@ export class CreationStudioService {
       progress: 0.16,
       seedPayload: {
         ...seed,
+        ...(llmSelection ? { llmSelection } : {}),
         selectedDirectionId: direction.id,
         productionTaskId: taskId,
         confirmedNarrativeForm: "short_story",
@@ -576,6 +590,7 @@ export class CreationStudioService {
     intentVersionId: string,
     direction: CreationDirection,
     input: CreationStudioConfirmRequest,
+    llmSelection: LLMModelIdentity | null,
   ): Promise<CreationStudioConfirmationResult> {
     try {
       const platformSnapshot = await writingPlatformProfileService.snapshot(input.writingPlatform, "long_novel");
@@ -588,6 +603,7 @@ export class CreationStudioService {
           secondaryStoryModeId: interpretation.productionFoundation.secondaryStoryMode?.id,
         }
         : await novelCreateResourceRecommendationService.resolveRequired({
+          ...llmSelection,
           title: direction.title,
           description: direction.premise,
           bookSellingPoint: direction.coreExperience,
@@ -596,6 +612,7 @@ export class CreationStudioService {
           projectMode: "auto_pipeline",
         });
       const result = await this.directorService.confirmCandidate({
+        ...llmSelection,
         idea: seed.idea,
         candidate: toDirectorCandidate(direction, input.targetWordCount, input.writingPlatform),
         title: direction.title,

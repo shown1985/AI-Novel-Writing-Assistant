@@ -166,6 +166,7 @@ Open-source AI novel writing assistant and long-form production studio.
 #### 修复
 
 - 刷新厂商模型列表后，隐藏或恢复某个模型会保留其余可选模型，避免列表只剩默认模型。
+- 在顶部切换模型后，创作工作室生成方向、开始创作和短篇重试会使用所选模型；同一次后台创作保持模型一致，短篇修改也遵循发起操作时的选择。
 
 完整历史更新见 [docs/releases/release-notes.md](./docs/releases/release-notes.md)。
 
