@@ -10,6 +10,10 @@ import {normalizeDirectorTargetChapterCount} from "../../services/novel/director
 
 /** New-book handoff is an entry adapter; it creates no legacy director task. */
 export async function launchNewDirectorBook(input: DirectorConfirmRequest, sourceTaskId: string, source: "creation_studio" | "original_opening" = "creation_studio") {
+  // A creation-studio confirmation captures the top model when the author confirms and passes it
+  // explicitly. That captured identity wins over a later re-read, so the opened run freezes exactly
+  // the model the author confirmed with; the stored selection is only the fallback for entries that
+  // do not capture one (for example the original opening page), and supplies the default temperature.
   const selection = await getLLMSelectionSettings();
   const provider = input.provider ?? selection?.provider, model = input.model ?? selection?.model;
   if (!provider || !model) throw new AppError("请先选择可用于创作的模型，再确认开书方向。",400);

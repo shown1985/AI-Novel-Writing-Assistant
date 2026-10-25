@@ -62,3 +62,31 @@ test("custom model catalog uses the configured authentication header", () => {
     Accept: "application/json",
   });
 });
+
+test("known catalog isolates endpoints and retains expired snapshots without making them fresh", async () => {
+  const { getKnownProviderModels, getProviderModels, refreshProviderModels } = require("../dist/llm/modelCatalog.js");
+  const originalFetch = global.fetch;
+  const originalNow = Date.now;
+  let calls = 0;
+  let now = originalNow();
+  global.fetch = async () => {
+    calls += 1;
+    return new Response(JSON.stringify({ data: [{ id: `remote-${calls}` }] }));
+  };
+  Date.now = () => now;
+  try {
+    const baseURL = "https://ttl-catalog.example/v1";
+    await refreshProviderModels("custom_ttl", undefined, baseURL, "none");
+    now += 31 * 60 * 1000;
+    assert.deepEqual(getKnownProviderModels("custom_ttl", { baseURL, fallbackModel: "selected" }), ["remote-1", "selected"]);
+    assert.deepEqual(getKnownProviderModels("custom_ttl", { baseURL: "https://other.example/v1", fallbackModel: "selected" }), ["selected"]);
+    assert.equal(calls, 1);
+    assert.deepEqual(await getProviderModels("custom_ttl", { baseURL, allowAnonymous: true }), ["remote-2"]);
+    assert.equal(calls, 2);
+    assert.deepEqual(getKnownProviderModels("openai", { fallbackModel: "selected" }).includes("selected"), true);
+    assert.deepEqual(getKnownProviderModels("custom_ttl", { baseURL, fallbackModels: ["explicit"] }), ["remote-2", "explicit"]);
+  } finally {
+    global.fetch = originalFetch;
+    Date.now = originalNow;
+  }
+});

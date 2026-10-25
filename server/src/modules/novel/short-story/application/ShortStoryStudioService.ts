@@ -7,6 +7,7 @@ import type {
   ShortStorySegmentUpdateRequest,
 } from "@ai-novel/shared/types/creationStudio";
 import { prisma } from "../../../../db/prisma";
+import { captureCurrentLLMModelIdentity, type LLMModelIdentity } from "../../../../services/settings/LLMSelectionSettingsService";
 import { AppError } from "../../../../middleware/errorHandler";
 import { runStructuredPrompt } from "../../../../prompting/core/promptRunner";
 import {
@@ -134,6 +135,7 @@ export class ShortStoryStudioService {
   }
 
   async retryProduction(novelId: string): Promise<{ taskId: string }> {
+    const llmSelection = await captureCurrentLLMModelIdentity();
     const task = await prisma.novelWorkflowTask.findFirst({
       where: {
         novelId,
@@ -149,6 +151,17 @@ export class ShortStoryStudioService {
     }
     if (task.status !== "failed" && task.status !== "cancelled") {
       throw new AppError("当前生成任务不需要重试。", 409);
+    }
+    if (llmSelection) {
+      const savedSeed = parseJson<unknown>(task.seedPayloadJson, null);
+      const seed = savedSeed && typeof savedSeed === "object" && !Array.isArray(savedSeed)
+        ? savedSeed as Record<string, unknown>
+        : {};
+      const updated = await prisma.novelWorkflowTask.updateMany({
+        where: { id: task.id, status: task.status, seedPayloadJson: task.seedPayloadJson },
+        data: { seedPayloadJson: JSON.stringify({ ...seed, llmSelection }) },
+      });
+      if (updated.count !== 1) throw new AppError("生成任务已更新，请刷新后重试。", 409);
     }
     await this.workflowService.retryTask(task.id);
     shortStoryProductionService.schedule(task.id);
@@ -187,6 +200,7 @@ export class ShortStoryStudioService {
   }
 
   async previewRevision(novelId: string, instruction: string): Promise<ShortStoryRevisionImpact> {
+    const llmSelection = await captureCurrentLLMModelIdentity();
     const context = await this.loadRevisionContext(novelId);
     const generated = await runStructuredPrompt({
       asset: shortStoryRevisionImpactPrompt,
@@ -203,6 +217,7 @@ export class ShortStoryStudioService {
         })),
       },
       options: {
+        ...llmSelection,
         novelId,
         taskId: context.task.id,
         stage: "short_story_review",
@@ -259,6 +274,7 @@ export class ShortStoryStudioService {
   }
 
   async applyRevision(novelId: string, intentVersionId: string): Promise<{ taskId: string }> {
+    const llmSelection = await captureCurrentLLMModelIdentity();
     const context = await this.loadRevisionContext(novelId);
     const proposed = await prisma.novelIntentVersion.findFirst({
       where: {
@@ -289,14 +305,14 @@ export class ShortStoryStudioService {
       progress: 0.9,
     });
     setImmediate(() => {
-      void this.runRevision(novelId, proposed.id).catch((error) => {
+      void this.runRevision(novelId, proposed.id, llmSelection).catch((error) => {
         console.error(`[short-story.revision] failed novelId=${novelId}`, error);
       });
     });
     return { taskId: context.task.id };
   }
 
-  private async runRevision(novelId: string, intentVersionId: string): Promise<void> {
+  private async runRevision(novelId: string, intentVersionId: string, llmSelection: LLMModelIdentity | null): Promise<void> {
     if (this.applying.has(novelId)) return;
     this.applying.add(novelId);
     try {
@@ -322,9 +338,9 @@ export class ShortStoryStudioService {
       });
       const direction = interpretation.directions.find((item) => item.id === scope.selectedDirectionId) ?? context.direction;
       if (scope.revision.recommendedStrategy === "full_replan") {
-        await this.applyFullReplan(context, direction, scope.revision);
+        await this.applyFullReplan(context, direction, scope.revision, llmSelection);
       } else {
-        await this.applyRevisionPatch(context, direction, scope.revision);
+        await this.applyRevisionPatch(context, direction, scope.revision, llmSelection);
       }
       await prisma.novel.update({
         where: { id: novelId },
@@ -369,6 +385,7 @@ export class ShortStoryStudioService {
       affectedSegmentOrders: number[];
       recommendedStrategy: "local_patch" | "rewrite_downstream" | "full_replan";
     },
+    llmSelection: LLMModelIdentity | null,
   ): Promise<void> {
     const affected = revision.recommendedStrategy === "rewrite_downstream"
       ? context.segments.filter((segment) => segment.order >= Math.min(...revision.affectedSegmentOrders))
@@ -400,6 +417,7 @@ export class ShortStoryStudioService {
         productionFoundation: context.productionFoundation,
       },
       options: {
+        ...llmSelection,
         novelId: context.novel.id,
         taskId: context.task.id,
         stage: "short_story_review",
@@ -438,6 +456,7 @@ export class ShortStoryStudioService {
       affectedSegmentOrders: number[];
       recommendedTargetWordCount: number;
     },
+    llmSelection: LLMModelIdentity | null,
   ): Promise<void> {
     const replanned = await runStructuredPrompt({
       asset: shortStoryPlanPrompt,
@@ -452,6 +471,7 @@ export class ShortStoryStudioService {
         productionFoundation: context.productionFoundation,
       },
       options: {
+        ...llmSelection,
         novelId: context.novel.id,
         taskId: context.task.id,
         stage: "short_story_plan",
@@ -502,6 +522,7 @@ export class ShortStoryStudioService {
           productionFoundation: context.productionFoundation,
         }),
         options: {
+          ...llmSelection,
           novelId: context.novel.id,
           taskId: context.task.id,
           stage: "short_story_draft",

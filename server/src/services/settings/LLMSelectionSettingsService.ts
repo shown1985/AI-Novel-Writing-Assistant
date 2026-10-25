@@ -11,6 +11,8 @@ export interface LLMSelectionSettings {
   maxTokens?: number;
 }
 
+export type LLMModelIdentity = Pick<LLMSelectionSettings, "provider" | "model">;
+
 export type SaveLLMSelectionSettingsInput = Omit<LLMSelectionSettings, "temperature"> & {
   temperature?: number;
 };
@@ -21,6 +23,18 @@ function normalizeProvider(value: unknown): LLMProvider | null {
 
 function normalizeModel(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+export function parseLLMModelIdentity(value: unknown): LLMModelIdentity | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const candidate = value as Record<string, unknown>;
+  const provider = normalizeProvider(candidate.provider);
+  const model = normalizeModel(candidate.model);
+  return provider && model ? { provider, model } : null;
+}
+
+export async function captureCurrentLLMModelIdentity(): Promise<LLMModelIdentity | null> {
+  return parseLLMModelIdentity(await getLLMSelectionSettings());
 }
 
 function normalizeTemperature(value: unknown): number {

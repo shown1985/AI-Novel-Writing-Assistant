@@ -14,6 +14,7 @@ import { setProviderSecretCache } from "../llm/factory";
 import { evictSharedLimiters } from "../llm/requestLimiter";
 import {
   filterHiddenModels,
+  getKnownProviderModels,
   parseHiddenModels,
   parseModelList,
   refreshProviderModels,
@@ -265,7 +266,9 @@ function buildBuiltInProviderStatus(
   const hiddenModels = parseHiddenModels(item?.hiddenModels);
   const fallbackModels = getFallbackModels(provider, configuredModel);
   const currentModel = configuredModel ?? fallbackModels[0] ?? "";
-  const models = filterHiddenModels(fallbackModels, hiddenModels, currentModel);
+  const models = filterHiddenModels(getKnownProviderModels(provider, {
+    baseURL: currentBaseURL, fallbackModel: currentModel,
+  }), hiddenModels, currentModel);
   const currentImageModel = imageModel ?? getDefaultImageModel(provider) ?? null;
   const isConfigured = requiresApiKey ? Boolean(effectiveKey && currentModel) : Boolean(currentModel && currentBaseURL);
   const supportsReasoningEffort = supportsModelReasoningEffort(provider, currentBaseURL, currentModel);
@@ -316,11 +319,14 @@ function buildCustomProviderStatus(item: {
   const currentBaseURL = normalizeOptionalText(item.baseURL) ?? "";
   const currentAuthMode = normalizeProviderAuthMode(item.authMode);
   const hiddenModels = parseHiddenModels(item.hiddenModels);
-  const models = filterHiddenModels(
-    [...parseModelList(item.availableModels), currentModel],
-    hiddenModels,
-    currentModel,
-  );
+  const models = filterHiddenModels([
+    ...parseModelList(item.availableModels),
+    ...getKnownProviderModels(item.provider, {
+      baseURL: currentBaseURL,
+      fallbackModel: currentModel,
+      includeBuiltInFallback: false,
+    }),
+  ], hiddenModels, currentModel);
   const supportsReasoningEffort = supportsModelReasoningEffort(item.provider, currentBaseURL, currentModel);
   return {
     provider: item.provider,
@@ -718,11 +724,12 @@ router.put(
       evictSharedLimiters(provider);
 
       const hiddenModels = parseHiddenModels(data.hiddenModels);
-      let availableModels = Array.from(new Set([
-        ...parseModelList(data.availableModels),
-        data.model ?? "",
-      ].filter(Boolean)));
-      let models = filterHiddenModels(availableModels, hiddenModels, data.model ?? undefined);
+      let availableModels = getKnownProviderModels(provider, {
+        baseURL: nextBaseURL ?? getProviderEnvBaseUrl(provider),
+        fallbackModel: effectiveCurrentModel,
+        fallbackModels: isBuiltInProvider(provider) ? undefined : parseModelList(existingRecord?.availableModels),
+      });
+      let models = filterHiddenModels(availableModels, hiddenModels, effectiveCurrentModel);
       let message = "厂商配置已保存。";
       try {
         availableModels = await refreshProviderModels(
@@ -731,7 +738,7 @@ router.put(
           nextBaseURL ?? getProviderEnvBaseUrl(provider),
           nextAuthMode,
         );
-        models = filterHiddenModels(availableModels, hiddenModels, data.model ?? undefined);
+        models = filterHiddenModels(availableModels, hiddenModels, effectiveCurrentModel);
       } catch {
         message = "厂商配置已保存，但模型列表刷新失败。可以稍后在厂商卡片中刷新。";
       }
