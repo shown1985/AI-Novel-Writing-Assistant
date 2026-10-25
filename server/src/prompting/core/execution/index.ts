@@ -5,8 +5,10 @@ export {
 } from "./promptExecutionContext";
 export {
   applyPromptPostValidate,
+  resolveStructuredFallbackRepairAttempts,
   resolveStructuredOutput,
   resolveStructuredRepairAttempts,
+  resolveStructuredRepairGuidance,
   resolveStructuredStreamOutput,
   type PromptStructuredInvoker,
 } from "./structuredPromptExecution";

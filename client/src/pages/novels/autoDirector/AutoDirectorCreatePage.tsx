@@ -13,7 +13,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { flattenGenreTreeOptions, getGenreTree } from "@/api/genre";
 import { flattenStoryModeTreeOptions, getStoryModeTree } from "@/api/storyMode";
-import { bootstrapNovelWorkflow, getNovelWorkflowTaskDetail } from "@/api/novelWorkflow";
+import { bootstrapNovelWorkflow } from "@/api/novelWorkflow";
+import { getTaskDetail } from "@/api/tasks";
 import { setNovelCreationExperience } from "@/api/novel";
 import { queryKeys } from "@/api/queryKeys";
 import { getWorldList } from "@/api/world";
@@ -21,10 +22,17 @@ import { getMarketCreativeBrief } from "@/api/marketRadar";
 import { createStyleProfileFromBookAnalysis, getStyleProfiles } from "@/api/styleEngine";
 import { generateCreativeCarryoverContract } from "@/api/creativeCarryoverContract";
 import { Button } from "@/components/ui/button";
+import { AppDialogContent, Dialog, DialogClose, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/toast";
+import { stripLegacyTaskUrlParams } from "@/lib/legacyTaskUrlParams";
+import { buildCandidateTaskHref, readCandidateTaskId } from "@/lib/novelRoutes";
+import { getCandidateTaskNovelHref } from "@/lib/novelRoutes";
 import { useLLMStore } from "@/store/llmStore";
 import type { CreativeCarryoverContract } from "@ai-novel/shared/types/creativeCarryoverContract";
-import { buildOpeningIdeaFromCarryoverContract } from "@ai-novel/shared/types/creativeCarryoverContract";
+import {
+  buildOpeningIdeaFromCarryoverContract,
+  matchesCreativeCarryoverSource,
+} from "@ai-novel/shared/types/creativeCarryoverContract";
 import ReferenceNovelStartDialog from "../components/ReferenceNovelStartDialog";
 import CreativeCarryoverContractPanel, {
   type CreativeCarryoverPanelState,
@@ -61,7 +69,6 @@ import {
   saveAutoDirectorCreateDraft,
 } from "./draft/autoDirectorCreateDraft";
 import { useAutoDirectorCreateController } from "./useAutoDirectorCreateController";
-import { resolveCarryoverSource } from "./creativeCarryover";
 
 const STAGE_ORDER: AutoDirectorCreateStageKey[] = ["idea", "basic", "world_style", "model_run", "candidates"];
 const ALL_BOOK_ANALYSIS_SECTIONS = [
@@ -100,7 +107,7 @@ function AutoDirectorCreatePageContent() {
   const reducedMotion = useReducedMotion();
   const queryClient = useQueryClient();
   const llm = useLLMStore();
-  const taskIdFromQuery = searchParams.get("taskId")?.trim() ?? "";
+  const taskIdFromQuery = readCandidateTaskId(searchParams)?.trim() ?? "";
   const legacyTaskIdFromQuery = searchParams.get("workflowTaskId")?.trim() ?? "";
   const normalizedTaskId = taskIdFromQuery || legacyTaskIdFromQuery;
   const marketBriefId = searchParams.get("marketBriefId")?.trim() ?? "";
@@ -142,6 +149,7 @@ function AutoDirectorCreatePageContent() {
     },
   ));
   const [referenceStartOpen, setReferenceStartOpen] = useState(searchParams.get("start") === "reference");
+  const [carryoverDialogOpen, setCarryoverDialogOpen] = useState(false);
   const [activeStage, setActiveStage] = useState<AutoDirectorCreateStageKey>(
     initialDraft?.activeStage ?? "idea",
   );
@@ -163,15 +171,37 @@ function AutoDirectorCreatePageContent() {
       : { kind: "idle" }
   ));
   const carryoverRequestedRef = useRef<string | null>(null);
-  const [carryoverAdoptionPending, setCarryoverAdoptionPending] = useState(false);
-  const handleCarryoverContractChange = useCallback((contract: CreativeCarryoverContract | null) => {
-    setCarryoverContract(contract);
-    setCarryoverPanelState(contract ? { kind: "ready", contract } : { kind: "idle" });
-  }, []);
+  const carryoverSelectionRef = useRef<string | null>(null);
+  const carryoverGenerationIdRef = useRef(0);
+  const [carryoverGeneratingKey, setCarryoverGeneratingKey] = useState<string | null>(null);
+  const [isCarryoverAdopting, setIsCarryoverAdopting] = useState(false);
   const restoreHandledRef = useRef<string | null>(null);
   const marketBriefFormAppliedRef = useRef<string | null>(null);
   const marketBriefIdeaAppliedRef = useRef<string | null>(null);
   const referenceAppliedRef = useRef<string | null>(null);
+  const resolvedCarryoverMode = referenceMode
+    || (basicForm.writingMode === "continuation" && basicForm.continuationBookAnalysisId
+      ? "continuation" as const
+      : basicForm.referenceBookAnalysisId
+        ? "adaptation" as const
+        : "");
+  const resolvedCarryoverAnalysisId = referenceBookAnalysisId
+    || (resolvedCarryoverMode === "continuation"
+      ? basicForm.continuationBookAnalysisId
+      : basicForm.referenceBookAnalysisId)
+    || "";
+  const showCarryoverPanel = Boolean(resolvedCarryoverMode && resolvedCarryoverAnalysisId);
+  const activeCarryoverContract = matchesCreativeCarryoverSource(
+    carryoverContract,
+    resolvedCarryoverMode,
+    resolvedCarryoverAnalysisId,
+  ) ? carryoverContract : null;
+  const handleCreativeCarryoverContractChange = useCallback((contract: CreativeCarryoverContract | null) => {
+    setCarryoverContract(contract);
+    if (contract) {
+      setCarryoverPanelState({ kind: "ready", contract });
+    }
+  }, []);
 
   const worldListQuery = useQuery({
     queryKey: queryKeys.worlds.all,
@@ -192,7 +222,7 @@ function AutoDirectorCreatePageContent() {
   });
   const restoreWorkflowQuery = useQuery({
     queryKey: queryKeys.tasks.detail("novel_workflow", normalizedTaskId || "none"),
-    queryFn: () => getNovelWorkflowTaskDetail(normalizedTaskId),
+    queryFn: () => getTaskDetail("novel_workflow", normalizedTaskId),
     enabled: Boolean(normalizedTaskId) && !hasLegacyParams,
     retry: false,
     refetchOnMount: "always",
@@ -312,11 +342,10 @@ function AutoDirectorCreatePageContent() {
     if (storage) {
       clearAutoDirectorCreateDraft(storage, draftScopeKey);
     }
-    const nextSearchParams = new URLSearchParams(searchParams);
+    const nextSearchParams = stripLegacyTaskUrlParams(searchParams);
     nextSearchParams.delete("workflowTaskId");
     nextSearchParams.delete("mode");
-    nextSearchParams.set("taskId", taskId);
-    navigate(`/novels/auto-director?${nextSearchParams.toString()}`, { replace: true });
+    navigate(buildCandidateTaskHref(taskId, nextSearchParams), { replace: true });
   };
 
   const restoreTask = restoreWorkflowQuery.isFetchedAfterMount
@@ -324,20 +353,6 @@ function AutoDirectorCreatePageContent() {
     : null;
   const restoredWorkflowTask = restoreTask?.meta.lane === "auto_director" ? restoreTask : null;
 
-  const { mode: resolvedCarryoverMode, bookAnalysisId: resolvedCarryoverAnalysisId } = resolveCarryoverSource({
-    basicForm,
-    formInitialized: Boolean(initialDraft || restoredWorkflowTask)
-      || referenceAppliedRef.current === `${referenceMode}:${referenceBookAnalysisId}:${referenceDocumentId}`
-      || !referenceMode || !referenceBookAnalysisId,
-    initialMode: referenceMode,
-    initialBookAnalysisId: referenceBookAnalysisId,
-    restoredContract: carryoverContract,
-  });
-  const effectiveCarryoverContract = carryoverContract
-    && carryoverContract.mode === resolvedCarryoverMode
-    && carryoverContract.bookAnalysisId === resolvedCarryoverAnalysisId
-    ? carryoverContract
-    : null;
   const controller = useAutoDirectorCreateController({
     marketBriefId,
     initialStyleProfileId: resolvedInitialStyleProfileId,
@@ -348,9 +363,9 @@ function AutoDirectorCreatePageContent() {
     initialDraft,
     workflowTaskId: normalizedTaskId,
     restoredTask: restoredWorkflowTask,
-    creativeCarryoverContract: effectiveCarryoverContract,
-    requireCreativeCarryoverAdopted: Boolean(resolvedCarryoverAnalysisId),
-    onCreativeCarryoverContractChange: handleCarryoverContractChange,
+    creativeCarryoverContract: activeCarryoverContract,
+    requireCreativeCarryoverAdopted: showCarryoverPanel,
+    onCreativeCarryoverContractChange: handleCreativeCarryoverContractChange,
     onWorkflowTaskChange: replaceTaskId,
     onBasicFormChange: (patch) => setBasicForm((prev) => patchNovelBasicForm(prev, patch)),
   });
@@ -370,6 +385,11 @@ function AutoDirectorCreatePageContent() {
     }
 
     if (restoreTask) {
+      const novelHref = getCandidateTaskNovelHref(restoreTask);
+      if (novelHref) {
+        navigate(novelHref, { replace: true });
+        return;
+      }
       if (restoreTask.meta.lane !== "auto_director") {
         if (restoreHandledRef.current !== `lane:${restoreTask.id}`) {
           restoreHandledRef.current = `lane:${restoreTask.id}`;
@@ -409,7 +429,7 @@ function AutoDirectorCreatePageContent() {
       controller.setRunMode(draft.runMode);
       controller.setWorldSetupMode(draft.worldSetupMode);
       controller.setSelectedStyleProfileId(initialStyleProfileId || draft.selectedStyleProfileId);
-      handleCarryoverContractChange(draft.creativeCarryoverContract ?? null);
+      handleCreativeCarryoverContractChange(draft.creativeCarryoverContract ?? null);
     } else if (sourceWorldId) {
       setBasicForm((current) => patchNovelBasicForm(current, { worldId: sourceWorldId }));
     }
@@ -426,7 +446,7 @@ function AutoDirectorCreatePageContent() {
     controller.setWorldSetupMode,
     draftScopeKey,
     hasLegacyParams,
-    handleCarryoverContractChange,
+    handleCreativeCarryoverContractChange,
     initialStyleProfileId,
     navigate,
     normalizedTaskId,
@@ -472,17 +492,19 @@ function AutoDirectorCreatePageContent() {
       activeStage,
       completedStages,
       runMode: controller.runMode,
+      directorVersion: controller.directorVersion,
       worldSetupMode: controller.worldSetupMode,
       selectedStyleProfileId: controller.selectedStyleProfileId,
-      creativeCarryoverContract: carryoverContract,
+      creativeCarryoverContract: activeCarryoverContract,
     });
   }, [
     activeStage,
     basicForm,
-    carryoverContract,
+    activeCarryoverContract,
     completedStages,
     controller.idea,
     controller.runMode,
+    controller.directorVersion,
     controller.selectedStyleProfileId,
     controller.workflowTaskId,
     controller.worldSetupMode,
@@ -492,6 +514,12 @@ function AutoDirectorCreatePageContent() {
     restoredWorkflowTask?.id,
   ]);
   const createdNovelId = controller.directorTask?.resumeTarget?.novelId?.trim() ?? "";
+  useEffect(() => {
+    const novelHref = getCandidateTaskNovelHref(controller.directorTask ?? restoredWorkflowTask);
+    if (novelHref) {
+      navigate(novelHref, { replace: true });
+    }
+  }, [controller.directorTask, navigate, restoredWorkflowTask]);
   const enterSimpleMutation = useMutation({
     mutationFn: () => setNovelCreationExperience(createdNovelId, "simple"),
     onSuccess: () => navigate(`/novels/${createdNovelId}/simple`, { replace: true }),
@@ -573,36 +601,24 @@ function AutoDirectorCreatePageContent() {
     setCompletedStages((prev) => new Set([...prev, stage]));
   };
 
-  const showCarryoverPanel = Boolean(resolvedCarryoverMode && resolvedCarryoverAnalysisId);
-  useEffect(() => {
-    if (!showCarryoverPanel && carryoverContract) handleCarryoverContractChange(null);
-  }, [carryoverContract, handleCarryoverContractChange, showCarryoverPanel]);
-
-  const carryoverContextKey = `${resolvedCarryoverMode}:${resolvedCarryoverAnalysisId}`;
-  const carryoverContextRef = useRef(carryoverContextKey);
-  const carryoverRequestIdRef = useRef(0);
-  const carryoverContractRef = useRef(carryoverContract);
-  carryoverContractRef.current = carryoverContract;
-  if (carryoverContextRef.current !== carryoverContextKey) {
-    carryoverContextRef.current = carryoverContextKey;
-    carryoverRequestIdRef.current += 1;
-  }
-  const isCurrentCarryoverRequest = (variables: { contextKey: string; requestId: number }) => (
-    mountedRef.current
-    && variables.contextKey === carryoverContextRef.current
-    && variables.requestId === carryoverRequestIdRef.current
-  );
-
-  const carryoverGenerateMutation = useMutation({
-    mutationFn: async (variables: {
-      mode: "continuation" | "adaptation";
-      bookAnalysisId: string;
-      contextKey: string;
-      requestId: number;
-    }) => {
+  // Effect-started mutations can lose their observer during StrictMode's subscription replay.
+  // Keep this request's lifecycle with its result so completion always unlocks adoption.
+  const generateCarryoverContract = useCallback(async (
+    selection: { mode: "continuation" | "adaptation"; bookAnalysisId: string; key: string },
+  ) => {
+    const requestId = ++carryoverGenerationIdRef.current;
+    const isCurrentRequest = () => carryoverSelectionRef.current === selection.key
+      && carryoverGenerationIdRef.current === requestId;
+    setCarryoverGeneratingKey(selection.key);
+    setCarryoverPanelState((prev) => (
+      prev.kind === "ready" && matchesCreativeCarryoverSource(prev.contract, selection.mode, selection.bookAnalysisId)
+        ? prev
+        : { kind: "loading" }
+    ));
+    try {
       const response = await generateCreativeCarryoverContract({
-        mode: variables.mode,
-        bookAnalysisId: variables.bookAnalysisId,
+        mode: selection.mode,
+        bookAnalysisId: selection.bookAnalysisId,
         provider: llm.provider || undefined,
         model: llm.model || undefined,
         temperature: llm.temperature,
@@ -610,17 +626,8 @@ function AutoDirectorCreatePageContent() {
       if (!response.data) {
         throw new Error(response.error || "创作承接方案生成失败。");
       }
-      return response.data;
-    },
-    onMutate: () => {
-      setCarryoverPanelState((prev) => (
-        prev.kind === "ready"
-          ? prev
-          : { kind: "loading" }
-      ));
-    },
-    onSuccess: (result, variables) => {
-      if (!isCurrentCarryoverRequest(variables)) return;
+      if (!isCurrentRequest()) return;
+      const result = response.data;
       if (result.status === "insufficient_material") {
         setCarryoverPanelState({
           kind: "insufficient",
@@ -630,99 +637,155 @@ function AutoDirectorCreatePageContent() {
         });
         return;
       }
-      handleCarryoverContractChange(result.contract);
-    },
-    onError: (error, variables) => {
-      if (!isCurrentCarryoverRequest(variables)) return;
+      if (!matchesCreativeCarryoverSource(result.contract, selection.mode, selection.bookAnalysisId)) {
+        setCarryoverPanelState({ kind: "error", message: "承接方案与当前参考作品不一致，请重新生成。", hasPrevious: Boolean(activeCarryoverContract) });
+        return;
+      }
+      setCarryoverContract(result.contract);
+      setCarryoverPanelState({ kind: "ready", contract: result.contract });
+    } catch (error) {
+      if (!isCurrentRequest()) return;
       const message = error instanceof Error ? error.message : "创作承接方案生成失败。";
       setCarryoverPanelState({
         kind: "error",
         message,
-        hasPrevious: Boolean(carryoverContractRef.current),
+        hasPrevious: Boolean(activeCarryoverContract),
       });
-    },
-  });
-
-  const generateCarryoverContract = () => {
-    if (!resolvedCarryoverMode || !resolvedCarryoverAnalysisId || carryoverAdoptionPending) return;
-    carryoverGenerateMutation.mutate({
-      mode: resolvedCarryoverMode,
-      bookAnalysisId: resolvedCarryoverAnalysisId,
-      contextKey: carryoverContextKey,
-      requestId: ++carryoverRequestIdRef.current,
-    });
-  };
+    } finally {
+      if (isCurrentRequest()) setCarryoverGeneratingKey(null);
+    }
+  }, [activeCarryoverContract, llm.model, llm.provider, llm.temperature]);
 
   useEffect(() => {
-    if (!showCarryoverPanel || !resolvedCarryoverMode || !resolvedCarryoverAnalysisId
-      || missingTaskDraftHydrationPending
-      || (normalizedTaskId && (!restoredWorkflowTask || !restoreWorkflowQuery.isFetchedAfterMount))) {
+    if (!showCarryoverPanel || !resolvedCarryoverMode || !resolvedCarryoverAnalysisId) {
+      carryoverSelectionRef.current = null;
       return;
     }
-    if (carryoverRequestedRef.current === carryoverContextKey) {
+    if (missingTaskDraftHydrationPending) {
       return;
     }
-    if (carryoverContract && carryoverContract.bookAnalysisId === resolvedCarryoverAnalysisId
-      && carryoverContract.mode === resolvedCarryoverMode) {
-      carryoverRequestedRef.current = carryoverContextKey;
-      setCarryoverPanelState({ kind: "ready", contract: carryoverContract });
+    const requestKey = `${resolvedCarryoverMode}:${resolvedCarryoverAnalysisId}`;
+    carryoverSelectionRef.current = requestKey;
+    if (carryoverRequestedRef.current === requestKey) {
       return;
     }
-    carryoverRequestedRef.current = carryoverContextKey;
-    if (carryoverContract) handleCarryoverContractChange(null);
+    if (activeCarryoverContract) {
+      carryoverRequestedRef.current = requestKey;
+      setCarryoverPanelState({ kind: "ready", contract: activeCarryoverContract });
+      return;
+    }
+    carryoverRequestedRef.current = requestKey;
     setCarryoverPanelState({ kind: "loading" });
-    generateCarryoverContract();
-  // Mutation callbacks read the current context; starting requests is driven by source identity.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [carryoverContract, carryoverContextKey, missingTaskDraftHydrationPending, normalizedTaskId,
-    resolvedCarryoverAnalysisId, resolvedCarryoverMode, restoredWorkflowTask, restoreWorkflowQuery.isFetchedAfterMount, showCarryoverPanel]);
+    void generateCarryoverContract({ mode: resolvedCarryoverMode, bookAnalysisId: resolvedCarryoverAnalysisId, key: requestKey });
+  }, [
+    activeCarryoverContract,
+    generateCarryoverContract,
+    missingTaskDraftHydrationPending,
+    resolvedCarryoverAnalysisId,
+    resolvedCarryoverMode,
+    showCarryoverPanel,
+  ]);
 
   const adoptCarryoverContract = async () => {
-    if (!carryoverContract || carryoverAdoptionPending || carryoverGenerateMutation.isPending
-      || carryoverContract.mode !== resolvedCarryoverMode
-      || carryoverContract.bookAnalysisId !== resolvedCarryoverAnalysisId) return;
-    const contractToAdopt = carryoverContract;
-    const adopted = { ...contractToAdopt, adopted: true };
-    const contextKey = carryoverContextKey;
-    setCarryoverAdoptionPending(true);
+    if (!activeCarryoverContract
+      || carryoverGeneratingKey === `${resolvedCarryoverMode}:${resolvedCarryoverAnalysisId}`
+      || isCarryoverAdopting) {
+      return;
+    }
+    const adopted = { ...activeCarryoverContract, adopted: true };
+    const selectionKey = carryoverSelectionRef.current;
+    setIsCarryoverAdopting(true);
     try {
       if (controller.workflowTaskId) {
-        await bootstrapNovelWorkflow({
+        const response = await bootstrapNovelWorkflow({
           workflowTaskId: controller.workflowTaskId,
           lane: "auto_director",
           seedPayload: { creativeCarryoverContract: adopted },
         });
+        if (!response.data) {
+          throw new Error(response.error || "保存承接方案失败。");
+        }
       }
-      if (!mountedRef.current || carryoverContextRef.current !== contextKey
-        || carryoverContractRef.current !== contractToAdopt) return;
-      handleCarryoverContractChange(adopted);
-      controller.setIdea((current) => current.trim() ? current : buildOpeningIdeaFromCarryoverContract(adopted));
+      if (carryoverSelectionRef.current !== selectionKey) return;
+      setCarryoverContract(adopted);
+      setCarryoverPanelState({ kind: "ready", contract: adopted });
+      if (!controller.idea.trim()) {
+        controller.setIdea(buildOpeningIdeaFromCarryoverContract(adopted));
+      }
+      setCarryoverDialogOpen(false);
     } catch (error) {
-      if (mountedRef.current && carryoverContextRef.current === contextKey) {
-        toast.error(error instanceof Error ? error.message : "保存承接方案失败。");
-      }
+      toast.error(error instanceof Error ? error.message : "保存承接方案失败。");
     } finally {
-      if (mountedRef.current) setCarryoverAdoptionPending(false);
+      setIsCarryoverAdopting(false);
     }
   };
 
   const startGenerate = () => {
-    if (showCarryoverPanel && !effectiveCarryoverContract?.adopted) {
-      toast.error("请先采用创作承接方案，再生成书级方向。");
+    if (showCarryoverPanel && !activeCarryoverContract?.adopted) {
+      setCarryoverDialogOpen(true);
       return;
     }
-    if (!controller.canGenerate || worldSelectionBlocked || carryoverAdoptionPending) {
+    if (!controller.canGenerate || worldSelectionBlocked || isCarryoverAdopting) {
       return;
     }
     setCompletedStages(completedThrough("model_run"));
     setActiveStage("candidates");
     controller.generateMutation.mutate();
   };
+  const currentCarryoverKey = `${resolvedCarryoverMode}:${resolvedCarryoverAnalysisId}`;
+  const panelBelongsToCurrentSource = !carryoverRequestedRef.current
+    || carryoverRequestedRef.current === currentCarryoverKey;
+  const readyPanelHasCurrentContract = carryoverPanelState.kind !== "ready"
+    || matchesCreativeCarryoverSource(
+      carryoverPanelState.contract,
+      resolvedCarryoverMode,
+      resolvedCarryoverAnalysisId,
+    );
+  const visibleCarryoverPanelState: CreativeCarryoverPanelState =
+    !panelBelongsToCurrentSource || !readyPanelHasCurrentContract || carryoverPanelState.kind === "idle"
+      ? { kind: "loading" }
+      : carryoverPanelState;
+  const isCarryoverGenerating = carryoverGeneratingKey === currentCarryoverKey;
+  const carryoverModeLabel = resolvedCarryoverMode === "continuation" ? "续写原作" : "参考创作新书";
+  const carryoverTitle = referenceTitle || activeCarryoverContract?.documentTitle || "参考作品";
+  const carryoverStatus = isCarryoverGenerating || visibleCarryoverPanelState.kind === "loading"
+    ? "AI 正在整理方案，你可以先完善开书想法。"
+    : visibleCarryoverPanelState.kind === "insufficient"
+      ? "拆书材料不足，请查看需要补齐的结论。"
+      : visibleCarryoverPanelState.kind === "error"
+        ? activeCarryoverContract ? "新方案生成失败，可查看并采用保留的方案。" : "方案生成失败，可打开后重试。"
+        : activeCarryoverContract?.adopted
+          ? "方案已采用，将用于后续故事规划。"
+          : "方案已准备好，查看并采用后即可生成整书方向。";
+  const regenerateCarryoverContract = () => {
+    if (!resolvedCarryoverMode || !resolvedCarryoverAnalysisId || isCarryoverGenerating || isCarryoverAdopting) return;
+    void generateCarryoverContract({
+      mode: resolvedCarryoverMode,
+      bookAnalysisId: resolvedCarryoverAnalysisId,
+      key: currentCarryoverKey,
+    });
+  };
+  const carryoverEntry = showCarryoverPanel ? (
+    <div className="flex flex-col gap-3 rounded-lg bg-muted/35 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium text-foreground" title={carryoverTitle}>
+          {carryoverModeLabel} · {carryoverTitle}
+        </p>
+        <p role="status" className="mt-1 text-xs leading-5 text-muted-foreground">{carryoverStatus}</p>
+      </div>
+      <DialogTrigger asChild>
+        <Button type="button" variant="secondary" size="sm" className="shrink-0 self-start sm:self-auto">
+          {activeCarryoverContract?.adopted ? "查看已采用方案" : "查看创作方案"}
+        </Button>
+      </DialogTrigger>
+    </div>
+  ) : null;
 
   const renderStage = () => {
     if (activeStage === "idea") {
       return (
         <StageIdea
+          referenceContext={carryoverEntry}
           idea={controller.idea}
           onIdeaChange={controller.setIdea}
           ideaInspirations={controller.ideaInspirations}
@@ -823,6 +886,10 @@ function AutoDirectorCreatePageContent() {
     if (activeStage === "model_run") {
       return (
         <StageModelRun
+          directorVersion={controller.directorVersion}
+          availableDirectorVersions={controller.availableDirectorVersions}
+          onDirectorVersionChange={controller.setDirectorVersion}
+          versionLocked={Boolean(controller.workflowTaskId)}
           basicForm={controller.directorBasicForm}
           onBasicFormChange={controller.onBasicFormChange}
           canGenerate={controller.canGenerate && !worldSelectionBlocked}
@@ -849,22 +916,44 @@ function AutoDirectorCreatePageContent() {
   const showSummaryBar = activeStage !== "idea" || completedStages.size > 0 || controller.workflowTaskId;
 
   return (
+    <Dialog open={carryoverDialogOpen} onOpenChange={setCarryoverDialogOpen}>
     <div className="mx-auto max-w-6xl space-y-4 px-3 py-4 sm:px-4 lg:px-0">
       <ReferenceNovelStartDialog open={referenceStartOpen} onOpenChange={setReferenceStartOpen} />
       {showCarryoverPanel ? (
+        <AppDialogContent
+          title="创作承接方案"
+          description="查看参考作品如何延续到你的故事，采用后继续完成开书设置。"
+          className="max-w-5xl"
+          footerClassName="flex-row flex-wrap items-center gap-2 sm:space-x-0"
+          footer={(
+            <>
+              <DialogClose asChild>
+                <Button type="button" variant="secondary" className="mr-auto">返回开书设置</Button>
+              </DialogClose>
+              {visibleCarryoverPanelState.kind === "ready" ? (
+                <Button type="button" variant="ghost" onClick={regenerateCarryoverContract} disabled={isCarryoverGenerating || isCarryoverAdopting}>
+                  {isCarryoverGenerating ? "正在生成…" : "重新生成"}
+                </Button>
+              ) : null}
+              {activeCarryoverContract && !activeCarryoverContract.adopted
+                && (visibleCarryoverPanelState.kind === "ready" || visibleCarryoverPanelState.kind === "error") ? (
+                <Button type="button" onClick={() => void adoptCarryoverContract()} disabled={isCarryoverGenerating || isCarryoverAdopting}>
+                  {isCarryoverAdopting ? "正在采用…" : "采用推荐方案"}
+                </Button>
+              ) : null}
+            </>
+          )}
+        >
         <CreativeCarryoverContractPanel
-          modeLabel={resolvedCarryoverMode === "continuation" ? "续写原作" : "参考创作新书"}
-          referenceTitle={referenceTitle || carryoverContract?.documentTitle || ""}
-          state={carryoverPanelState.kind === "idle" ? { kind: "loading" } : carryoverPanelState}
-          onAdopt={() => {
-            void adoptCarryoverContract();
-          }}
-          onRegenerate={generateCarryoverContract}
-          isGenerating={carryoverGenerateMutation.isPending || carryoverAdoptionPending}
+          modeLabel={carryoverModeLabel}
+          referenceTitle={carryoverTitle}
+          state={visibleCarryoverPanelState}
+          previousContract={activeCarryoverContract}
+          onRegenerate={regenerateCarryoverContract}
+          isGenerating={isCarryoverGenerating}
+          isAdopting={isCarryoverAdopting}
         />
-      ) : null}
-      {showCarryoverPanel ? (
-        <div className="text-xs leading-5 text-muted-foreground">
+        <div className="mt-5 border-t border-border/60 pt-4 text-xs leading-5 text-muted-foreground">
           {referenceStyleProfileQuery.isFetching
             ? "参考写法正在后台准备，不影响继续设置。"
             : referenceStyleProfileQuery.isError
@@ -873,6 +962,7 @@ function AutoDirectorCreatePageContent() {
                 ? "参考写法会随项目进入后续正文生成。"
                 : "拆书结论已带入，可以继续设置。"}
         </div>
+        </AppDialogContent>
       ) : null}
       {showSummaryBar ? (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -925,6 +1015,8 @@ function AutoDirectorCreatePageContent() {
           })}
         </div>
       ) : null}
+
+      {activeStage !== "idea" ? carryoverEntry : null}
 
       {restoreWorkflowQuery.isPending && normalizedTaskId ? (
         <div className="rounded-lg bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
@@ -1029,7 +1121,7 @@ function AutoDirectorCreatePageContent() {
             </div>
           ) : null}
         </section>
-      ) : activeStage === "idea" ? (
+      ) : activeStage === "idea" && !showCarryoverPanel ? (
         <div className="flex flex-col gap-3 rounded-xl bg-muted/35 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
           <span className="text-muted-foreground">也可以从一部参考小说或近期热门方向开始。</span>
           <div className="flex flex-wrap gap-2">
@@ -1051,6 +1143,7 @@ function AutoDirectorCreatePageContent() {
         </motion.div>
       </AnimatePresence>
     </div>
+    </Dialog>
   );
 }
 
@@ -1096,9 +1189,17 @@ class AutoDirectorCreateErrorBoundary extends Component<
 export default function AutoDirectorCreateRoute() {
   const [searchParams] = useSearchParams();
   const sourceWorldId = searchParams.get("worldId")?.trim() ?? "";
+  const scopeKey = buildAutoDirectorCreateDraftScope({
+    sourceWorldId,
+    marketBriefId: searchParams.get("marketBriefId") ?? "",
+    referenceMode: searchParams.get("referenceMode") ?? "",
+    referenceBookAnalysisId: searchParams.get("bookAnalysisId") ?? "",
+    referenceDocumentId: searchParams.get("sourceDocumentId") ?? "",
+    initialStyleProfileId: searchParams.get("styleProfileId") ?? "",
+  });
   return (
     <AutoDirectorCreateErrorBoundary>
-      <AutoDirectorCreatePageContent key={sourceWorldId} />
+      <AutoDirectorCreatePageContent key={scopeKey} />
     </AutoDirectorCreateErrorBoundary>
   );
 }

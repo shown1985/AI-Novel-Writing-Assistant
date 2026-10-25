@@ -1,4 +1,5 @@
 import { WorldService } from "../../../world/WorldService";
+import { DirectorTaskStateWriter } from "../state";
 import { randomUUID } from "node:crypto";
 import {
   DIRECTOR_CANDIDATE_SETUP_STEPS,
@@ -174,7 +175,7 @@ export class NovelDirectorCandidateStageService {
     if (!workflowTaskId?.trim()) {
       return;
     }
-    await this.workflowService.markTaskRunning(workflowTaskId, {
+    await new DirectorTaskStateWriter(this.workflowService).markRunning(workflowTaskId, {
       stage: "auto_director",
       itemKey,
       itemLabel,
@@ -323,11 +324,11 @@ export class NovelDirectorCandidateStageService {
       ].filter(Boolean).join("\n\n"),
     };
     if (resolvedInput.workflowTaskId?.trim()) {
-      await this.workflowService.bootstrapTask({
+      await new DirectorTaskStateWriter(this.workflowService).initializeTask({
         workflowTaskId: resolvedInput.workflowTaskId,
         lane: "auto_director",
         title: resolvedInput.title ?? null,
-        seedPayload: buildWorkflowSeedPayload(resolvedInput, {
+        directorState: buildWorkflowSeedPayload(resolvedInput, {
           batches: [],
           candidateStage: {
             mode: "generate",
@@ -364,11 +365,11 @@ export class NovelDirectorCandidateStageService {
       return result;
     }
 
-    const workflowTask = await this.workflowService.bootstrapTask({
+    const workflowTask = await new DirectorTaskStateWriter(this.workflowService).initializeTask({
       workflowTaskId: resolvedInput.workflowTaskId,
       lane: "auto_director",
       title: resolvedInput.title ?? null,
-      seedPayload: buildWorkflowSeedPayload(resolvedInput, {
+      directorState: buildWorkflowSeedPayload(resolvedInput, {
         batches: [result.batch],
         productionFoundation: foundation.recommendation,
         candidateStage: {
@@ -376,15 +377,8 @@ export class NovelDirectorCandidateStageService {
         },
       }),
     });
-    await this.workflowService.recordCandidateSelectionRequired(workflowTask.id, {
+    await new DirectorTaskStateWriter(this.workflowService).markCandidateSelectionRequired(workflowTask.id, {
       summary: `${result.batch.roundLabel} 已生成 ${result.batch.candidates.length} 套书级方向，并完成每套书名组。`,
-      seedPayload: buildWorkflowSeedPayload(resolvedInput, {
-        batches: [result.batch],
-        productionFoundation: foundation.recommendation,
-        candidateStage: {
-          mode: "generate",
-        },
-      }),
     });
     return {
       ...result,
@@ -395,11 +389,11 @@ export class NovelDirectorCandidateStageService {
   async refineCandidates(input: DirectorRefinementRequest): Promise<DirectorRefineResponse> {
     const worldReference = input.worldId?.trim() ? await new WorldService().getPlanningReference(input.worldId.trim()) : "";
     if (input.workflowTaskId?.trim()) {
-      await this.workflowService.bootstrapTask({
+      await new DirectorTaskStateWriter(this.workflowService).initializeTask({
         workflowTaskId: input.workflowTaskId,
         lane: "auto_director",
         title: input.title ?? null,
-        seedPayload: buildWorkflowSeedPayload(input, {
+        directorState: buildWorkflowSeedPayload(input, {
           batches: input.previousBatches,
           candidateStage: {
             mode: "refine",
@@ -439,11 +433,11 @@ export class NovelDirectorCandidateStageService {
     }
 
     const nextBatches = [...input.previousBatches, result.batch];
-    const workflowTask = await this.workflowService.bootstrapTask({
+    const workflowTask = await new DirectorTaskStateWriter(this.workflowService).initializeTask({
       workflowTaskId: input.workflowTaskId,
       lane: "auto_director",
       title: input.title ?? null,
-      seedPayload: buildWorkflowSeedPayload(input, {
+      directorState: buildWorkflowSeedPayload(input, {
         batches: nextBatches,
         candidateStage: {
           mode: "refine",
@@ -452,16 +446,8 @@ export class NovelDirectorCandidateStageService {
         },
       }),
     });
-    await this.workflowService.recordCandidateSelectionRequired(workflowTask.id, {
+    await new DirectorTaskStateWriter(this.workflowService).markCandidateSelectionRequired(workflowTask.id, {
       summary: `${result.batch.roundLabel} 已根据修正意见生成 ${result.batch.candidates.length} 套新方向，并完成标题组增强。`,
-      seedPayload: buildWorkflowSeedPayload(input, {
-        batches: nextBatches,
-        candidateStage: {
-          mode: "refine",
-          presets: input.presets ?? [],
-          feedback: input.feedback?.trim() || null,
-        },
-      }),
     });
     return {
       ...result,
@@ -472,11 +458,11 @@ export class NovelDirectorCandidateStageService {
   async patchCandidate(input: DirectorCandidatePatchRequest): Promise<DirectorCandidatePatchResponse> {
     const worldReference = input.worldId?.trim() ? await new WorldService().getPlanningReference(input.worldId.trim()) : "";
     if (input.workflowTaskId?.trim()) {
-      await this.workflowService.bootstrapTask({
+      await new DirectorTaskStateWriter(this.workflowService).initializeTask({
         workflowTaskId: input.workflowTaskId,
         lane: "auto_director",
         title: input.title ?? null,
-        seedPayload: buildWorkflowSeedPayload(input, {
+        directorState: buildWorkflowSeedPayload(input, {
           batches: input.previousBatches,
           candidateStage: {
             mode: "patch_candidate",
@@ -568,11 +554,11 @@ export class NovelDirectorCandidateStageService {
       };
     }
 
-    const workflowTask = await this.workflowService.bootstrapTask({
+    const workflowTask = await new DirectorTaskStateWriter(this.workflowService).initializeTask({
       workflowTaskId: input.workflowTaskId,
       lane: "auto_director",
       title: input.title ?? null,
-      seedPayload: buildWorkflowSeedPayload(input, {
+      directorState: buildWorkflowSeedPayload(input, {
         batches: nextBatches,
         candidateStage: {
           mode: "patch_candidate",
@@ -583,18 +569,8 @@ export class NovelDirectorCandidateStageService {
         },
       }),
     });
-    await this.workflowService.recordCandidateSelectionRequired(workflowTask.id, {
+    await new DirectorTaskStateWriter(this.workflowService).markCandidateSelectionRequired(workflowTask.id, {
       summary: `已按你的意见定向修正《${targetCandidate.workingTitle}》。`,
-      seedPayload: buildWorkflowSeedPayload(input, {
-        batches: nextBatches,
-        candidateStage: {
-          mode: "patch_candidate",
-          presets: input.presets ?? [],
-          feedback: input.feedback.trim(),
-          batchId: input.batchId,
-          candidateId: input.candidateId,
-        },
-      }),
     });
     return {
       batch: nextBatch,
@@ -606,11 +582,11 @@ export class NovelDirectorCandidateStageService {
   async refineCandidateTitleOptions(input: DirectorCandidateTitleRefineRequest): Promise<DirectorCandidateTitleRefineResponse> {
     const worldReference = input.worldId?.trim() ? await new WorldService().getPlanningReference(input.worldId.trim()) : "";
     if (input.workflowTaskId?.trim()) {
-      await this.workflowService.bootstrapTask({
+      await new DirectorTaskStateWriter(this.workflowService).initializeTask({
         workflowTaskId: input.workflowTaskId,
         lane: "auto_director",
         title: input.title ?? null,
-        seedPayload: buildWorkflowSeedPayload(input, {
+        directorState: buildWorkflowSeedPayload(input, {
           batches: input.previousBatches,
           candidateStage: {
             mode: "refine_titles",
@@ -668,11 +644,11 @@ export class NovelDirectorCandidateStageService {
       };
     }
 
-    const workflowTask = await this.workflowService.bootstrapTask({
+    const workflowTask = await new DirectorTaskStateWriter(this.workflowService).initializeTask({
       workflowTaskId: input.workflowTaskId,
       lane: "auto_director",
       title: input.title ?? null,
-      seedPayload: buildWorkflowSeedPayload(input, {
+      directorState: buildWorkflowSeedPayload(input, {
         batches: nextBatches,
         candidateStage: {
           mode: "refine_titles",
@@ -682,17 +658,8 @@ export class NovelDirectorCandidateStageService {
         },
       }),
     });
-    await this.workflowService.recordCandidateSelectionRequired(workflowTask.id, {
+    await new DirectorTaskStateWriter(this.workflowService).markCandidateSelectionRequired(workflowTask.id, {
       summary: `已按你的意见重做《${targetCandidate.workingTitle}》的标题组。`,
-      seedPayload: buildWorkflowSeedPayload(input, {
-        batches: nextBatches,
-        candidateStage: {
-          mode: "refine_titles",
-          feedback: input.feedback.trim(),
-          batchId: input.batchId,
-          candidateId: input.candidateId,
-        },
-      }),
     });
     return {
       batch: nextBatch,

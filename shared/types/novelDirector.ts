@@ -27,6 +27,7 @@ import type { StyleIntentSummary } from "./styleEngine";
 import type { DirectorAutoApprovalConfig } from "./autoDirectorApproval";
 import type { DirectorIssuePolicy } from "./directorIssue";
 import type { DirectorRiskAssessment } from "./directorRisk";
+import type {DirectorVersion} from "./director/version";
 
 export const DIRECTOR_CORRECTION_PRESETS = [
   {
@@ -243,9 +244,37 @@ export function isFullBookAutopilotRunMode(
   return runMode === DIRECTOR_FULL_BOOK_AUTOPILOT_RUN_MODE;
 }
 
+/** Frozen mode permission shared by scheduling and persisted resource authority. */
+export function canAutomaticallyReviewDirectorResources(
+  runMode: DirectorRunMode | string | null | undefined,
+): boolean {
+  return isFullBookAutopilotRunMode(runMode);
+}
+
 export function buildFullBookAutopilotExecutionPlan(): DirectorAutoExecutionPlan {
   return {
     ...DIRECTOR_FULL_BOOK_AUTOPILOT_CONTRACT.autoExecutionPlan,
+  };
+}
+
+/**
+ * Full-book autopilot is AI-led, so an explicit choice to turn automatic review or repair off is
+ * kept instead of being forced back on; both stay on by default. Repair only runs after review,
+ * so turning review off also turns repair off. An explicit chapter range keeps its own stop
+ * boundary and is returned unchanged.
+ */
+export function buildFullBookAutopilotExecutionPlanPreservingSelection(
+  selected: Pick<DirectorAutoExecutionPlan, "mode"> & Partial<Pick<DirectorAutoExecutionPlan, "autoReview" | "autoRepair">> | null | undefined,
+): DirectorAutoExecutionPlan {
+  if (selected?.mode === "chapter_range") {
+    return { ...(selected as DirectorAutoExecutionPlan) };
+  }
+  const autoReview = typeof selected?.autoReview === "boolean" ? selected.autoReview : true;
+  const autoRepair = autoReview && (typeof selected?.autoRepair === "boolean" ? selected.autoRepair : true);
+  return {
+    ...DIRECTOR_FULL_BOOK_AUTOPILOT_CONTRACT.autoExecutionPlan,
+    autoReview,
+    autoRepair,
   };
 }
 
@@ -482,6 +511,7 @@ export interface DirectorTaskSeedPayloadSnapshot {
 }
 
 export interface DirectorLLMOptions {
+  directorVersion?: DirectorVersion;
   provider?: LLMProvider;
   model?: string;
   temperature?: number;

@@ -52,10 +52,12 @@ test("all issue actions remain editable and changed rules show a safety warning"
   assert.doesNotMatch(novelPolicySource, /DIRECTOR_ISSUE_CATALOG\.filter/);
   for (const source of [globalPolicySource, novelPolicySource]) {
     assert.match(source, /你修改了/);
-    assert.match(source, /hasChanges \? \(/);
+    assert.match(source, /hasChanges/);
     assert.match(source, /role="status"/);
     assert.match(source, /安全保护/);
   }
+  // 本书偏好还会比较章节审校重试规则，重试规则变化同样需要提示。
+  assert.match(novelPolicySource, /hasChanges \|\| retryChanged \? \(/);
 });
 
 test("issue management exposes the two production presets with a single retry ceiling", () => {

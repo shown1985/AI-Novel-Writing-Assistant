@@ -7,7 +7,7 @@ const workspace = read("../src/pages/worlds/WorldWorkspace.tsx");
 const deepeningTab = read("../src/pages/worlds/components/workspace/WorldDeepeningTab.tsx");
 
 test("integrated deepening questions leave the answer queue instead of returning as blank drafts", () => {
-  assert.match(workspace, /list\.filter\(\(question\) => question\.status !== "integrated"\)\.slice\(0, 3\)/);
+  assert.match(workspace, /list\.filter\(\(question\) => question\.status !== "integrated" \|\| !readWorldAnswerIntegration\(question\.integratedSummary\)\)/);
   assert.doesNotMatch(workspace, /actionable\.length > 0 \? actionable : list/);
   assert.match(workspace, /integratedQuestionCount=\{integratedDeepeningQuestionCount\}/);
   assert.match(deepeningTab, /这一批关键设定已整合/);

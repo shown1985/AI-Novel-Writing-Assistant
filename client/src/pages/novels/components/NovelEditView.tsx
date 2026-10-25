@@ -17,6 +17,7 @@ import KnowledgeBindingPanel from "@/components/knowledge/KnowledgeBindingPanel"
 import AITakeoverContainer from "@/components/workflow/AITakeoverContainer";
 import ChapterManagementTab from "./ChapterManagementTab";
 import DirectorFactDebugDialog from "./DirectorFactDebugDialog";
+import DirectorStepCalibrationDialog from "./DirectorStepCalibrationDialog";
 import NovelCharacterPanel from "./NovelCharacterPanel";
 import NovelTaskDrawer from "./NovelTaskDrawer";
 import OutlineTab from "./OutlineTab";
@@ -40,6 +41,7 @@ import {
   tabFromDirectorDisplayStage,
 } from "../novelWorkspaceNavigation";
 import { StepHero } from "./workspaceShell";
+import DirectorVersionControl from "@/components/directorVersion/DirectorVersionControl";
 
 export default function NovelEditView(props: NovelEditViewProps) {
   const isMobileViewport = useIsMobileViewport();
@@ -69,6 +71,7 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
     taskDrawer,
     singleBookDisplay,
     singleBookPrimaryAction,
+    directorStepCalibration,
     activeStepTakeoverEntry,
     onSwitchToSimpleMode,
     isSwitchingToSimpleMode = false,
@@ -192,6 +195,7 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
           eyebrow={(
             <>
               <span className="truncate font-semibold text-foreground">{novelTitle}</span>
+              <DirectorVersionControl novelId={id} version="v1"/>
               {progressLabel ? <span>{progressLabel}</span> : null}
               <span>当前页面：{currentPageLabel}</span>
             </>
@@ -385,6 +389,7 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
               执行详情
               {taskAttentionLabel ? <Badge variant="secondary">{taskAttentionLabel}</Badge> : null}
             </Button>
+            {directorStepCalibration ? <DirectorStepCalibrationDialog {...directorStepCalibration} /> : null}
             </>
           )}
         />

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import DirectorVersionControl from "@/components/directorVersion/DirectorVersionControl";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -25,6 +26,8 @@ import {
 } from "@/api/novel";
 import { continueNovelWorkflow } from "@/api/novelWorkflow";
 import { queryKeys } from "@/api/queryKeys";
+import { stripLegacyTaskUrlParams } from "@/lib/legacyTaskUrlParams";
+import { getTaskCenterLink } from "@/lib/novelWorkflowTaskUi";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/toast";
@@ -111,6 +114,13 @@ export default function SimpleNovelShelfPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const readingViewportRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const cleaned = stripLegacyTaskUrlParams(searchParams);
+    if (cleaned.toString() !== searchParams.toString()) {
+      setSearchParams(cleaned, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const shelfQuery = useQuery({
     queryKey: queryKeys.novels.simpleShelf(id),
@@ -322,6 +332,7 @@ export default function SimpleNovelShelfPage() {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{shelf.novel.title}</h1>
+                      <DirectorVersionControl novelId={id!} version="v1" />
                       <Badge variant="outline">简易模式 · 阅读书架</Badge>
                     </div>
                     <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">这里优先展示这本书的正文和进度。AI 会在后台继续规划、写作和审校；需要查看完整资料时可随时切换工作台。</p>
@@ -355,7 +366,7 @@ export default function SimpleNovelShelfPage() {
           <div className="flex flex-wrap items-center gap-2 border-t border-border bg-muted/20 px-5 py-3 sm:px-7">
             {shelf.progress.directorTaskId ? (
               <Button variant="outline" size="sm" asChild>
-                <Link to={`/novels/auto-director?taskId=${encodeURIComponent(shelf.progress.directorTaskId)}`}>查看 AI 导演进度</Link>
+                <Link to={getTaskCenterLink(shelf.progress.directorTaskId)}>查看 AI 导演进度</Link>
               </Button>
             ) : null}
             {shelf.progress.canRetry ? (

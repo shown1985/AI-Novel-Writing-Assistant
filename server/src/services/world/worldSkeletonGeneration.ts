@@ -22,6 +22,10 @@ import {
 import { worldStructureSectionPrompt } from "../../prompting/prompts/world/world.prompts";
 import { extractStructuredOutputErrorCategory } from "../../llm/structuredOutput";
 import {
+  getWorldGenerationTimeoutMs,
+  rethrowWithWorldGenerationTimeoutHint,
+} from "../settings/worldGeneration/timeoutSettings";
+import {
   buildWorldBindingSupport,
   createEmptyWorldStructure,
   normalizeWorldBindingSupport,
@@ -37,7 +41,6 @@ import {
   type WorldPromptCompressionLevel,
 } from "./worldPromptCompression";
 
-const WORLD_SKELETON_GENERATION_TIMEOUT_MS = 120_000;
 const WORLD_SKELETON_GENERATION_MAX_TOKENS = 6_000;
 // Soft policy for telemetry only. The exact provider context window is
 // resolved by the provider adapter; this value should not reject a request.
@@ -719,9 +722,11 @@ async function runWorldStructureStageAttempts(
           ...(disableReasoningOnRetry ? { reasoningEnabled: false } : {}),
           reasoningEffort: "low",
           maxTokens: resolveWorldStageOutputTokens(WORLD_SKELETON_STAGE_MAX_TOKENS[section], compressionLevel),
-          timeoutMs: WORLD_SKELETON_GENERATION_TIMEOUT_MS,
+          timeoutMs: await getWorldGenerationTimeoutMs(),
           requestBudget: WORLD_SKELETON_REQUEST_BUDGET,
         },
+      }).catch((error: unknown) => {
+        rethrowWithWorldGenerationTimeoutHint(error);
       });
       let next = section === "locations" && batch
         ? mergeWorldLocationBatch(current, result.output, batch)
@@ -906,9 +911,11 @@ async function invokeWorldSkeletonPresentation(input: {
         input.storyEntryCount === 1 ? 1_600 : WORLD_SKELETON_STAGE_MAX_TOKENS.presentation,
         input.compressionLevel,
       ),
-      timeoutMs: WORLD_SKELETON_GENERATION_TIMEOUT_MS,
+      timeoutMs: await getWorldGenerationTimeoutMs(),
       requestBudget: WORLD_SKELETON_REQUEST_BUDGET,
     },
+  }).catch((error: unknown) => {
+    rethrowWithWorldGenerationTimeoutHint(error);
   });
   return result.output;
 }
@@ -1035,9 +1042,11 @@ async function generateWorldSkeletonOneShot(
             temperature: 0.7,
             reasoningEffort: "low",
             maxTokens: resolveWorldStageOutputTokens(WORLD_SKELETON_GENERATION_MAX_TOKENS, compressionLevel),
-            timeoutMs: WORLD_SKELETON_GENERATION_TIMEOUT_MS,
+            timeoutMs: await getWorldGenerationTimeoutMs(),
             requestBudget: WORLD_SKELETON_REQUEST_BUDGET,
           },
+        }).catch((error: unknown) => {
+          rethrowWithWorldGenerationTimeoutHint(error);
         });
         break;
       } catch (error) {

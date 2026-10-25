@@ -9,6 +9,7 @@ import {
 } from "@ai-novel/shared/types/creativeCarryoverContract";
 import type { NovelBasicFormState } from "../../novelBasicInfo.shared";
 import type { AutoDirectorCreateStageKey } from "../directorCreateStages";
+import type {DirectorVersion} from "@ai-novel/shared/types/director/version";
 
 const DRAFT_VERSION = 1;
 const DRAFT_STORAGE_PREFIX = `ai-novel.auto-director-create.draft.v${DRAFT_VERSION}`;
@@ -39,6 +40,7 @@ export interface AutoDirectorCreateDraft {
   activeStage: RecoverableStage;
   completedStages: RecoverableStage[];
   runMode: DirectorRunMode;
+  directorVersion?: DirectorVersion;
   worldSetupMode: DirectorWorldSetupMode;
   selectedStyleProfileId: string;
   creativeCarryoverContract?: CreativeCarryoverContract | null;
@@ -46,6 +48,7 @@ export interface AutoDirectorCreateDraft {
 }
 
 export interface AutoDirectorCreateDraftInput {
+  directorVersion?: DirectorVersion;
   idea: string;
   basicForm: NovelBasicFormState;
   activeStage: AutoDirectorCreateStageKey;
@@ -109,6 +112,7 @@ export function saveAutoDirectorCreateDraft(
         .filter(isRecoverableStage),
     )),
     runMode: input.runMode,
+    ...(input.directorVersion ? {directorVersion: input.directorVersion} : {}),
     worldSetupMode: input.worldSetupMode,
     selectedStyleProfileId: input.selectedStyleProfileId,
     ...(input.creativeCarryoverContract === undefined ? {} : {
@@ -160,6 +164,7 @@ export function loadAutoDirectorCreateDraft(
       activeStage: value.activeStage,
       completedStages: Array.from(new Set(value.completedStages.filter(isRecoverableStage))),
       runMode: value.runMode as DirectorRunMode,
+      ...(value.directorVersion === "v1" || value.directorVersion === "v2" ? {directorVersion: value.directorVersion} : {}),
       worldSetupMode: value.worldSetupMode,
       selectedStyleProfileId: value.selectedStyleProfileId,
       ...(value.creativeCarryoverContract === undefined ? {} : {

@@ -3,30 +3,13 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const childProcess = require("node:child_process");
+const { initializeTemporarySqliteDatabase } = require("./testInfrastructure/tempSqliteDatabase.cjs");
 
 const repoRoot = path.resolve(__dirname, "..", "..");
 const serverRoot = path.resolve(repoRoot, "server");
 
-function pnpmExecutable() {
-  return process.platform === "win32" ? "pnpm.cmd" : "pnpm";
-}
-
 function setupTempSqliteDatabase(tempDir) {
-  const databasePath = path.join(tempDir, "p0b-real-chain.db");
-  const databaseUrl = `file:${databasePath.replace(/\\/g, "/")}`;
-  // Prisma 7's macOS schema engine cannot create a missing SQLite file during
-  // `db push`; create an empty test file first so the engine only performs the
-  // schema operation. This remains isolated under the test temp directory.
-  fs.closeSync(fs.openSync(databasePath, "a"));
-  childProcess.execFileSync(pnpmExecutable(), ["--filter", "@ai-novel/server", "prisma:push"], {
-    cwd: repoRoot,
-    env: {
-      ...process.env,
-      DATABASE_URL: databaseUrl,
-    },
-    stdio: ["ignore", "ignore", "pipe"],
-  });
-  return databaseUrl;
+  return initializeTemporarySqliteDatabase(tempDir, "p0b-real-chain.db");
 }
 
 function writeChildScript(tempDir) {
@@ -126,7 +109,9 @@ async function main() {
 
     let volumeId = null;
     let workspaceSource = null;
+    let sourceBeforeMigration = null;
     if (scenario === "legacy") {
+      sourceBeforeMigration = (await novelService.getVolumes(novel.id, { hydrateCanonical: false })).source;
       const workspace = await novelService.migrateLegacyVolumes(novel.id);
       workspaceSource = workspace.source;
       volumeId = workspace.volumes[0]?.id ?? null;
@@ -438,6 +423,7 @@ async function main() {
     console.log(JSON.stringify({
       scenario,
       workspaceSource,
+      sourceBeforeMigration,
       hasReviewContext: Boolean(capturedContextPackage?.chapterReviewContext),
       hasWriteContext: Boolean(capturedContextPackage?.chapterWriteContext),
       volumeMission: capturedContextPackage?.chapterReviewContext?.volumeWindow?.missionSummary ?? null,
@@ -501,6 +487,9 @@ test("legacy project migration feeds shared review context through manual audit 
   const result = runScenario("legacy");
 
   assert.equal(result.scenario, "legacy");
+  assert.equal(result.sourceBeforeMigration, "legacy");
+  // The read that performs the backfill still reports the legacy source so
+  // migrateLegacyVolumes can seed the payoff ledger; later reads return "volume".
   assert.equal(result.workspaceSource, "legacy");
   assert.equal(result.hasReviewContext, true);
   assert.equal(result.hasWriteContext, true);

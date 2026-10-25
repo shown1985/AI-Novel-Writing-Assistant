@@ -27,6 +27,7 @@ import {
   resolveWorkflowContinuationFeedback,
 } from "@/lib/novelWorkflowContinuation";
 import { getCandidateSelectionLink } from "@/lib/novelWorkflowTaskUi";
+import { getTaskSourceHref } from "@/lib/novelRoutes";
 import { syncAutoDirectorTaskCache } from "@/lib/taskQueryCache";
 import { useStructuredOutlineWorkspaceStore } from "../../stores/useStructuredOutlineWorkspaceStore";
 import {
@@ -49,10 +50,10 @@ interface CommandInput {
  id: string; activeTab: string; selectedChapterId: string; payoffLedgerChapterOrder: number | undefined;
  director: ReturnType<typeof useWorkspaceDirectorState>; queryClient: QueryClient; llm: ReturnType<typeof useLLMStore.getState>;
  navigate: ReturnType<typeof useNavigate>;
- setActiveTab: (tab: string) => void; setSelectedChapterId: (id: string) => void; setSelectedVolumeId: (id: string) => void; setDirectorTaskId: (id: string) => void;
+ setActiveTab: (tab: string) => void; setSelectedChapterId: (id: string) => void; setSelectedVolumeId: (id: string) => void;
  setIsTaskDrawerOpen: (value: boolean) => void; setIsDirectorExitActionExpanded: (value: boolean) => void;
 }
-export function useWorkspaceDirectorCommands({ id, activeTab, selectedChapterId, payoffLedgerChapterOrder, director, queryClient, llm, navigate, setActiveTab, setSelectedChapterId, setSelectedVolumeId, setDirectorTaskId, setIsTaskDrawerOpen, setIsDirectorExitActionExpanded }: CommandInput) {
+export function useWorkspaceDirectorCommands({ id, activeTab, selectedChapterId, payoffLedgerChapterOrder, director, queryClient, llm, navigate, setActiveTab, setSelectedChapterId, setSelectedVolumeId, setIsTaskDrawerOpen, setIsDirectorExitActionExpanded }: CommandInput) {
  const {
   actionTargetDirectorTaskId,
   activeAutoDirectorFollowUp,
@@ -90,6 +91,7 @@ export function useWorkspaceDirectorCommands({ id, activeTab, selectedChapterId,
       invalidations.push(
         queryClient.invalidateQueries({ queryKey: queryKeys.tasks.detail("novel_workflow", taskId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.tasks.directorTaskSnapshot(taskId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.tasks.directorTaskFactInspection(taskId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.tasks.directorRuntime(taskId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.autoDirectorFollowUps.detail(taskId) }),
       );
@@ -183,7 +185,6 @@ export function useWorkspaceDirectorCommands({ id, activeTab, selectedChapterId,
     onSuccess: async (response, input) => {
       const targetTaskId = input?.directorTaskId || actionTargetDirectorTaskId;
       const targetTask = targetTaskId === visibleDirectorTask?.id ? visibleDirectorTask : activeAutoDirectorTask;
-      setDirectorTaskId(response.data?.taskId ?? targetTaskId);
       void invalidateAutoDirectorTaskState(response.data?.taskId ?? targetTaskId);
       const feedback = resolveWorkflowContinuationFeedback(response.data, {
         mode: resolveDirectorContinueMode(targetTask),
@@ -222,7 +223,6 @@ export function useWorkspaceDirectorCommands({ id, activeTab, selectedChapterId,
   const acceptManualChangesAndContinueMutation = useBookScopedMutation(id, {
     mutationFn: (directorTaskId: string) => acceptManualChangesAndContinueDirector(directorTaskId),
     onSuccess: async (response, directorTaskId) => {
-      setDirectorTaskId(response.data?.taskId ?? directorTaskId);
       await invalidateAutoDirectorTaskState(response.data?.taskId ?? directorTaskId);
       toast.success("已确认当前修改，导演将从下一个未完成步骤继续。");
     },
@@ -243,7 +243,6 @@ export function useWorkspaceDirectorCommands({ id, activeTab, selectedChapterId,
     onSuccess: async (response, input) => {
       const targetTaskId = input?.directorTaskId || actionTargetDirectorTaskId;
       const targetTask = targetTaskId === visibleDirectorTask?.id ? visibleDirectorTask : activeAutoDirectorTask;
-      setDirectorTaskId(response.data?.taskId ?? targetTaskId);
       void invalidateAutoDirectorTaskState(response.data?.taskId ?? targetTaskId);
       const feedback = resolveWorkflowContinuationFeedback(response.data, {
         mode: input?.continuationMode ?? "auto_execute_range",
@@ -277,7 +276,6 @@ export function useWorkspaceDirectorCommands({ id, activeTab, selectedChapterId,
       );
     },
     onSuccess: async (response, input) => {
-      setDirectorTaskId(response.data?.taskId ?? input.taskId);
       await invalidateAutoDirectorTaskState(response.data?.taskId ?? input.taskId);
       const feedback = resolveWorkflowContinuationFeedback(response.data, {
         mode: input.mode,
@@ -336,7 +334,6 @@ export function useWorkspaceDirectorCommands({ id, activeTab, selectedChapterId,
       if (result?.task) {
         syncAutoDirectorTaskCache(queryClient, id, result.task);
       }
-      setDirectorTaskId(result?.directorTaskId ?? result?.taskId ?? input.directorTaskId ?? actionTargetDirectorTaskId);
       await invalidateAutoDirectorTaskState(result?.directorTaskId ?? result?.taskId ?? input.directorTaskId ?? actionTargetDirectorTaskId);
       if (result?.code === "failed" || result?.code === "forbidden") {
         toast.error(result.message);
@@ -434,8 +431,7 @@ export function useWorkspaceDirectorCommands({ id, activeTab, selectedChapterId,
       openQualityRepair: (taskId) => openQualityRepair(
         taskId === visibleDirectorTask?.id ? visibleDirectorTask : undefined,
       ),
-      openDetails: (taskId) => {
-        setDirectorTaskId(taskId);
+      openDetails: () => {
         setIsTaskDrawerOpen(true);
       },
       navigate: (href) => {
@@ -450,7 +446,7 @@ export function useWorkspaceDirectorCommands({ id, activeTab, selectedChapterId,
       const internalTarget = resolveInternalNavigationTarget(targetUrl);
       if (internalTarget) {
         setIsTaskDrawerOpen(false);
-        navigate(internalTarget);
+        navigate(getTaskSourceHref(internalTarget));
         return;
       }
       if (/^https?:\/\//i.test(targetUrl)) {

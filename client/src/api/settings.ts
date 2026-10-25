@@ -3,6 +3,7 @@ import type {
   DirectorAutoApprovalPreferenceSettings,
 } from "@ai-novel/shared/types/autoDirectorApproval";
 import type { DirectorIssuePolicy } from "@ai-novel/shared/types/directorIssue";
+import type { DirectorChapterBudgetSettings } from "@ai-novel/shared/types/director/chapterBudget";
 import type {
   ApplyDiagnosticRecommendationsRequest,
   ApplyDiagnosticRecommendationsResult,
@@ -16,6 +17,14 @@ import type {
   ModelRouteTaskType,
 } from "@ai-novel/shared/types/novel";
 import { apiClient } from "./client";
+
+export async function getDirectorChapterBudgetSettings() {
+  return (await apiClient.get<ApiResponse<DirectorChapterBudgetSettings>>("/settings/auto-director/chapter-budget")).data;
+}
+
+export async function saveDirectorChapterBudgetSettings(payload: DirectorChapterBudgetSettings) {
+  return (await apiClient.put<ApiResponse<DirectorChapterBudgetSettings>>("/settings/auto-director/chapter-budget", payload)).data;
+}
 
 export type EmbeddingProvider = LLMProvider;
 
@@ -121,6 +130,13 @@ export interface StyleEngineRuntimeSettingsStatus {
   defaultStyleExtractionTimeoutMs: number;
   minStyleExtractionTimeoutMs: number;
   maxStyleExtractionTimeoutMs: number;
+}
+
+export interface WorldGenerationTimeoutSettings {
+  timeoutMs: number;
+  defaultTimeoutMs: number;
+  minTimeoutMs: number;
+  maxTimeoutMs: number;
 }
 
 export interface LLMSelectionSettings {
@@ -324,6 +340,19 @@ export async function saveStyleEngineRuntimeSettings(payload: {
 }) {
   const { data } = await apiClient.put<ApiResponse<StyleEngineRuntimeSettingsStatus>>(
     "/settings/style-engine-runtime",
+    payload,
+  );
+  return data;
+}
+
+export async function getWorldGenerationTimeoutSettings() {
+  const { data } = await apiClient.get<ApiResponse<WorldGenerationTimeoutSettings>>("/settings/world-generation-timeout");
+  return data;
+}
+
+export async function saveWorldGenerationTimeoutSettings(payload: { timeoutMs: number }) {
+  const { data } = await apiClient.put<ApiResponse<WorldGenerationTimeoutSettings>>(
+    "/settings/world-generation-timeout",
     payload,
   );
   return data;

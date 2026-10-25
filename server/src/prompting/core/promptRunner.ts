@@ -21,7 +21,9 @@ import {
   preparePromptExecution,
   resolvePromptOverlaysForAsset,
   resolveStructuredOutput,
+  resolveStructuredFallbackRepairAttempts,
   resolveStructuredRepairAttempts,
+  resolveStructuredRepairGuidance,
   resolveStructuredStreamOutput,
 } from "./execution";
 import {
@@ -115,6 +117,7 @@ async function runStructuredPromptInContext<I, O, R = O>(input: {
     promptInput: input.promptInput,
     context: prepared.context,
     messages: resolvedTemplateMessages,
+    preserveMessageLayout: true,
   });
   logPromptEvent({
     event: "started",
@@ -168,6 +171,10 @@ async function runStructuredPromptInContext<I, O, R = O>(input: {
       maxRepairAttempts: input.options?.singleProviderTransportAttempt === true
         ? 0
         : resolveStructuredRepairAttempts(input.asset as PromptAsset<unknown, unknown, unknown>),
+      fallbackMaxRepairAttempts: input.options?.singleProviderTransportAttempt === true
+        ? 0
+        : resolveStructuredFallbackRepairAttempts(input.asset as PromptAsset<unknown, unknown, unknown>),
+      repairGuidance: resolveStructuredRepairGuidance(input.asset as PromptAsset<unknown, unknown, unknown>),
       promptMeta: prepared.invocation,
     });
     logMemoryUsage({
@@ -372,7 +379,7 @@ async function streamStructuredPromptInContext<I, O, R = O>(input: {
       invokeOptions.signal = input.options.signal;
     }
     liveSession.phase("streaming", "模型正在返回结构化结果");
-    const rawStream = await llm.stream(prepared.messages, invokeOptions);
+    const rawStream = await liveSession.observe(() => llm.stream(prepared.messages, invokeOptions));
     captured = captureStreamOutput(
       rawStream as AsyncIterable<BaseMessageChunk>,
       (content) => liveSession.delta(content),
@@ -420,7 +427,7 @@ async function streamStructuredPromptInContext<I, O, R = O>(input: {
 
   return {
     stream: captured.stream,
-    complete: captured.completedText.then(async (rawContent) => {
+    complete: captured.completedText.then((rawContent) => liveSession.observe(async () => {
       const runComplete = async (): Promise<PromptRunResult<O>> => {
         liveSession.phase("validating", "正在检查生成结果");
         const parsed = await resolveStructuredStreamOutput({
@@ -475,7 +482,7 @@ async function streamStructuredPromptInContext<I, O, R = O>(input: {
         return runWithModelAttemptRequestState(requestState, runComplete);
       }
       return runComplete();
-    }).catch(async (error) => {
+    })).catch(async (error) => {
       const runFailure = async () => {
         if (transportCompleted) {
           await modelAttempt?.finalizeSucceeded(transportUsage, "not_adopted");

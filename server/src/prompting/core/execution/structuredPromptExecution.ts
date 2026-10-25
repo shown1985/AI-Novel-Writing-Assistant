@@ -17,11 +17,20 @@ import type {
 } from "../promptTypes";
 import { buildPromptInvocationMeta } from "./promptExecutionContext";
 import type { ModelAttemptCandidate } from "../../../platform/llm/provenance";
+import { currentModelRequestBudget } from "../../../platform/llm/retries";
 
 export type PromptStructuredInvoker = typeof invokeStructuredLlmDetailed;
 
 export function resolveStructuredRepairAttempts(asset: PromptAsset<unknown, unknown, unknown>): number {
   return Math.max(0, asset.repairPolicy?.maxAttempts ?? 1);
+}
+
+export function resolveStructuredFallbackRepairAttempts(asset: PromptAsset<unknown, unknown, unknown>): number {
+  return Math.max(0, asset.fallbackRepairPolicy?.maxAttempts ?? resolveStructuredRepairAttempts(asset));
+}
+
+export function resolveStructuredRepairGuidance(asset: PromptAsset<unknown, unknown, unknown>): string | undefined {
+  return asset.repairPolicy?.guidance?.trim() || undefined;
 }
 
 function resolveStructuredSemanticRetryAttempts(asset: PromptAsset<unknown, unknown, unknown>): number {
@@ -169,6 +178,7 @@ export async function resolveStructuredStreamOutput<I, O, R = O>(input: {
       taskType: input.asset.taskType,
       label: `${input.asset.id}@${input.asset.version}`,
       maxRepairAttempts: resolveStructuredRepairAttempts(input.asset as PromptAsset<unknown, unknown, unknown>),
+      repairGuidance: resolveStructuredRepairGuidance(input.asset as PromptAsset<unknown, unknown, unknown>),
       promptMeta: input.invocation,
       onRepairOutputDelta: (content) => {
         if (!repairStarted) {
@@ -197,6 +207,8 @@ export async function resolveStructuredStreamOutput<I, O, R = O>(input: {
       schema: input.outputSchema,
       structuredStrategy: "prompt_json",
       maxRepairAttempts: resolveStructuredRepairAttempts(input.asset as PromptAsset<unknown, unknown, unknown>),
+      repairGuidance: resolveStructuredRepairGuidance(input.asset as PromptAsset<unknown, unknown, unknown>),
+      fallbackMaxRepairAttempts: resolveStructuredFallbackRepairAttempts(input.asset as PromptAsset<unknown, unknown, unknown>),
       promptMeta: input.invocation,
       deferModelAttemptAdoption: true,
       modelAttemptRole: "transport_retry",
@@ -224,9 +236,17 @@ export async function resolveStructuredOutput<I, O, R = O>(input: {
   let totalRepairAttempts = currentResult.repairAttempts;
   let repairUsed = currentResult.repairUsed;
   let semanticRetryAttempts = 0;
-  const maxSemanticRetryAttempts = input.options?.singleProviderTransportAttempt === true
+  const singleTransport = input.options?.singleProviderTransportAttempt === true;
+  const requestBudget = currentModelRequestBudget();
+  // Single-transport mode never retries semantically, whatever the request
+  // budget or the shared correction budget would otherwise allow.
+  const maxSemanticRetryAttempts = singleTransport
     ? 0
-    : resolveStructuredSemanticRetryAttempts(asset);
+    : requestBudget?.remaining() ?? resolveStructuredSemanticRetryAttempts(asset);
+  const sharedCorrectionBudget = requestBudget ? undefined : asset.semanticRetryPolicy?.sharedCorrectionBudget;
+  const remainingSharedCorrections = (): number => sharedCorrectionBudget === undefined
+    ? Infinity
+    : Math.max(0, sharedCorrectionBudget - totalRepairAttempts - semanticRetryAttempts);
 
   const finalizeCandidate = async (
     adoption: "adopted" | "not_adopted",
@@ -264,7 +284,12 @@ export async function resolveStructuredOutput<I, O, R = O>(input: {
         postValidateFailureRecovered: false,
       };
     } catch (error) {
-      if (semanticRetryAttempts >= maxSemanticRetryAttempts) {
+      if (
+        singleTransport
+        || semanticRetryAttempts >= maxSemanticRetryAttempts
+        || requestBudget?.remaining() === 0
+        || remainingSharedCorrections() <= 0
+      ) {
         if (input.asset.postValidateFailureRecovery) {
           await finalizeCandidate("adopted");
           logStructuredPromptEvent({
@@ -342,7 +367,7 @@ export async function resolveStructuredOutput<I, O, R = O>(input: {
         asset: input.asset,
         promptInput: input.promptInput,
         context: input.context,
-        baseMessages: currentMessages,
+        baseMessages: input.baseMessages,
         parsedOutput: currentResult.data,
         validationError: stringifyPromptError(error),
         attempt: semanticRetryAttempts,
@@ -365,9 +390,13 @@ export async function resolveStructuredOutput<I, O, R = O>(input: {
         deferModelAttemptAdoption: true,
         modelAttemptRole: "semantic_retry",
         modelAttemptParentId: currentResult.modelAttemptCandidate?.attemptId ?? null,
-        maxRepairAttempts: input.options?.singleProviderTransportAttempt === true
+        maxRepairAttempts: singleTransport
           ? 0
-          : resolveStructuredRepairAttempts(asset),
+          : Math.min(resolveStructuredRepairAttempts(asset), remainingSharedCorrections()),
+        fallbackMaxRepairAttempts: singleTransport
+          ? 0
+          : Math.min(resolveStructuredFallbackRepairAttempts(asset), remainingSharedCorrections()),
+        repairGuidance: resolveStructuredRepairGuidance(asset),
         promptMeta: buildPromptInvocationMeta(
           asset,
           input.context,

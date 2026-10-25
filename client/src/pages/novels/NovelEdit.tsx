@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type {
@@ -59,6 +59,10 @@ import {
   useWorkspaceResources,
 } from "./workspace/application";
 import { NovelEditPresentation } from "./workspace/presentation";
+import {
+  EMPTY_DIRECTOR_FOLLOW_MEMORY,
+  resolveStructuredOutlineDirectorFollow,
+} from "./stores/structuredOutlineDirectorFollow";
 
 function takeoverDismissStorageKey(novelId: string): string {
   return `novel-edit:takeover-dismissed:${novelId}`;
@@ -72,8 +76,6 @@ export default function NovelEdit() {
   const {
     activeTab,
     setActiveTab,
-    directorTaskId,
-    setDirectorTaskId,
     selectedChapterId,
     setSelectedChapterId,
     selectedVolumeId,
@@ -155,9 +157,9 @@ export default function NovelEdit() {
   });
   const workspaceResources = useWorkspaceResources({ id, activeTab, selectedChapterId, currentJobId, selectedCharacterId, selectedBaseCharacterId });
   const { shouldLoadVolumeWorkspace, shouldLoadStoryMacro, shouldLoadWorldSlice, novelDetailQuery, volumeWorkspaceQuery, payoffLedgerChapterOrder, chapterTimelineQuery, chapters, outlineSyncChapters, selectedChapter, characters, baseCharacters, selectedCharacter, selectedBaseCharacter, hasCharacters, savedVolumeWorkspace, chapterAuditReports, pendingCharacterResourceProposals } = workspaceResources;
-  const director = useWorkspaceDirectorState({ id, directorTaskId, taskPanelOpen, setDirectorTaskId });
+  const director = useWorkspaceDirectorState({ id, taskPanelOpen });
   const { activeAutoDirectorTask, displayAutoDirectorTask, activeDirectorSnapshot, activeStructuredOutlineChapterId, workflowCurrentTab, autoDirectorRefreshSignatureRef, autoDirectorArtifactSignatureRef, autoDirectorWorkspaceSignatureRef, activeAutoDirectorRefreshSignature, activeAutoDirectorArtifactSignature, activeAutoDirectorWorkspaceSignature } = director;
-  const directorCommands = useWorkspaceDirectorCommands({ id, activeTab, selectedChapterId, payoffLedgerChapterOrder, director, queryClient, llm, navigate, setActiveTab, setSelectedChapterId, setSelectedVolumeId, setDirectorTaskId, setIsTaskDrawerOpen, setIsDirectorExitActionExpanded });
+  const directorCommands = useWorkspaceDirectorCommands({ id, activeTab, selectedChapterId, payoffLedgerChapterOrder, director, queryClient, llm, navigate, setActiveTab, setSelectedChapterId, setSelectedVolumeId, setIsTaskDrawerOpen, setIsDirectorExitActionExpanded });
   const { invalidateAutoDirectorTaskState, invalidateWorkspaceDataForTabs, invalidateVisibleWorkspaceData } = directorCommands;
   const switchToSimpleMutation = useMutation({
     mutationFn: () => setNovelCreationExperience(id, "simple"),
@@ -219,6 +221,8 @@ export default function NovelEdit() {
     setStructuredMessage,
   });
   const { normalizedVolumeDraft, hasUnsavedVolumeDraft } = volumePlanning;
+  // 记录上一次跟随过的导演目标章节：目标不变时，不因草稿变更重复抢回工作区选中（issue #172）。
+  const directorFollowMemoryRef = useRef({ ...EMPTY_DIRECTOR_FOLLOW_MEMORY });
   const volumeSyncPreview = useMemo(
     () => buildVolumeSyncPreview(normalizedVolumeDraft, outlineSyncChapters, volumeSyncOptions),
     [normalizedVolumeDraft, outlineSyncChapters, volumeSyncOptions],
@@ -350,38 +354,34 @@ export default function NovelEdit() {
     if (!id) {
       return;
     }
-    useStructuredOutlineWorkspaceStore.getState().patchWorkspace(id, {
-      selectedVolumeId: selectedVolumeId || undefined,
-      selectedChapterId: selectedChapterId || undefined,
-    });
+    // URL 参数为空时不做任何同步：undefined 不得覆盖用户已选的工作区状态（issue #172）。
+    const patch: { selectedVolumeId?: string; selectedChapterId?: string } = {};
+    if (selectedVolumeId) {
+      patch.selectedVolumeId = selectedVolumeId;
+    }
+    if (selectedChapterId) {
+      patch.selectedChapterId = selectedChapterId;
+    }
+    if (Object.keys(patch).length === 0) {
+      return;
+    }
+    useStructuredOutlineWorkspaceStore.getState().patchWorkspace(id, patch);
   }, [id, selectedChapterId, selectedVolumeId]);
 
   useEffect(() => {
-    if (!id || activeTab !== "structured" || !activeStructuredOutlineChapterId) {
-      return;
-    }
-    const targetVolume = normalizedVolumeDraft.find((volume) => (
-      volume.chapters.some((chapter) => (
-        chapter.id === activeStructuredOutlineChapterId
-        || chapter.chapterId === activeStructuredOutlineChapterId
-      ))
-    ));
-    if (!targetVolume) {
-      return;
-    }
-    const currentWorkspace = useStructuredOutlineWorkspaceStore.getState().workspaces[id];
-    if (
-      currentWorkspace?.selectedChapterId === activeStructuredOutlineChapterId
-      && currentWorkspace.selectedVolumeId === targetVolume.id
-      && currentWorkspace.selectedBeatKey === "all"
-    ) {
-      return;
-    }
-    useStructuredOutlineWorkspaceStore.getState().patchWorkspace(id, {
-      selectedVolumeId: targetVolume.id,
-      selectedChapterId: activeStructuredOutlineChapterId,
-      selectedBeatKey: "all",
+    const { patch, memory } = resolveStructuredOutlineDirectorFollow({
+      novelId: id,
+      activeTab,
+      directorChapterId: activeStructuredOutlineChapterId,
+      volumes: normalizedVolumeDraft,
+      workspace: useStructuredOutlineWorkspaceStore.getState().workspaces[id],
+      memory: directorFollowMemoryRef.current,
     });
+    directorFollowMemoryRef.current = memory;
+    if (!patch) {
+      return;
+    }
+    useStructuredOutlineWorkspaceStore.getState().patchWorkspace(id, patch);
   }, [activeStructuredOutlineChapterId, activeTab, id, normalizedVolumeDraft]);
 
   useEffect(() => {
@@ -719,7 +719,6 @@ export default function NovelEdit() {
     <NovelEditPresentation
       id={id}
       activeTab={activeTab}
-      directorTaskId={directorTaskId}
       selectedChapterId={selectedChapterId}
       taskPanelOpen={taskPanelOpen}
       clearTaskPanelOpen={clearTaskPanelOpen}

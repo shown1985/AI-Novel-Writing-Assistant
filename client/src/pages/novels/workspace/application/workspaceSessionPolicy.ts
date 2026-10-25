@@ -47,15 +47,16 @@ export function resolveWorkspaceActivation(input: {
   };
 }
 
+/**
+ * 小说工作台展示哪一条导演任务：本书最新任务优先，其次才回退到当前活跃任务。
+ * URL 上的 directorTaskId 不再是任务来源，任务归属以书级投影为准。
+ */
 export function resolveRequestedDirectorTaskId(input: {
   activeDirectorTaskId?: string | null;
-  autofocusProjectedTask: boolean;
-  directorTaskId?: string | null;
   projectedTaskId?: string | null;
 }): string {
-  return input.directorTaskId?.trim()
+  return input.projectedTaskId?.trim()
     || input.activeDirectorTaskId?.trim()
-    || (input.autofocusProjectedTask ? input.projectedTaskId?.trim() : "")
     || "";
 }
 

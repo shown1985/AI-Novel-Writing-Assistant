@@ -145,6 +145,6 @@ test("source navigation actions stay navigation-only", () => {
     kind: "navigate",
     novelId: "novel-a",
     taskId: "task-a",
-    href: "/novels/novel-a/edit?directorTaskId=task-a",
+    href: "/novels/novel-a/edit",
   });
 });

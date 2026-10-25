@@ -1,5 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const {characterLocationService} = require("../dist/services/novel/characters/locations");
 
 const {
   GenerationContextAssembler,
@@ -15,6 +16,7 @@ const { characterDynamicsQueryService } = require("../dist/services/novel/dynami
 const { payoffLedgerSyncService } = require("../dist/services/payoff/PayoffLedgerSyncService.js");
 const { characterResourceLedgerService } = require("../dist/services/novel/characterResource/CharacterResourceLedgerService.js");
 const { buildChapterReviewContext } = require("../dist/prompting/prompts/novel/chapterLayeredContext.js");
+const { batchContextCache } = require("../dist/services/novel/runtime/BatchContextCache.js");
 
 test("blocking pending-review proposals are scoped to the current chapter plus global proposals", () => {
   const where = buildBlockingPendingReviewProposalWhere("novel-1", "chapter-2");
@@ -153,6 +155,9 @@ test("assembler only reads planning artifacts prepared before context assembly",
     consistencyFactFindMany: prisma.consistencyFact.findMany,
     chapterFindMany: prisma.chapter.findMany,
     creativeDecisionFindMany: prisma.creativeDecision.findMany,
+    characterMindSnapshotFindMany: prisma.characterMindSnapshot.findMany,
+    characterDialogueInfluenceFindMany: prisma.characterDialogueInfluence.findMany,
+    novelFactEntryFindMany: prisma.novelFactEntry.findMany,
     getChapterPlan: plannerService.getChapterPlan,
     ensureChapterPlan: plannerService.ensureChapterPlan,
     buildPlanPromptBlock: plannerService.buildPlanPromptBlock,
@@ -162,9 +167,11 @@ test("assembler only reads planning artifacts prepared before context assembly",
     buildRagContext: ragServices.hybridRetrievalService.buildContextBlock,
     getPayoffLedger: payoffLedgerSyncService.getPayoffLedger,
     buildCharacterResourceContext: characterResourceLedgerService.buildContext,
+    readLocations: characterLocationService.readBeforeChapter,
   };
 
   try {
+    batchContextCache.invalidate("novel-1");
     prisma.novel.findUnique = async () => ({
       id: "novel-1",
       title: "测试小说",
@@ -210,6 +217,9 @@ test("assembler only reads planning artifacts prepared before context assembly",
     prisma.consistencyFact.findMany = async () => [];
     prisma.chapter.findMany = async () => [];
     prisma.creativeDecision.findMany = async () => [];
+    prisma.characterMindSnapshot.findMany = async () => [];
+    prisma.characterDialogueInfluence.findMany = async () => [];
+    prisma.novelFactEntry.findMany = async () => [];
     plannerService.getChapterPlan = async () => ({
       id: "plan-1",
       chapterId: "chapter-1",
@@ -301,7 +311,47 @@ test("assembler only reads planning artifacts prepared before context assembly",
     assert.ok(reviewContext.worldRules.includes("不要把星核写成普通灵石"));
     assert.equal(assembled.contextPackage.chapterWriteContext.chapterBoundary.entryState, "新合同入口1");
     assert.ok(assembled.contextPackage.chapterWriteContext.chapterBoundary.doNotCross.includes("新禁止"));
+
+    const loadNovel = prisma.novel.findUnique;
+    prisma.novel.findUnique = async () => ({...await loadNovel(), directorVersion: "v2",
+      characters:[{id:"a",name:"甲",role:"主角",currentLocation:"村庄"}]});
+    batchContextCache.invalidate("novel-1");
+    const loadChapter=prisma.chapter.findFirst;
+    prisma.chapter.findFirst=async()=>({...await loadChapter(),order:12});
+    let locationReads=0;
+    characterLocationService.readBeforeChapter=async(input)=>{
+      locationReads++;
+      assert.equal(input.chapterOrder,12);
+      return new Map([["a",{currentLocation:"牢房",source:"chapter",sourceChapterId:"c10",sourceChapterOrder:10,
+        contentHash:"hash10",evidence:"甲被押进牢房。",concern:null}]]);
+    };
+    prisma.novelFactEntry.findMany = async ({ where }) => {
+      const facts = [
+        { chapterOrder: 1, category: "completed", text: "旧事件已完成" },
+        { chapterOrder: 11, category: "revealed", text: "最新秘密已揭示" },
+        { chapterOrder: 9, category: "state_changed", text: "稍早状态已变化" },
+      ];
+      return facts.filter(fact => fact.chapterOrder < where.chapterOrder.lt
+        && (typeof where.category === "string" ? fact.category === where.category : where.category.in.includes(fact.category)))
+        .map((fact, index) => ({ ...fact, id: `fact-${index}`, novelId: "novel-1", source: "auto", createdAt: now }));
+    };
+    const located=await assembler.assemble("novel-1","chapter-1",{});
+    assert.deepEqual(located.contextPackage.chapterWriteContext.completedMilestones,
+      ["旧事件已完成", "稍早状态已变化", "最新秘密已揭示"], "a recent fact window must use chapter order across all fact categories");
+    assert.equal(located.contextPackage.characterRoster[0].currentLocation,"牢房","dynamic location must override a cached profile location");
+    assert.equal(located.contextPackage.chapterWriteContext.characterHardFacts[0].locationState.sourceChapterOrder,10);
+    assert.equal(located.contextPackage.chapterReviewContext.characterHardFacts[0].currentLocation,"牢房");
+    characterLocationService.readBeforeChapter=async()=>{throw new Error("位置读取失败");};
+    await assert.rejects(assembler.assemble("novel-1","chapter-1",{}),/位置读取失败/);
+    characterResourceLedgerService.buildContext = async () => { throw new Error("资源读取失败"); };
+    await assert.rejects(assembler.assemble("novel-1", "chapter-1", {}), /资源读取失败/,
+      "V2 cannot pay for writing with silently missing cross-chapter constraints");
+    prisma.novel.findUnique = async () => ({...await loadNovel(), directorVersion: "v1"});
+    batchContextCache.invalidate("novel-1");
+    assert.ok(await assembler.assemble("novel-1", "chapter-1", {}), "V1 retains its original read tolerance");
+    assert.equal(locationReads,1,"V1 must not read V2 locations");
   } finally {
+    batchContextCache.invalidate("novel-1");
     prisma.novel.findUnique = originals.novelFindUnique;
     prisma.chapter.findFirst = originals.chapterFindFirst;
     prisma.stateChangeProposal.count = originals.stateChangeProposalCount;
@@ -312,6 +362,9 @@ test("assembler only reads planning artifacts prepared before context assembly",
     prisma.consistencyFact.findMany = originals.consistencyFactFindMany;
     prisma.chapter.findMany = originals.chapterFindMany;
     prisma.creativeDecision.findMany = originals.creativeDecisionFindMany;
+    prisma.characterMindSnapshot.findMany = originals.characterMindSnapshotFindMany;
+    prisma.characterDialogueInfluence.findMany = originals.characterDialogueInfluenceFindMany;
+    prisma.novelFactEntry.findMany = originals.novelFactEntryFindMany;
     plannerService.getChapterPlan = originals.getChapterPlan;
     plannerService.ensureChapterPlan = originals.ensureChapterPlan;
     plannerService.buildPlanPromptBlock = originals.buildPlanPromptBlock;
@@ -321,5 +374,6 @@ test("assembler only reads planning artifacts prepared before context assembly",
     ragServices.hybridRetrievalService.buildContextBlock = originals.buildRagContext;
     payoffLedgerSyncService.getPayoffLedger = originals.getPayoffLedger;
     characterResourceLedgerService.buildContext = originals.buildCharacterResourceContext;
+    characterLocationService.readBeforeChapter = originals.readLocations;
   }
 });

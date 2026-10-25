@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FlaskConical } from "lucide-react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getChapterEditorWorkspace, getNovelDetail } from "@/api/novel";
 import { queryKeys } from "@/api/queryKeys";
 import { Button } from "@/components/ui/button";
+import { stripLegacyTaskUrlParams } from "@/lib/legacyTaskUrlParams";
 import ChapterEditorShell from "./components/chapterEditor/ChapterEditorShell";
 import {
   buildChapterEditorSessionIdentity,
@@ -25,6 +26,19 @@ export default function NovelChapterEdit() {
   const sessionIdentity = buildChapterEditorSessionIdentity(id, chapterId);
   const [workspaceRequestIdentity, setWorkspaceRequestIdentity] = useState<string | null>(null);
   const workspaceRequested = isChapterEditorWorkspaceRequested(workspaceRequestIdentity, sessionIdentity);
+  const location = useLocation();
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const cleaned = stripLegacyTaskUrlParams(searchParams);
+    if (cleaned.toString() !== searchParams.toString()) {
+      navigate({
+        pathname: location.pathname,
+        search: `?${cleaned.toString()}`,
+        hash: location.hash,
+      }, { replace: true, state: location.state });
+    }
+  }, [location.hash, location.pathname, location.search, location.state, navigate]);
 
   const novelDetailQuery = useQuery({
     queryKey: queryKeys.novels.detail(id),
@@ -36,6 +50,8 @@ export default function NovelChapterEdit() {
     queryFn: () => getChapterEditorWorkspace(id, chapterId),
     enabled: Boolean(id && chapterId && workspaceRequested),
     staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const detail = novelDetailQuery.data?.data;
@@ -91,6 +107,8 @@ export default function NovelChapterEdit() {
         onRequestWorkspace={() => setWorkspaceRequestIdentity(sessionIdentity)}
         onBack={() => navigate(`/novels/${id}/edit`)}
         onOpenVersionHistory={() => navigate(`/novels/${id}/edit`)}
+        onRefreshWorkspace={() => { void chapterEditorWorkspaceQuery.refetch(); }}
+        isRefreshingWorkspace={chapterEditorWorkspaceQuery.isFetching}
       />
     </div>
   );

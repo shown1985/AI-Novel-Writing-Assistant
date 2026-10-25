@@ -45,18 +45,23 @@ export class BookAnalysisBudgetGuard {
 
   private async applyUsage(usage: LlmTokenUsageSnapshot | null | undefined): Promise<void> {
     const tokenCount = readUsageTokens(usage);
-    // Prisma increment on NULL yields NULL — read first and compute manually as fallback.
-    const current = await prisma.bookAnalysis.findUnique({
-      where: { id: this.analysisId },
-      select: { budgetTokens: true, usedTokens: true },
-    });
+    // Initialize legacy NULL counters without overwriting another completed call.
+    if (tokenCount > 0) {
+      await prisma.bookAnalysis.updateMany({
+        where: { id: this.analysisId, usedTokens: null },
+        data: { usedTokens: 0 },
+      });
+    }
     const updated = tokenCount > 0
       ? await prisma.bookAnalysis.update({
           where: { id: this.analysisId },
-          data: { usedTokens: (current?.usedTokens ?? 0) + tokenCount },
+          data: { usedTokens: { increment: tokenCount } },
           select: { budgetTokens: true, usedTokens: true },
         })
-      : current;
+      : await prisma.bookAnalysis.findUnique({
+          where: { id: this.analysisId },
+          select: { budgetTokens: true, usedTokens: true },
+        });
 
     if (!updated?.budgetTokens) {
       return;

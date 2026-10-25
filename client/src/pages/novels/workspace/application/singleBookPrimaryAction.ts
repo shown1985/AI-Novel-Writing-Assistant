@@ -4,10 +4,10 @@ import type {
 } from "@ai-novel/shared/types/directorRuntime";
 import type { DirectorContinuationMode } from "@ai-novel/shared/types/novelDirector";
 import {
-  getDirectorCockpitActionHref,
   getDirectorCockpitContinuationMode,
   isDirectorCockpitContinuationAction,
 } from "../../../../lib/directorCockpitActions.ts";
+import { getDirectorCockpitActionHref } from "../../../../lib/novelRoutes.ts";
 
 export type SingleBookPrimaryActionCommand =
   | {

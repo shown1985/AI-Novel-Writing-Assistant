@@ -45,6 +45,8 @@ domain   Prompt port   persistence / lease / index ports
 
 诊断配置 fingerprint、Prompt 版本和模型来源属于调用证据，不进入上述内容版本体系。
 
+任何写入世界正式内容的入口（含上游合入的新入口，例如深化问答的 `deepening/AnswerIntegration`）都必须以读到的 `contentRevision` 作为条件更新并递增它。原因：AI 结构补全等长耗时流程用 `contentRevision` 做 CAS 判断世界是否在生成期间被改过；漏掉递增的写入口会让在途补全把作者刚保存的内容静默覆盖。合入上游时如出现新的 World 写入口，需检查并补上同样的条件更新与测试。
+
 ### 本书世界切片的派生缓存
 
 `NovelWorld.storySliceJson`、override、digest 与 builtAt 是派生缓存，刷新它们不递增 `NovelWorld.contentRevision`。`storySliceDigest` 是实例内部的 freshness 指纹，固定绑定实例 ID、`contentRevision`、`sourceWorldId`、`syncBaseVersion`、故事输入 digest 和切片 schema 版本；公开切片中的 `metadata.storyInputDigest` 仍只表示故事输入，`rawSlice.worldId` 仍保留来源世界或既有兼容标识，不承担实例版本语义。不得以 `updatedAt`、来源样本后续修改或切片构建时间代替内容版本。

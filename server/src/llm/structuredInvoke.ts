@@ -44,6 +44,7 @@ import {
   startModelTransportAttempt,
 } from "../platform/llm/provenance";
 import type { ModelAttemptRole } from "../platform/llm/provenance/attempts/contracts";
+import { claimModelRequest, currentModelRequestBudget } from "../platform/llm/retries";
 
 export {
   parseStructuredLlmRawContentDetailed,
@@ -71,6 +72,8 @@ export interface StructuredInvokeInput<T> {
   structuredStrategy?: StructuredOutputStrategy;
   label: string;
   maxRepairAttempts?: number;
+  fallbackMaxRepairAttempts?: number;
+  repairGuidance?: string;
   promptMeta?: PromptInvocationMeta;
   sessionId?: string;
   reasoningEnabled?: boolean;
@@ -285,6 +288,9 @@ async function invokeStructuredAttempt<T>(input: {
     reasoningForcedOff: resolved.reasoningForcedOff,
   });
   const startedAt = Date.now();
+  // Claim the request-count budget before the live session and the transport
+  // attempt record, so a refused claim never leaves a phantom provider attempt.
+  await claimModelRequest();
   const liveSession = beginLlmLiveSession({
     label: input.baseInput.label,
     mode: "structured",
@@ -370,7 +376,7 @@ async function invokeStructuredAttempt<T>(input: {
     });
     liveSession.phase("validating", "正在检查生成结果");
     let repairStarted = false;
-    const parsed = await parseStructuredLlmRawContentDetailed({
+    const parsed = await liveSession.observe(() => parseStructuredLlmRawContentDetailed({
       rawContent,
       schema: input.baseInput.schema,
       tokenUsage: collected.tokenUsage,
@@ -389,7 +395,9 @@ async function invokeStructuredAttempt<T>(input: {
         ? 0
         : input.baseInput.maxRepairAttempts,
       classifyZeroRepairParseFailure: input.baseInput.singleProviderTransportAttempt === true,
+      repairGuidance: input.baseInput.repairGuidance,
       promptMeta: input.baseInput.promptMeta,
+      repairMessages: currentModelRequestBudget() ? messages : undefined,
       onRepairOutputDelta: (content) => {
         if (!repairStarted) {
           repairStarted = true;
@@ -406,7 +414,7 @@ async function invokeStructuredAttempt<T>(input: {
       reasoningEnabled: resolved.reasoningEnabled,
       reasoningEffort: input.baseInput.reasoningEffort,
       modelAttemptCandidate: modelAttempt,
-    });
+    }));
     const candidate = parsed.modelAttemptCandidate ?? modelAttempt;
     if (!input.baseInput.deferModelAttemptAdoption) {
       await candidate?.finalizeSucceeded(
@@ -473,9 +481,15 @@ async function tryStructuredStrategies<T>(input: {
     ]
     : sequence;
   let lastError: StructuredOutputError | null = null;
-  const strategyLimit = input.baseInput.singleProviderTransportAttempt ? 1 : preferredSequence.length;
-  for (let index = 0; index < strategyLimit; index += 1) {
-    const strategy = preferredSequence[index]!;
+  const budget = currentModelRequestBudget();
+  // Single-transport mode is a hard one-call gate: exactly one strategy, and
+  // the request-count budget must never extend the loop past it.
+  const singleTransport = input.baseInput.singleProviderTransportAttempt === true;
+  const strategyLimit = singleTransport ? 1 : preferredSequence.length;
+  for (let index = 0; index < strategyLimit || Boolean(!singleTransport && budget && budget.remaining() > 0
+    && (!input.fallbackAvailable || input.fallbackUsed)); index += 1) {
+    const strategy = preferredSequence[index] ?? preferredSequence.at(-1)!;
+    const remainingBefore = budget?.remaining();
     try {
       return await invokeStructuredAttempt({
         baseInput: input.baseInput,
@@ -495,6 +509,9 @@ async function tryStructuredStrategies<T>(input: {
         fallbackAvailable: input.fallbackAvailable,
         fallbackUsed: input.fallbackUsed,
       });
+      if (singleTransport) break;
+      if (currentModelRequestBudget()?.remaining() === 0) break;
+      if (budget && index >= preferredSequence.length - 1 && budget.remaining() === remainingBefore) break;
       if (
         (lastError.category === "transport_error" || lastError.category === "empty_content")
         && !lastError.retryWithNextStrategy
@@ -504,7 +521,7 @@ async function tryStructuredStrategies<T>(input: {
       if (["request_too_large", "reasoning_budget_exhausted", "output_truncated"].includes(lastError.category)) {
         break;
       }
-      if (lastError.category === "schema_mismatch" && strategy === "prompt_json") {
+      if (!budget && lastError.category === "schema_mismatch" && strategy === "prompt_json") {
         break;
       }
     }
@@ -542,6 +559,7 @@ async function tryStructuredStrategiesWithTransportRetries<T>(input: {
         structuredError?.category !== "transport_error"
         || retryAttempt >= input.retryCount
         || input.baseInput.signal?.aborted
+        || currentModelRequestBudget()?.remaining() === 0
       ) {
         throw error;
       }
@@ -596,7 +614,12 @@ async function invokeStructuredLlmDetailedInContext<T>(input: StructuredInvokeIn
       retryCount: input.singleProviderTransportAttempt ? 0 : transportRetryCount,
     });
   } catch (primaryError) {
-    if (input.singleProviderTransportAttempt || !fallbackEnabled || !fallbackSettings) {
+    if (
+      input.singleProviderTransportAttempt
+      || !fallbackEnabled
+      || !fallbackSettings
+      || currentModelRequestBudget()?.remaining() === 0
+    ) {
       throw primaryError;
     }
 
@@ -617,6 +640,7 @@ async function invokeStructuredLlmDetailedInContext<T>(input: StructuredInvokeIn
           model: fallbackTarget.model,
           temperature: fallbackTarget.temperature,
           maxTokens: fallbackTarget.maxTokens,
+          maxRepairAttempts: input.fallbackMaxRepairAttempts ?? input.maxRepairAttempts,
           disableFallbackModel: true,
         },
         target: fallbackTarget,

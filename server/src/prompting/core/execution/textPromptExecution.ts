@@ -234,7 +234,7 @@ async function executeTextPromptInContext<I>(input: {
       modelRoute: resolved?.modelRoute ?? null,
     });
     liveSession.phase("streaming", "模型正在返回内容");
-    const stream = await llm.stream(messages, buildPromptCallOptions(input.options));
+    const stream = await liveSession.observe(() => llm.stream(messages, buildPromptCallOptions(input.options)));
     let rawOutput = "";
     const reasoningCollector = new ReasoningStreamCollector();
     for await (const chunk of stream) {
@@ -385,7 +385,7 @@ async function executeTextPromptStreamInContext<I>(input: {
       modelRoute: resolved?.modelRoute ?? null,
     });
     liveSession.phase("streaming", "模型正在返回内容");
-    const rawStream = await llm.stream(messages, buildPromptCallOptions(input.options));
+    const rawStream = await liveSession.observe(() => llm.stream(messages, buildPromptCallOptions(input.options)));
     captured = captureStreamOutput(
       rawStream as AsyncIterable<BaseMessageChunk>,
       (content) => liveSession.delta(content),

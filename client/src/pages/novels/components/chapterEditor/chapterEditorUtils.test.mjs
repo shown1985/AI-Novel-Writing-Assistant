@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import {
   applyCandidateToContent,
   buildAiRevisionRequest,
-} from "./chapterEditorUtils.ts";
+} from "./document/editorDocument.ts";
 
 test("selection revision keeps the exact target range in the request", () => {
   const content = "第一段正文。\n\n第二段需要修改。\n\n第三段正文。";

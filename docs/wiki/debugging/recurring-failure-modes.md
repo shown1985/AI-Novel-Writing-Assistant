@@ -33,6 +33,14 @@
 - 世界生成日志出现 `too big` 时，先检查结构化错误分类是否为 `request_too_large`：413、`context_length_exceeded`、payload/context 过大属于请求边界；`Too big: expected array to have <=N items` 属于 Zod 数组校验，不能靠缩短 Prompt 代替输出契约修复。确认分类后再查看阶段投影后的提示长度和 provider 的实际响应。
 - 世界骨架阶段若日志显示“关闭思考后重试”但供应商仍返回相同思考耗尽，检查 `reasoningEnabled` 是否贯穿 Prompt Runner、structuredInvoke 和 factory；只改阶段调用参数而未传入客户端不会改变模型行为。
 
+### 局域网 HTTP 的导演命令提交
+
+`crypto.randomUUID()` 依赖浏览器安全上下文。通过 `http://192.168.*` 等局域网地址访问时，直接调用它会在构造命令时抛错，请求尚未发出；开发机的 localhost 测试不能覆盖这个环境差异。
+
+新导演的命令标识由 `client/src/api/directorNext.ts` 的 `createDirectorCommandKey` 统一生成。优先使用原生 UUID；缺失时使用可在普通 HTTP 中工作的 `getRandomValues`，加时间和本页面序号；没有 Crypto API 时使用随机片段、时间和序号。标识只用于命令去重，不能作为认证令牌或授权依据，同一时刻的不同提交也必须保持不同标识。
+
+此规则覆盖启动正文、三种阶段处理、模式切换、继续与取消。兼容处理不能改变本次章节范围、运行归属、预期状态版本或创作方式，也不能绕过服务端的命令与状态校验。排查时先确认请求是否发出，再区分浏览器能力缺失与服务端拒绝。代码回归需模拟缺少 `randomUUID` 的环境并检查真实请求载荷，不能只在 Node 的完整 Crypto 环境中验证。
+
 ## 失败模式
 
 不能用来替代根因修复的手段：
@@ -61,3 +69,8 @@
 - [正文产出链路瘦身与资产回灌优化计划](../../plans/chapter-output-pipeline-optimization-plan.md)
 - [Prompt Governance Audit 2026-05-08](../../checkpoints/prompt-governance-audit-2026-05-08.md)
 - [README 最新更新](../../../README.md)
+## 补丁重叠与单章用量归属
+
+模型生成多个修复目标时可能让小片段包含在大段中。按返回顺序修改正文会让小片段从编辑后的文本消失，产生误导性的 missing_target。全部目标必须先在同一份原文定位，统一校验唯一性与互不重叠；成功后从后往前应用。任一校验失败返回完整原文，不能返回部分修改稿。Prompt 要求同一区域的问题合并为一条补丁；运行时仍报告 overlapping_target，不能猜测丢弃哪条修复意图，也不能额外启动无预算的补丁调用。局部失败按任务冻结的问题策略记录质量债。
+
+排查单章超限应分开读取 GenerationJob 总用量、chapterUsage 起止计数和逐次调用日志。正文保存之后的后续窗口决策与章节规划属于作业消耗，不属于保存章的消耗。新日志保留流式返回的实际 input/output/total Tokens；累计流片段取最终最大值，不重复相加。中断流的已报告消耗也写入错误记录；供应商未报告的用量保持未知。历史缺失的逐次用量不能用字符估算回填成实际消耗。

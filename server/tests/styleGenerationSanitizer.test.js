@@ -108,8 +108,10 @@ function styleContext() {
 }
 
 test("sanitizeStyleContextForGeneration redacts source entities before writer context", () => {
+  const original = styleContext();
+  const originalJson = JSON.stringify(original);
   const sanitized = sanitizeStyleContextForGeneration(
-    styleContext(),
+    original,
     new Date("2026-05-01T00:00:00.000Z"),
   );
 
@@ -126,4 +128,6 @@ test("sanitizeStyleContextForGeneration redacts source entities before writer co
   assert.match(block, /\[source-entity\]/);
   assert.doesNotMatch(block, /北凉王世子/);
   assert.doesNotMatch(block, /徐凤年/);
+  assert.equal(JSON.stringify(original), originalJson, "stored style reference must remain intact");
+  assert.notEqual(sanitized.compiledBlocks.contract, original.compiledBlocks.contract);
 });

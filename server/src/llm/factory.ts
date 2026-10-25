@@ -1,3 +1,5 @@
+import {attachLLMCacheRequestPolicy,resolveCacheCapability} from "../platform/llm/cache";
+import {attachExecutionSignal} from "../platform/llm/execution";
 import type {
   LLMProvider,
   ModelSelectionProvenance,
@@ -546,9 +548,11 @@ export function createLLMFromResolvedOptions(resolved: ResolvedLLMClientOptions)
     modelRoute: resolved.modelRoute,
     routeDegraded: resolved.routeDegraded,
     baseURL: resolved.baseURL,
+    requestProtocol: resolved.requestProtocol,
     promptMeta: resolved.promptMeta,
   };
-  const decorated = attachLLMDebugLogging(attachLLMUsageTracking(attachLLMRequestGuard(llm, meta), meta), meta);
+  const cacheAware=attachLLMCacheRequestPolicy(llm,resolveCacheCapability({model:resolved.model,baseURL:resolved.baseURL,protocol:resolved.requestProtocol==="anthropic"?"anthropic":"openai-compatible"}));
+  const decorated = attachLLMDebugLogging(attachLLMUsageTracking(attachLLMRequestGuard(cacheAware, meta), meta), meta);
   const limited = attachLLMRequestLimiter(decorated, {
     provider: resolved.provider,
     model: resolved.model,
@@ -556,7 +560,7 @@ export function createLLMFromResolvedOptions(resolved: ResolvedLLMClientOptions)
     requestIntervalMs: resolved.requestIntervalMs,
   });
   (limited as ChatOpenAIWithResolvedOptions)[RESOLVED_LLM_OPTIONS] = resolved;
-  return limited;
+  return attachExecutionSignal(limited);
 }
 
 export async function getLLM(provider?: LLMProvider, options: LLMOptions = {}): Promise<ChatOpenAI> {

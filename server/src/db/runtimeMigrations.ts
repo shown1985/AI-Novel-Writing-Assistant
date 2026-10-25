@@ -24,6 +24,7 @@ const MIGRATIONS_SUPERSEDED_BY_GRANULAR_REPAIRS = new Set([
 ]);
 
 const REQUIRED_COLUMN_BACKFILLS = [
+  { tableName: "APIKey", columnName: "secretRef", columnDefinition: `"secretRef" TEXT` },
   { tableName: "Character", columnName: "arcClimax", columnDefinition: `"arcClimax" TEXT` },
   { tableName: "Character", columnName: "arcEnd", columnDefinition: `"arcEnd" TEXT` },
   { tableName: "Character", columnName: "arcMidpoint", columnDefinition: `"arcMidpoint" TEXT` },

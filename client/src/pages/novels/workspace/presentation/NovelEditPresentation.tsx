@@ -13,6 +13,10 @@ import type {
   VolumeStrategyPlan,
   VolumeSyncPreview,
 } from "@ai-novel/shared/types/novel";
+import {
+  extractDirectorTaskSeedPayloadFromMeta,
+  type DirectorStepCalibrationRequest,
+} from "@ai-novel/shared/types/novelDirector";
 import type { LLMSelectorValue } from "@/components/common/LLMSelector";
 import { canCancelDirectorTask } from "@/lib/novelWorkflowTaskUi";
 import NovelEditView from "../../components/NovelEditView";
@@ -129,7 +133,6 @@ interface PresentationSetters {
 export interface NovelEditPresentationProps {
   id: string;
   activeTab: string;
-  directorTaskId: string;
   selectedChapterId: string;
   taskPanelOpen: boolean;
   clearTaskPanelOpen: () => void;
@@ -174,7 +177,6 @@ export function NovelEditPresentation(props: NovelEditPresentationProps) {
   const {
     id,
     activeTab,
-    directorTaskId,
     selectedChapterId,
     taskPanelOpen,
     clearTaskPanelOpen,
@@ -211,7 +213,6 @@ export function NovelEditPresentation(props: NovelEditPresentationProps) {
     variant: "default" | "outline" | "secondary" = "default",
   ) => {
     const workflowTaskId = resolveTakeoverDialogContextTaskId({
-      directorTaskId,
       activeAutoDirectorTask: director.activeAutoDirectorTask,
       projection: director.bookAutomationProjection,
     });
@@ -424,6 +425,25 @@ export function NovelEditPresentation(props: NovelEditPresentationProps) {
     confirmingCharacterResourceProposalId: resourceMutations.confirm.isPending ? resourceMutations.confirm.variables ?? "" : "",
     rejectingCharacterResourceProposalId: resourceMutations.reject.isPending ? resourceMutations.reject.variables ?? "" : "",
     chapterAuditReports: resources.chapterAuditReports,
+    manualDirectorHandoff: {
+      enabled: Boolean(
+        director.displayAutoDirectorTask?.id
+        && resources.selectedChapter?.content?.trim()
+        && (
+          director.displayAutoDirectorTask.pendingManualRecovery
+          || (
+            director.displayAutoDirectorTask.status === "waiting_approval"
+            && director.displayAutoDirectorTask.checkpointType === "step_review_required"
+          )
+        )
+      ),
+      isAccepting: directorCommands.acceptManualChangesAndContinueMutation.isPending,
+      onAccept: () => {
+        if (director.displayAutoDirectorTask?.id) {
+          directorCommands.acceptManualChangesAndContinueMutation.mutate(director.displayAutoDirectorTask.id);
+        }
+      },
+    },
     backgroundSyncActivities: resources.pipelineBackgroundActivities,
     isGeneratingChapterPlan: chapterRuntime.generateChapterPlanMutation.isPending,
     isReplanningChapter: chapterRuntime.replanChapterMutation.isPending,
@@ -687,6 +707,19 @@ export function NovelEditPresentation(props: NovelEditPresentationProps) {
       exportControls,
       takeover: isTakeoverDismissed ? null : directorInteraction.takeover,
       activeStepTakeoverEntry,
+      directorStepCalibration: director.displayAutoDirectorTask ? {
+        taskId: director.displayAutoDirectorTask.id,
+        activeStepId: extractDirectorTaskSeedPayloadFromMeta(director.displayAutoDirectorTask.meta)?.stepReview?.stepId
+          ?? director.displayAutoDirectorTask.currentItemKey
+          ?? null,
+        enabled: director.displayAutoDirectorTask.status === "waiting_approval"
+          && director.displayAutoDirectorTask.checkpointType === "step_review_required",
+        isSubmitting: directorCommands.calibrateDirectorStepMutation.isPending,
+        onSubmit: (request: DirectorStepCalibrationRequest) => directorCommands.calibrateDirectorStepMutation.mutate({
+          directorTaskId: director.displayAutoDirectorTask!.id,
+          ...request,
+        }),
+      } : undefined,
       onSwitchToSimpleMode: () => switchToSimple.mutate(),
       isSwitchingToSimpleMode: switchToSimple.isPending,
       taskDrawer,

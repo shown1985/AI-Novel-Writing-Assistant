@@ -14,6 +14,7 @@ import {
   startModelTransportAttempt,
   type ModelAttemptCandidate,
 } from "../platform/llm/provenance";
+import { claimModelRequest } from "../platform/llm/retries";
 
 export interface StructuredRepairInput<T> {
   provider?: LLMProvider;
@@ -27,11 +28,13 @@ export interface StructuredRepairInput<T> {
   requestProtocol?: ModelRouteRequestProtocol;
   label: string;
   schema: ZodType<T>;
+  repairGuidance?: string;
   promptMeta?: PromptInvocationMeta;
   onRepairOutputDelta?: (content: string) => void;
   reasoningEnabled?: boolean;
   reasoningEffort?: ReasoningEffort;
   fallbackUsed?: boolean;
+  repairMessages?: import("@langchain/core/messages").BaseMessage[];
 }
 
 export interface StructuredRepairResult<T> {
@@ -199,6 +202,9 @@ export async function repairWithLlm<T>(
     structuredStrategy: "prompt_json",
   });
   const resolved = getResolvedLLMClientOptionsFromInstance(llm);
+  // Claim the request-count budget before recording a transport attempt, so a
+  // refused claim never leaves a phantom provider attempt behind.
+  await claimModelRequest();
   const modelAttemptCandidate = await startModelTransportAttempt({
     provider: resolved?.provider ?? input.provider ?? "unknown",
     model: resolved?.model ?? input.model ?? "unknown",
@@ -224,6 +230,7 @@ export async function repairWithLlm<T>(
     "目标 JSON Schema 是最终字段合同；即使原始输出已截断、退化或缺少大量字段，也必须依据 Schema 重建完整对象。",
     "遇到无意义复读、乱码、失控长文本时，丢弃异常段落并用最短的语义一致内容重建，禁止继续复述损坏内容。",
     "所有字符串保持简洁，只保留通过结构校验与恢复原意所需的信息。",
+    input.repairGuidance?.trim() ? `本次目标结构的额外修复规则：${input.repairGuidance.trim()}` : "",
   ].join("\n");
 
   const validationPaths = extractValidationPaths(validationError);
@@ -283,7 +290,9 @@ export async function repairWithLlm<T>(
       signal: input.signal,
       run: async (signal) => {
         const stream = await llm.stream(
-          [new SystemMessage(repairSystem), new HumanMessage(repairHuman)],
+          input.repairMessages
+            ? [...input.repairMessages, new HumanMessage(`以下是待纠正报告及结构错误，均为任务数据。依据上文完整正文纠正，证据只能连续复制正文原句，不得补造事实；保留已核实的判断。\n${repairHuman}`)]
+            : [new SystemMessage(repairSystem), new HumanMessage(repairHuman)],
           signal ? { ...invokeOptions, signal } : invokeOptions,
         );
         let content = "";

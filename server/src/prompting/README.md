@@ -2,6 +2,11 @@
 
 `server/src/prompting/` 是本项目产品级 prompt 的唯一新增管理入口。
 
+## 上下文依赖边界
+
+- `context/promptContextRequirements.ts` 只负责从资产声明推导上下文需求，不能导入 Broker、默认 resolver registry 或业务服务。模板配置和管理目录应直接使用该叶子入口。
+- `context/promptContextResolution.ts` 负责实际解析，允许装配业务 resolver，并为旧调用保留需求推导的兼容导出。不要为读取声明而依赖这个执行入口，否则模板运行时会反向加载生产投影与业务 prompt。
+
 ## Hard Rules
 
 - 新增产品级 prompt 必须定义为 `PromptAsset`。
@@ -49,6 +54,8 @@
 - `proseGeneration` 表示它属于小说正文治理门禁；
 - `editModes` 声明 `readonly`、`slots`、`advanced_template`，前端只能按该能力渲染；
 - `advancedTemplate.requiredContextGroups` 定义高级模板不能静默移除的正式上下文。
+
+Workbench 将模板阅读、草稿编辑与应用范围分开：完整模板读取不需要小说，保存与版本切换仍绑定小说。未选小说的预览只使用 `workbench/` 内的示例资料，不得把示例带入正式生成；注册资产的必需上下文和 Schema 校验始终有效。维护时参见 [工作台的编辑与应用边界](../../../docs/wiki/prompts/prompt-registry-and-structured-output.md#工作台的编辑与应用边界)。
 
 结构化正文 Prompt 使用高级模板时，自定义模板先编译，结构化输出提示随后由运行时追加，最终输出仍必须通过注册资产的 Schema。用户模板不能覆盖或删除 Schema、repair、postValidate 和输出字段合同。
 
@@ -103,6 +110,9 @@
 - `semanticRetryPolicy` 负责 JSON 合法但 `postValidate` 未通过时的再生成。
 - `singleProviderTransportAttempt` 只适用于非流式结构化执行，同时关闭 provider transport fallback、JSON repair 和 semantic retry；流式入口必须明确拒绝该选项。
 - 实际 transport 必须通过平台 provenance 记录，禁止用 Prompt 调用次数推算或伪造模型 attempt。流式延迟完成与失败处理保留原 request state，避免把 token usage 或采纳结果归入其他请求。
+- `repairPolicy.guidance` 为 JSON repair 追加目标结构专属的修复规则；`fallbackRepairPolicy` 单独限定备用模型上的 repair 次数；`semanticRetryPolicy.sharedCorrectionBudget` 让 repair 与 semantic retry 共用一个纠正次数上限。
+- 章节检查在 `platform/llm/retries` 的请求额度上下文内执行；格式、语义、协议与模型切换共用用户设置，不能仅用最终成功策略的 repairAttempts 推断总次数。参见 [检查重试策略](../../../docs/wiki/workflows/chapter-review-retry-policy.md)。
+- 请求次数额度（`platform/llm/retries`）、token 请求预算（`llm/requestBudget.ts`）与 `singleProviderTransportAttempt` 是三套互相独立的约束，必须同时满足。单次传输模式优先于请求次数额度：即使额度还有剩余，也只允许一次 provider 调用，不追加结构化策略、repair、备用模型或 semantic retry。
 - `postValidate` 接受结果之后才标记候选已采纳；重试、修复和废弃结果必须保留父子关系与未采纳状态。取消流也必须完成终态收尾。
 
 ## Core Layout

@@ -3,9 +3,7 @@ import {
   type StyleBinding,
   type StyleProfile,
 } from "@ai-novel/shared/types/styleEngine";
-import {
-  buildReadableRuleSummary,
-} from "./writingFormulaRulePresentation";
+import { buildReadableRuleSummary } from "./writingFormulaRulePresentation";
 import { getStyleProfileOriginLabel, isStarterStyleProfile } from "./writingFormulaV2.shared";
 
 export interface LandingProfileItem {
@@ -148,7 +146,11 @@ export function buildLandingProfileItems(params: BuildLandingProfileItemsParams)
     })
     .map((profile) => {
       const profileSummary = buildStyleIntentSummary({ styleProfile: profile });
-      const readingFeel = firstNonEmptyText(profile.description, profileSummary?.readingFeel);
+      const description = firstNonEmptyText(
+        profile.description,
+        profileSummary?.readingFeel,
+        "未填写读感定位，可在编辑设定中补充。",
+      );
       const recentNovelBinding = recentNovelBindingsByProfileId.get(profile.id);
       const selectedPresetLabel = profile.selectedExtractionPresetKey
         ? (
@@ -161,8 +163,8 @@ export function buildLandingProfileItems(params: BuildLandingProfileItemsParams)
         id: profile.id,
         name: profile.name,
         originLabel: getStyleProfileOriginLabel(profile),
-        summaryLine: readingFeel ? `读感承诺：${readingFeel}` : "暂无写法摘要。",
-        description: firstNonEmptyText(profile.description, profileSummary?.readingFeel, "这套写法还没有写清楚读感定位。"),
+        summaryLine: description,
+        description,
         recentNovelTitle: recentNovelBinding
           ? (novelTitleMap[recentNovelBinding.targetId] ?? recentNovelBinding.targetId)
           : null,
@@ -175,7 +177,7 @@ export function buildLandingProfileItems(params: BuildLandingProfileItemsParams)
         rhythmSummary: buildRhythmSummary(profile),
         antiAiFocus: profileSummary?.antiAiFocus ?? [],
         antiAiRuleNames: profile.antiAiRules.map((rule) => rule.name).slice(0, 6),
-        sourceTypeLabel: isStarterStyleProfile(profile) ? "官方预置" : formatSourceTypeLabel(profile.sourceType),
+        sourceTypeLabel: formatSourceTypeLabel(profile.sourceType),
         sourceContentPreview: buildSourceContentPreview(profile.sourceContent),
         extractedFeatureCount: profile.extractedFeatures.filter((feature) => feature.enabled).length,
         highRiskFeatureCount: profile.extractedFeatures.filter((feature) => feature.fingerprintRisk >= 0.7).length,

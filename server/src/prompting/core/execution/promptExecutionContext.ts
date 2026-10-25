@@ -4,6 +4,7 @@ import { promptSlotOverrideService } from "../../slots/PromptSlotOverrideService
 import type { ResolvedSlots } from "../../slots/slotTypes";
 import { selectContextBlocks } from "../contextSelection";
 import { appendStructuredOutputHintMessages } from "../structuredOutputHint";
+import { registerPromptCacheBoundary } from "../cache";
 import type {
   PromptAsset,
   PromptExecutionOptions,
@@ -113,13 +114,15 @@ export function preparePromptExecution<I, O, R = O>(input: {
     input.resolvedSlots,
   );
   const renderedMessages = input.asset.render(input.promptInput, context);
+  const messages = appendStructuredOutputHintMessages({
+    asset: input.asset,
+    promptInput: input.promptInput,
+    context,
+    messages: renderedMessages,
+  });
+  registerPromptCacheBoundary(input.asset as PromptAsset<unknown, unknown>, renderedMessages, messages);
   return {
-    messages: appendStructuredOutputHintMessages({
-      asset: input.asset,
-      promptInput: input.promptInput,
-      context,
-      messages: renderedMessages,
-    }),
+    messages,
     context,
     invocation: buildPromptInvocationMeta(
       input.asset as PromptAsset<unknown, unknown, unknown>,

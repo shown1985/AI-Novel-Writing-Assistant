@@ -33,6 +33,7 @@ export default function CreationStudioPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const taskId = searchParams.get("taskId")?.trim() ?? "";
   const shortStoryEntry = searchParams.get("form") === "short_story";
+  const longNovelEntry = searchParams.get("form") === "long_novel";
   const [idea, setIdea] = useState("");
   const [selectedDirectionId, setSelectedDirectionId] = useState("");
   const [narrativeForm, setNarrativeForm] = useState<NarrativeForm>("short_story");
@@ -91,6 +92,7 @@ export default function CreationStudioPage() {
       idea: idea.trim(),
       preferredNarrativeForm: shortStoryEntry ? "short_story" : undefined,
       directionCount: shortStoryEntry ? directionCount : 2,
+      ...(longNovelEntry ? {preferredNarrativeForm: "long_novel" as const} : {}),
       writingPlatformPreference: initialPlatformPreference,
     }),
     onSuccess: (response) => {

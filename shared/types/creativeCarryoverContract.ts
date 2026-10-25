@@ -111,16 +111,36 @@ export function parseCreativeCarryoverContract(value: unknown): CreativeCarryove
   return parsed.success ? parsed.data : null;
 }
 
-export function parseAdoptedCreativeCarryoverContractForSource(
+export function matchesCreativeCarryoverSource(
+  contract: CreativeCarryoverContract | null | undefined,
+  mode: CreativeCarryoverMode | "",
+  bookAnalysisId: string | null | undefined,
+): boolean {
+  return Boolean(
+    contract
+    && mode
+    && bookAnalysisId?.trim()
+    && contract.mode === mode
+    && contract.bookAnalysisId === bookAnalysisId.trim(),
+  );
+}
+
+export function requireAdoptedCreativeCarryoverContract(
   value: unknown,
-  source: { mode: CreativeCarryoverMode; bookAnalysisId?: string | null },
+  mode: CreativeCarryoverMode | "",
+  bookAnalysisId: string | null | undefined,
 ): CreativeCarryoverContract | null {
   const contract = parseCreativeCarryoverContract(value);
-  if (!contract?.adopted || contract.mode !== source.mode
-    || !source.bookAnalysisId || contract.bookAnalysisId !== source.bookAnalysisId) {
-    return null;
+  if (mode && !contract?.adopted) {
+    throw new Error("请先生成并采用当前参考作品的创作承接方案，再创建小说。");
   }
-  return contract;
+  if (contract?.adopted && !matchesCreativeCarryoverSource(contract, mode, bookAnalysisId)) {
+    throw new Error("已采用的创作承接方案与当前创作模式或参考拆书不一致，请返回开书页重新生成并采用。");
+  }
+  if (contract?.adopted) {
+    assertCreativeCarryoverFocusForMode(contract.mode, contract);
+  }
+  return contract?.adopted ? contract : null;
 }
 
 export function serializeCreativeCarryoverContract(contract: CreativeCarryoverContract): string {

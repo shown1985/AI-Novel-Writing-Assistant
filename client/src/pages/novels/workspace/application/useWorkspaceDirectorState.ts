@@ -17,11 +17,7 @@ import {
   tabFromDirectorProgress,
 } from "../../novelWorkspaceNavigation";
 import { resolveAutoExecutionScopeLabel } from "../../novelEditTakeover.shared";
-import {
-  buildDisplayAutoDirectorTask,
-  shouldAutofocusProjectedDirectorTask,
-  shouldPreserveRequestedDirectorTaskId,
-} from "../../novelEditAutomationStatus";
+import { buildDisplayAutoDirectorTask } from "../../novelEditAutomationStatus";
 import {
   preservePendingManualRecovery,
   resolveRequestedDirectorTaskId,
@@ -51,9 +47,9 @@ function resolveActiveStructuredOutlineChapterId(snapshot: DirectorTaskSnapshot 
 }
 
 interface DirectorInput {
- id: string; directorTaskId: string; taskPanelOpen: boolean; setDirectorTaskId: (id: string) => void;
+ id: string; taskPanelOpen: boolean;
 }
-export function useWorkspaceDirectorState({id, directorTaskId, taskPanelOpen, setDirectorTaskId}: DirectorInput) {
+export function useWorkspaceDirectorState({id, taskPanelOpen}: DirectorInput) {
   const activeAutoDirectorTaskQuery = useQuery({
     queryKey: queryKeys.novels.autoDirectorTask(id),
     queryFn: () => getActiveAutoDirectorTask(id),
@@ -86,8 +82,6 @@ export function useWorkspaceDirectorState({id, directorTaskId, taskPanelOpen, se
   const bookAutomationProjection = bookAutomationQuery.data?.data?.projection ?? null;
   const requestedDirectorTaskId = resolveRequestedDirectorTaskId({
     activeDirectorTaskId: activeAutoDirectorTask?.id,
-    autofocusProjectedTask: shouldAutofocusProjectedDirectorTask(bookAutomationProjection),
-    directorTaskId,
     projectedTaskId: bookAutomationProjection?.latestTask?.id,
   });
   const requestedDirectorTaskQuery = useQuery({
@@ -100,7 +94,7 @@ export function useWorkspaceDirectorState({id, directorTaskId, taskPanelOpen, se
   const visibleDirectorTask = useMemo(
     () => {
       const sourceTask = requestedDirectorTask ?? activeAutoDirectorTask;
-      if (!directorTaskId && !taskPanelOpen && sourceTask?.status === "cancelled") {
+      if (!taskPanelOpen && sourceTask?.status === "cancelled") {
         return null;
       }
       const displayTask = buildDisplayAutoDirectorTask(sourceTask, bookAutomationProjection);
@@ -115,42 +109,11 @@ export function useWorkspaceDirectorState({id, directorTaskId, taskPanelOpen, se
         ? displayTask
         : { ...displayTask, pendingManualRecovery: true };
     },
-    [activeAutoDirectorTask, bookAutomationProjection, directorTaskId, requestedDirectorTask, taskPanelOpen],
+    [activeAutoDirectorTask, bookAutomationProjection, requestedDirectorTask, taskPanelOpen],
   );
   const displayAutoDirectorTask = visibleDirectorTask;
   const actionTargetDirectorTaskId = visibleDirectorTask?.id ?? "";
   const selectedDirectorTaskId = visibleDirectorTask?.id ?? requestedDirectorTaskId;
-  useEffect(() => {
-    if (!id || !activeAutoDirectorTaskQuery.isSuccess) {
-      return;
-    }
-    const canonicalDirectorTaskId = activeAutoDirectorTask?.id ?? "";
-    if (!canonicalDirectorTaskId && taskPanelOpen && directorTaskId) {
-      return;
-    }
-    if (!canonicalDirectorTaskId && directorTaskId && !requestedDirectorTaskQuery.isFetched) {
-      return;
-    }
-    if (!canonicalDirectorTaskId && shouldPreserveRequestedDirectorTaskId({
-      directorTaskId,
-      requestedTask: requestedDirectorTask,
-    })) {
-      return;
-    }
-    if (directorTaskId === canonicalDirectorTaskId) {
-      return;
-    }
-    setDirectorTaskId(canonicalDirectorTaskId);
-  }, [
-    activeAutoDirectorTask?.id,
-    activeAutoDirectorTaskQuery.isSuccess,
-    directorTaskId,
-    id,
-    requestedDirectorTask,
-    requestedDirectorTaskQuery.isFetched,
-    setDirectorTaskId,
-    taskPanelOpen,
-  ]);
   useEffect(() => {
     if (!id || !activeAutoDirectorTaskQuery.isSuccess) {
       return;

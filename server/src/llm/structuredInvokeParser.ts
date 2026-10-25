@@ -51,8 +51,10 @@ export interface StructuredInvokeRawParseInput<T> {
   maxRepairAttempts?: number;
   /** Only single-transport calls classify an unparseable zero-repair response as malformed_json. */
   classifyZeroRepairParseFailure?: boolean;
+  repairGuidance?: string;
   promptMeta?: PromptInvocationMeta;
   onRepairOutputDelta?: (content: string) => void;
+  repairMessages?: import("@langchain/core/messages").BaseMessage[];
   strategy: StructuredOutputStrategy;
   profile: StructuredOutputProfile;
   fallbackAvailable?: boolean;

@@ -37,6 +37,7 @@ import {
 import type { ApiHttpError } from "@/api/client";
 import { queryKeys } from "@/api/queryKeys";
 import { toast } from "@/components/ui/toast";
+import {readWorldAnswerIntegration} from "@ai-novel/shared/types/world";
 import { useLLMStore } from "@/store/llmStore";
 import { useSSE } from "@/hooks/useSSE";
 import { featureFlags } from "@/config/featureFlags";
@@ -53,7 +54,7 @@ import {
 import WorldAssetsTab from "./components/workspace/WorldAssetsTab";
 import WorldAxiomsCard from "./components/workspace/WorldAxiomsCard";
 import WorldConsistencyTab from "./components/workspace/WorldConsistencyTab";
-import WorldDeepeningTab from "./components/workspace/WorldDeepeningTab";
+import WorldDeepeningTab, {collectWorldAnswerDrafts} from "./components/workspace/WorldDeepeningTab";
 import WorldHandbookEditor from "./components/workspace/WorldHandbookEditor";
 import WorldLayersTab from "./components/workspace/WorldLayersTab";
 import WorldOverviewTab from "./components/workspace/WorldOverviewTab";
@@ -185,7 +186,8 @@ export default function WorldWorkspace() {
   );
   const visibleDeepeningQuestions = useMemo(() => {
     const list = world?.deepeningQA ?? [];
-    return list.filter((question) => question.status !== "integrated").slice(0, 3);
+    const actionable = list.filter((question) => question.status !== "integrated" || !readWorldAnswerIntegration(question.integratedSummary));
+    return [...actionable.slice(0, 3), ...list.filter(question => !actionable.includes(question)).slice(0, 3)];
   }, [world?.deepeningQA]);
   const integratedDeepeningQuestionCount = useMemo(
     () => (world?.deepeningQA ?? []).filter((question) => question.status === "integrated").length,
@@ -244,17 +246,22 @@ export default function WorldWorkspace() {
     },
   });
   const deepeningAnswerMutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (submitted: Record<string, string>) =>
       answerWorldDeepeningQuestions(
         id,
-        Object.entries(answerDrafts)
+        Object.entries(submitted)
           .filter(([, answer]) => answer.trim())
           .map(([questionId, answer]) => ({ questionId, answer })),
+        {provider: llm.provider, model: llm.model},
       ),
-    onSuccess: async () => {
-      setAnswerDrafts({});
+    onSuccess: async (response, submitted) => {
+      setAnswerDrafts(current => Object.fromEntries(Object.entries(current).filter(([key, value]) => value !== submitted[key])));
+      queryClient.setQueryData(queryKeys.worlds.detail(id), (current: typeof worldDetailQuery.data) => current?.data
+        ? {...current, data: {...current.data, deepeningQA: response.data ?? current.data.deepeningQA}} : current);
+      toast.success("回答已整合到世界手册，可在“手册整理”查看。");
       await invalidateWorld();
     },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "整合未完成，回答已保留，请重试。"),
   });
   const consistencyMutation = useMutation({
     mutationFn: () => checkWorldConsistency(id, { provider: llm.provider, model: llm.model }),
@@ -731,7 +738,7 @@ export default function WorldWorkspace() {
             generatePending={deepeningQuestionMutation.isPending}
             submitPending={deepeningAnswerMutation.isPending}
             onGenerate={() => deepeningQuestionMutation.mutate()}
-            onSubmit={() => deepeningAnswerMutation.mutate()}
+            onSubmit={() => deepeningAnswerMutation.mutate(collectWorldAnswerDrafts(visibleDeepeningQuestions, answerDrafts))}
           />
         </TabsContent>
 

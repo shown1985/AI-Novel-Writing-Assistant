@@ -81,22 +81,15 @@ test("late mutation completion cannot cross book or A-B-A epochs", () => {
   assert.equal(isCurrentBookRequest(bookASecond, bookASecond), false);
 });
 
-test("director task identity never falls back to a workspace task", () => {
+test("director task identity follows the book projection and never falls back to a workspace task", () => {
   assert.equal(resolveRequestedDirectorTaskId({
     activeDirectorTaskId: "director-live",
-    autofocusProjectedTask: true,
-    directorTaskId: "director-url",
     projectedTaskId: "director-projected",
-  }), "director-url");
+  }), "director-projected");
   assert.equal(resolveRequestedDirectorTaskId({
     activeDirectorTaskId: "director-live",
-    autofocusProjectedTask: true,
-    projectedTaskId: "director-projected",
   }), "director-live");
-  assert.equal(resolveRequestedDirectorTaskId({
-    autofocusProjectedTask: false,
-    projectedTaskId: "director-projected",
-  }), "");
+  assert.equal(resolveRequestedDirectorTaskId({}), "");
 });
 
 test("manual recovery remains pending through polling projections", () => {
