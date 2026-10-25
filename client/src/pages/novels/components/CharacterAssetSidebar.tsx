@@ -114,7 +114,7 @@ export default function CharacterAssetSidebar(props: CharacterAssetSidebarProps)
     isDeletingCharacter,
     deletingCharacterId,
   } = props;
-  const protagonist = characters.find(isProtagonistCharacter);
+  const protagonists = characters.filter((character) => isProtagonistCharacter(character));
   const supportingCharacters = characters.filter((character) => !isProtagonistCharacter(character));
 
   return (
@@ -123,20 +123,29 @@ export default function CharacterAssetSidebar(props: CharacterAssetSidebarProps)
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
             <Crown className="h-3.5 w-3.5 text-emerald-600" />
-            主角位
+            主角
           </div>
-          {protagonist ? <Badge variant="outline">主角</Badge> : null}
+          {protagonists.length > 0 ? (
+            <Badge variant="outline">
+              {protagonists.length > 1 ? `主角 ×${protagonists.length}` : "主角"}
+            </Badge>
+          ) : null}
         </div>
-        {protagonist ? (
-          <CharacterCard
-            character={protagonist}
-            selectedCharacterId={selectedCharacterId}
-            onSelectedCharacterChange={onSelectedCharacterChange}
-            onDeleteCharacter={onDeleteCharacter}
-            isDeletingCharacter={isDeletingCharacter}
-            deletingCharacterId={deletingCharacterId}
-            isProtagonist
-          />
+        {protagonists.length > 0 ? (
+          <div className="max-h-[300px] space-y-2 overflow-auto pr-1">
+            {protagonists.map((character) => (
+              <CharacterCard
+                key={character.id}
+                character={character}
+                selectedCharacterId={selectedCharacterId}
+                onSelectedCharacterChange={onSelectedCharacterChange}
+                onDeleteCharacter={onDeleteCharacter}
+                isDeletingCharacter={isDeletingCharacter}
+                deletingCharacterId={deletingCharacterId}
+                isProtagonist
+              />
+            ))}
+          </div>
         ) : (
           <div className="rounded-xl border border-dashed border-primary/30 bg-primary/5 p-3 text-xs leading-5 text-muted-foreground">
             当前阵容还没有标记主角，可在角色定位中补充主角信息。
