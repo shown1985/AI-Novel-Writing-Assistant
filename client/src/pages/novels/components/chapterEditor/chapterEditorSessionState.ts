@@ -6,16 +6,6 @@ export interface ChapterEditorPanelState {
   lastOpened: ChapterEditorAuxiliaryPanel | null;
 }
 
-export interface ExternalChapterContentInput {
-  incomingContent: string;
-  lastIncomingContent: string;
-  draftContent: string;
-  savedContent: string;
-  hasPendingRevision: boolean;
-}
-
-export type ExternalChapterContentDecision = "unchanged" | "accept" | "conflict";
-
 export const CLOSED_CHAPTER_EDITOR_PANELS: ChapterEditorPanelState = {
   referenceOpen: false,
   collaborationOpen: false,
@@ -82,15 +72,4 @@ export function constrainChapterEditorPanelsForViewport(
 
   const panelToKeep = state.lastOpened ?? "collaboration";
   return setChapterEditorPanelOpen(state, panelToKeep, true, true);
-}
-
-export function decideExternalChapterContent(
-  input: ExternalChapterContentInput,
-): ExternalChapterContentDecision {
-  if (input.incomingContent === input.lastIncomingContent) {
-    return "unchanged";
-  }
-
-  const hasDirtyDraft = input.draftContent !== input.savedContent;
-  return hasDirtyDraft || input.hasPendingRevision ? "conflict" : "accept";
 }

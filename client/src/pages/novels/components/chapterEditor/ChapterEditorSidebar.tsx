@@ -10,7 +10,6 @@ interface ChapterEditorSidebarProps {
   saveStatusLabel: string;
   isDirty: boolean;
   isSaving: boolean;
-  isSaveBlocked?: boolean;
   selectedDiagnosticId: string | null;
   onBack?: () => void;
   backLabel?: string;

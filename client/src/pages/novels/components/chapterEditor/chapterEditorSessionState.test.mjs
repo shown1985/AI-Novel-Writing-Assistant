@@ -5,7 +5,6 @@ import {
   CLOSED_CHAPTER_EDITOR_PANELS,
   buildChapterEditorSessionIdentity,
   constrainChapterEditorPanelsForViewport,
-  decideExternalChapterContent,
   isChapterEditorWorkspaceRequested,
   setChapterEditorPanelOpen,
   toggleChapterEditorPanel,
@@ -68,42 +67,4 @@ test("narrow viewport keeps only the panel explicitly opened most recently", () 
     collaborationOpen: true,
     lastOpened: "collaboration",
   });
-});
-
-test("same query value is ignored even while the local draft is dirty", () => {
-  assert.equal(decideExternalChapterContent({
-    incomingContent: "server v1",
-    lastIncomingContent: "server v1",
-    draftContent: "local draft",
-    savedContent: "server v1",
-    hasPendingRevision: false,
-  }), "unchanged");
-});
-
-test("new external content can replace a clean idle editor", () => {
-  assert.equal(decideExternalChapterContent({
-    incomingContent: "server v2",
-    lastIncomingContent: "server v1",
-    draftContent: "server v1",
-    savedContent: "server v1",
-    hasPendingRevision: false,
-  }), "accept");
-});
-
-test("new external content conflicts with a dirty draft or pending revision work", () => {
-  assert.equal(decideExternalChapterContent({
-    incomingContent: "server v2",
-    lastIncomingContent: "server v1",
-    draftContent: "local draft",
-    savedContent: "server v1",
-    hasPendingRevision: false,
-  }), "conflict");
-
-  assert.equal(decideExternalChapterContent({
-    incomingContent: "server v2",
-    lastIncomingContent: "server v1",
-    draftContent: "server v1",
-    savedContent: "server v1",
-    hasPendingRevision: true,
-  }), "conflict");
 });
