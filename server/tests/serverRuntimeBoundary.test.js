@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const { createApp, resolveServerStartOptions } = require("../dist/app.js");
 
 function withServerEnv(values, run) {
-  const keys = ["ALLOW_LAN", "HOST", "PORT", "CORS_ORIGIN"];
+  const keys = ["ALLOW_LAN", "HOST", "PORT", "CORS_ORIGIN", "AI_NOVEL_DEV_CONTAINER", "AI_NOVEL_DEV_LOOPBACK_ONLY"];
   const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
   for (const key of keys) {
     const value = values[key];
@@ -66,6 +66,39 @@ test("Release 1 rejects wildcard and private-network bind hosts", () => {
       );
     });
   }
+});
+
+test("Release 1 keeps the loopback gate when the dev-container flag is half-configured", () => {
+  for (const env of [
+    { AI_NOVEL_DEV_CONTAINER: "true" },
+    { AI_NOVEL_DEV_LOOPBACK_ONLY: "true" },
+  ]) {
+    withServerEnv({ ...env, HOST: "0.0.0.0", ALLOW_LAN: "true" }, () => {
+      assert.throws(
+        () => resolveServerStartOptions(),
+        /Release 1 only supports loopback access/,
+      );
+    });
+  }
+});
+
+test("Release 1 allows the loopback-only dev container bind for hot-reload development", () => {
+  withServerEnv(
+    {
+      AI_NOVEL_DEV_CONTAINER: "true",
+      AI_NOVEL_DEV_LOOPBACK_ONLY: "true",
+      HOST: "0.0.0.0",
+      ALLOW_LAN: "true",
+      CORS_ORIGIN: "http://localhost:5173",
+    },
+    () => {
+      assert.deepEqual(resolveServerStartOptions(), {
+        host: "0.0.0.0",
+        port: 3000,
+        allowLan: false,
+      });
+    },
+  );
 });
 
 test("Release 1 rejects non-loopback CORS origins", () => {

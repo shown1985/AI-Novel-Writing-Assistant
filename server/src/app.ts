@@ -283,7 +283,11 @@ export function resolveServerStartOptions(options?: ServerStartOptions): {
   const allowLan = options?.allowLan ?? parseEnvFlag(process.env.ALLOW_LAN, false);
   const host = options?.host ?? process.env.HOST ?? "127.0.0.1";
   validateReleaseOneCorsOrigins(resolveCorsAllowList());
-  if (allowLan || !isLoopbackHost(host)) {
+  // 本地开发容器在容器网络内监听 0.0.0.0 供 compose 内部互访，端口映射只绑定
+  // 宿主机 127.0.0.1，宿主局域网依然不可达；需要显式声明才豁免本机限制。
+  const devContainer = parseEnvFlag(process.env.AI_NOVEL_DEV_CONTAINER, false);
+  const loopbackBound = devContainer && parseEnvFlag(process.env.AI_NOVEL_DEV_LOOPBACK_ONLY, false);
+  if (!loopbackBound && (allowLan || !isLoopbackHost(host))) {
     throw new Error(
       "Release 1 only supports loopback access. Set ALLOW_LAN=false and HOST=127.0.0.1; LAN access requires the Release 2 authentication boundary.",
     );

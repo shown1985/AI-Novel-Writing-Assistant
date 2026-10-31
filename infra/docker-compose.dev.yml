@@ -63,6 +63,10 @@ services:
         condition: service_healthy
     environment:
       CHOKIDAR_USEPOLLING: ${AI_NOVEL_DEV_POLLING:-false}
+      # 开发容器豁免：容器网络内监听 0.0.0.0 供 web 容器代理转发，
+      # 端口映射只绑定宿主机 127.0.0.1，宿主局域网不可达。
+      AI_NOVEL_DEV_CONTAINER: "true"
+      AI_NOVEL_DEV_LOOPBACK_ONLY: "true"
       HOST: 0.0.0.0
       PORT: "3000"
       ALLOW_LAN: "true"
@@ -81,7 +85,8 @@ services:
       - api-data:/data
       - api-tmp:/app/server/.tmp
     ports:
-      - "${AI_NOVEL_DEV_API_PORT:-3000}:3000"
+      # 只绑定宿主机回环，LAN 无法访问这个单机开发实例。
+      - "127.0.0.1:${AI_NOVEL_DEV_API_PORT:-3000}:3000"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
@@ -104,7 +109,8 @@ services:
       # 置空后浏览器统一走同源 /api，经 Vite 代理转发，不受宿主机 client/.env 影响。
       VITE_API_BASE_URL: ""
     ports:
-      - "${AI_NOVEL_DEV_WEB_PORT:-5173}:5173"
+      # 只绑定宿主机回环，LAN 无法访问这个单机开发实例。
+      - "127.0.0.1:${AI_NOVEL_DEV_WEB_PORT:-5173}:5173"
     restart: unless-stopped
 
   qdrant:
