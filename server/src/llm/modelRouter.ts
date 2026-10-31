@@ -1,9 +1,10 @@
-import type {
-  LLMProvider,
-  ModelRouteDegradedReason,
-  ModelSelectionAdjustment,
-  ModelSelectionProvenance,
-  ModelSelectionSource,
+import {
+  DEFAULT_MODEL_OUTPUT_TOKENS,
+  type LLMProvider,
+  type ModelRouteDegradedReason,
+  type ModelSelectionAdjustment,
+  type ModelSelectionProvenance,
+  type ModelSelectionSource,
 } from "@ai-novel/shared/types/llm";
 import type {
   ModelRouteRequestProtocol,
@@ -12,7 +13,7 @@ import type {
 } from "@ai-novel/shared/types/novel";
 import { prisma } from "../db/prisma";
 import { createModelSelectionField } from "../platform/llm/provenance";
-import { isBuiltInProvider, PROVIDERS } from "./providers";
+import { PROVIDERS } from "./providers";
 import type { StructuredOutputStrategy } from "./structuredOutput";
 
 export type TaskType =
@@ -170,39 +171,13 @@ interface NormalizedMaxTokens {
   adjustments: ModelSelectionAdjustment<number>[];
 }
 
-function normalizeMaxTokens(provider: LLMProvider, maxTokens?: number): NormalizedMaxTokens {
+function normalizeMaxTokens(maxTokens?: number): NormalizedMaxTokens {
   if (typeof maxTokens !== "number" || !Number.isFinite(maxTokens)) {
     return { effective: undefined, adjustments: [] };
   }
   const normalized = Math.floor(maxTokens);
-  if (normalized < 1) {
+  if (!Number.isSafeInteger(normalized) || normalized < 1) {
     return { effective: undefined, adjustments: [] };
-  }
-  // Historical UI defaults persisted 4096 as a placeholder for "use provider defaults".
-  if (normalized === 4096) {
-    return {
-      effective: undefined,
-      adjustments: [{
-        kind: "legacy_4096_unset",
-        provider,
-        before: normalized,
-        after: null,
-        reason: "历史值 4096 表示沿用厂商默认 Token 上限。",
-      }],
-    };
-  }
-  const providerLimit = isBuiltInProvider(provider) ? PROVIDERS[provider].maxTokens : undefined;
-  if (typeof providerLimit === "number" && normalized > providerLimit) {
-    return {
-      effective: providerLimit,
-      adjustments: [{
-        kind: "provider_limit",
-        provider,
-        before: normalized,
-        after: providerLimit,
-        reason: "请求的 Token 上限超过厂商支持范围。",
-      }],
-    };
   }
   return { effective: normalized, adjustments: [] };
 }
@@ -217,7 +192,7 @@ function createRouteSelectionProvenance(input: {
   routeDegraded: boolean;
   routeDegradedReason: ModelRouteDegradedReason;
 }): ModelSelectionProvenance {
-  const normalizedMaxTokens = normalizeMaxTokens(input.provider, input.maxTokens);
+  const normalizedMaxTokens = normalizeMaxTokens(input.maxTokens);
   return {
     provider: createModelSelectionField({ requested: input.provider, source: input.source }),
     model: createModelSelectionField({ requested: input.model, source: input.source }),
@@ -286,7 +261,7 @@ function applyOverrides(
   const model = userOverride?.model ?? base.model;
   const temperature = userOverride?.temperature ?? base.temperature;
   const maxTokensInput = userOverride?.maxTokens ?? base.maxTokens;
-  const normalizedMaxTokens = normalizeMaxTokens(provider, maxTokensInput);
+  const normalizedMaxTokens = normalizeMaxTokens(maxTokensInput);
   const merged: ResolvedModel = {
     ...base,
     provider,
@@ -305,6 +280,7 @@ function applyOverrides(
   return {
     ...merged,
     ...routePreferences,
+    maxTokens: normalizedMaxTokens.effective ?? DEFAULT_MODEL_OUTPUT_TOKENS,
     routeKey: merged.routeKey,
     routeDegraded: merged.routeDegraded,
     routeDegradedReason: merged.routeDegradedReason,
@@ -375,7 +351,7 @@ export async function resolveModel(
     });
     if (row) {
       const provider = normalizeProviderId(row.provider);
-      const normalizedMaxTokens = normalizeMaxTokens(provider, row.maxTokens ?? undefined);
+      const normalizedMaxTokens = normalizeMaxTokens(row.maxTokens ?? undefined);
       const routePreferences = normalizeRoutePreferences({
         requestProtocol: "requestProtocol" in row ? row.requestProtocol : null,
         structuredResponseFormat: "structuredResponseFormat" in row ? row.structuredResponseFormat : null,
@@ -451,7 +427,7 @@ export async function listModelRouteConfigs(): Promise<Array<{
         taskType: r.taskType,
         model: r.model,
         temperature: r.temperature,
-        maxTokens: normalizeMaxTokens(provider, r.maxTokens ?? undefined).effective ?? null,
+        maxTokens: normalizeMaxTokens(r.maxTokens ?? undefined).effective ?? DEFAULT_MODEL_OUTPUT_TOKENS,
         ...routePreferences,
       };
     });
@@ -473,7 +449,7 @@ export async function upsertModelRouteConfig(
 ): Promise<void> {
   const normalizedTaskType = normalizeTaskType(taskType as TaskType);
   const provider = normalizeProviderId(data.provider);
-  const normalizedMaxTokens = normalizeMaxTokens(provider, data.maxTokens ?? undefined).effective ?? null;
+  const normalizedMaxTokens = normalizeMaxTokens(data.maxTokens ?? undefined).effective ?? null;
   const {
     requestProtocol,
     structuredResponseFormat,

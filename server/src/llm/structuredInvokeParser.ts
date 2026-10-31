@@ -1,3 +1,4 @@
+import { terminalResponseReason } from "../platform/llm/diagnostics/structuredEvidence";
 import { z, type ZodError, type ZodType } from "zod";
 import type { LLMProvider, ReasoningEffort } from "@ai-novel/shared/types/llm";
 import type { ModelRouteRequestProtocol } from "@ai-novel/shared/types/novel";
@@ -34,6 +35,7 @@ export interface StructuredInvokeResult<T> {
 }
 
 export interface StructuredInvokeRawParseInput<T> {
+  diagnosticContext?: import("../platform/llm/diagnostics/StructuredDiagnosticStore").StructuredDiagnosticContext;
   rawContent: string;
   schema: ZodType<T>;
   tokenUsage?: LlmTokenUsageSnapshot | null;
@@ -301,11 +303,13 @@ export function buildStructuredError(input: {
   reasoningForcedOff?: boolean;
   fallbackAvailable?: boolean;
   fallbackUsed?: boolean;
+  cause?: unknown;
 }): StructuredOutputError {
   return new StructuredOutputError({
     message: input.message,
     category: input.category,
     retryWithNextStrategy: input.retryWithNextStrategy,
+    cause: input.cause,
     diagnostics: buildDiagnostics({
       strategy: input.strategy,
       profile: input.profile,
@@ -341,6 +345,7 @@ export function wrapStructuredInvokeError(input: {
       : `[${input.label}] Structured output failed.`;
   return buildStructuredError({
     message,
+    cause: input.error,
     category,
     strategy: input.strategy,
     profile: input.profile,
@@ -435,9 +440,11 @@ export async function parseStructuredLlmRawContentDetailed<T>(
           modelAttemptUsage: repaired.tokenUsage,
         };
       } catch (repairError) {
+        if (repairError instanceof StructuredOutputError && terminalResponseReason(repairError.diagnostics.response?.failureReason)) throw repairError;
         if (attempt >= maxRepairAttempts) {
           throw buildStructuredError({
             message: `[${input.label}] JSON 解析失败且修复未成功。错误：${repairError instanceof Error ? repairError.message : String(repairError)}`,
+            cause: repairError,
             category: classifyStructuredOutputFailure({
               error: repairError,
               rawContent: input.rawContent,
@@ -465,6 +472,12 @@ export async function parseStructuredLlmRawContentDetailed<T>(
         fallbackUsed: input.fallbackUsed,
       });
     }
+    throw buildStructuredError({
+      message: `[${input.label}] JSON 解析未通过。`,
+      category: classifyStructuredOutputFailure({ error: parseErrorMessage }) === "incomplete_json" ? "incomplete_json" : "malformed_json",
+      strategy: input.strategy, profile: input.profile,
+      reasoningForcedOff: input.reasoningForcedOff, fallbackAvailable: input.fallbackAvailable, fallbackUsed: input.fallbackUsed,
+    });
   }
 
   const first = runtimeSchema.safeParse(parsed);
@@ -544,10 +557,12 @@ export async function parseStructuredLlmRawContentDetailed<T>(
         modelAttemptUsage: repaired.tokenUsage,
       };
     } catch (error) {
+      if (error instanceof StructuredOutputError && terminalResponseReason(error.diagnostics.response?.failureReason)) throw error;
       if (attempt >= maxRepairAttempts) {
         throw buildStructuredError({
           message: `[${input.label}] LLM 输出经修复后仍未通过 Schema 校验。错误：${error instanceof Error ? error.message : String(error)}`,
           category: "schema_mismatch",
+          cause: error,
           strategy: input.strategy,
           profile: input.profile,
           reasoningForcedOff: input.reasoningForcedOff,

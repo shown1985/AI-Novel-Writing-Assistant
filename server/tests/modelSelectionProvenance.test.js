@@ -17,7 +17,7 @@ function routeRow(overrides = {}) {
     provider: "deepseek",
     model: "deepseek-route-model",
     temperature: 0.3,
-    maxTokens: 32768,
+    maxTokens: 8192,
     requestProtocol: "auto",
     structuredResponseFormat: "auto",
     ...overrides,
@@ -64,7 +64,7 @@ test("model route resolution preserves the frozen value and source matrix", asyn
       row: null,
       expected: {
         provider: "deepseek", model: "deepseek-flash", temperature: 0.3,
-        maxTokens: null, routeKey: "planner", routeDegraded: false,
+        maxTokens: 8192, routeKey: "planner", routeDegraded: false,
       },
       sources: {
         provider: "task_route_default", model: "task_route_default",
@@ -78,7 +78,7 @@ test("model route resolution preserves the frozen value and source matrix", asyn
       error: new Error("route store unavailable"),
       expected: {
         provider: "deepseek", model: "deepseek-flash", temperature: 0.3,
-        maxTokens: null, routeKey: "planner", routeDegraded: false,
+        maxTokens: 8192, routeKey: "planner", routeDegraded: false,
       },
       sources: {
         provider: "task_route_default", model: "task_route_default",
@@ -92,7 +92,7 @@ test("model route resolution preserves the frozen value and source matrix", asyn
       row: null,
       expected: {
         provider: "deepseek", model: "deepseek-flash", temperature: 0.1,
-        maxTokens: null, routeKey: "critical_review", routeDegraded: true,
+        maxTokens: 8192, routeKey: "critical_review", routeDegraded: true,
       },
       sources: {
         provider: "task_route_default", model: "task_route_default",
@@ -106,7 +106,7 @@ test("model route resolution preserves the frozen value and source matrix", asyn
       error: new Error("route store unavailable"),
       expected: {
         provider: "deepseek", model: "deepseek-flash", temperature: 0.1,
-        maxTokens: null, routeKey: "critical_review", routeDegraded: true,
+        maxTokens: 8192, routeKey: "critical_review", routeDegraded: true,
       },
       sources: {
         provider: "task_route_default", model: "task_route_default",
@@ -125,7 +125,6 @@ test("model route resolution preserves the frozen value and source matrix", asyn
       },
       sources: { provider: "explicit_request", model: "task_route", temperature: "task_route", maxTokens: "task_route" },
       reason: null,
-      adjustmentProvider: "deepseek",
     },
     {
       name: "model-only override",
@@ -184,11 +183,10 @@ test("model route resolution preserves the frozen value and source matrix", asyn
       row: routeRow({ maxTokens: 4096 }),
       expected: {
         provider: "deepseek", model: "deepseek-route-model", temperature: 0.3,
-        maxTokens: null, routeKey: "planner", routeDegraded: false,
+        maxTokens: 4096, routeKey: "planner", routeDegraded: false,
       },
       sources: { provider: "task_route", model: "task_route", temperature: "task_route", maxTokens: "task_route" },
       reason: null,
-      adjustmentProvider: "deepseek",
     },
   ];
 
@@ -223,16 +221,10 @@ test("model route provenance keeps requested values and deterministic adjustment
     assert.equal(resolved.provider, "deepseek");
     assert.equal(resolved.maxTokens, 8192);
     assert.deepEqual(resolved.selectionProvenance.maxTokens, {
-      requested: 32768,
+      requested: 8192,
       effective: 8192,
       source: "task_route",
-      adjustments: [{
-        kind: "provider_limit",
-        provider: "deepseek",
-        before: 32768,
-        after: 8192,
-        reason: "请求的 Token 上限超过厂商支持范围。",
-      }],
+      adjustments: [],
     });
     assert.equal(resolved.selectionProvenance.provider.source, "task_route");
     assert.equal(resolved.selectionProvenance.model.source, "task_route");
@@ -240,12 +232,10 @@ test("model route provenance keeps requested values and deterministic adjustment
 
     prisma.modelRouteConfig.findUnique = async () => routeRow({ maxTokens: 4096 });
     const legacy = await resolveModel("planner");
-    assert.equal(legacy.maxTokens, undefined);
-    assert.deepEqual(legacy.selectionProvenance.maxTokens.adjustments.map((item) => item.kind), [
-      "legacy_4096_unset",
-    ]);
+    assert.equal(legacy.maxTokens, 4096);
+    assert.deepEqual(legacy.selectionProvenance.maxTokens.adjustments, []);
     assert.equal(legacy.selectionProvenance.maxTokens.requested, 4096);
-    assert.equal(legacy.selectionProvenance.maxTokens.effective, null);
+    assert.equal(legacy.selectionProvenance.maxTokens.effective, 4096);
   } finally {
     prisma.modelRouteConfig.findUnique = originalFindUnique;
   }
@@ -329,8 +319,7 @@ test("factory records mixed field sources and returns a detached sanitized proje
     assert.equal(provenance.model.source, "provider_configuration");
     assert.equal(provenance.temperature.source, "task_route");
     assert.equal(provenance.maxTokens.source, "task_route");
-    assert.deepEqual(provenance.maxTokens.adjustments.map((item) => item.kind), ["provider_limit"]);
-    assert.deepEqual(provenance.maxTokens.adjustments.map((item) => item.provider), ["deepseek"]);
+    assert.deepEqual(provenance.maxTokens.adjustments, []);
     assert.equal(writeCount, 0);
     assert.equal(transportCount, 0);
 
@@ -351,10 +340,10 @@ test("factory records mixed field sources and returns a detached sanitized proje
       assert.equal(serialized.includes(forbidden), false, `projection must omit ${forbidden}`);
     }
 
-    provenance.maxTokens.adjustments[0].reason = "mutated";
+    provenance.temperature.requested = 0.99;
     assert.notEqual(
-      resolved.selectionProvenance.maxTokens.adjustments[0].reason,
-      provenance.maxTokens.adjustments[0].reason,
+      resolved.selectionProvenance.temperature.requested,
+      provenance.temperature.requested,
     );
   } finally {
     setProviderSecretCache("openai", null);

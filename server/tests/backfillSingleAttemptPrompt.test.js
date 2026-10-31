@@ -423,7 +423,7 @@ test("single transport mode classifies zero-repair parse failures without reachi
   const { StructuredOutputError } = require("../dist/llm/structuredOutput.js");
   const scenarios = [
     { name: "non-empty non-JSON is malformed_json", content: "not-json at all", category: "malformed_json" },
-    { name: "whitespace-only is empty_content", content: "   \n\t ", category: "empty_content" },
+    { name: "whitespace-only is an empty response before parsing", content: "   \n\t ", category: "transport_error" },
     {
       name: "valid JSON violating the schema stays schema_mismatch",
       content: JSON.stringify({ summary: "缺少候选", candidates: [] }),
@@ -460,7 +460,7 @@ test("ordinary structured mode still sends the same non-JSON output through JSON
   }
 });
 
-test("zero-repair calls outside single transport mode keep the legacy one-call schema_mismatch classification", async () => {
+test("zero-repair calls outside single transport mode keep the one-call malformed_json classification", async () => {
   const { StructuredOutputError } = require("../dist/llm/structuredOutput.js");
   const { invokeStructuredLlmDetailed } = require("../dist/llm/structuredInvoke.js");
   const harness = installTransportHarness(async () => jsonStream("not-json"));
@@ -478,9 +478,9 @@ test("zero-repair calls outside single transport mode keep the legacy one-call s
         // Isolate the primary strategy loop; the configured fallback model is a separate, unchanged stage.
         disableFallbackModel: true,
       }),
-      (error) => error instanceof StructuredOutputError && error.category === "schema_mismatch",
+      (error) => error instanceof StructuredOutputError && error.category === "malformed_json",
     );
-    assert.equal(harness.calls.length, 1, "prompt_json schema_mismatch still stops after one provider call");
+    assert.equal(harness.calls.length, 3, "prompt_json malformed_json escalates through the structured protocol strategies");
     assert.equal(harness.calls[0].strategy, "prompt_json");
     assert.equal(harness.repairs.length, 0);
   } finally {

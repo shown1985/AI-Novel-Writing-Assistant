@@ -7,6 +7,8 @@ export interface ApiResponse<T> {
   error?: string;
   message?: string;
   details?: unknown;
+  code?: string;
+  requestId?: string;
 }
 
 export type SSEFrame =

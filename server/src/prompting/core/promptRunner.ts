@@ -59,7 +59,7 @@ type PromptRunnerStructuredInvoker = typeof invokeStructuredLlmDetailed;
 let promptRunnerLLMFactory: PromptRunnerLLMFactory = getLLM;
 let promptRunnerStructuredInvoker: PromptRunnerStructuredInvoker = invokeStructuredLlmDetailed;
 
-export { preparePromptExecution };
+export { preparePromptExecution, resolvePromptOverlaysForAsset };
 
 export async function runStructuredPrompt<I, O, R = O>(input: {
   asset: PromptAsset<I, O, R>;

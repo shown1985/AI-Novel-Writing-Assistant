@@ -10,6 +10,7 @@ import {
 } from "../../../llm/usageTracking";
 import { toText } from "../../../services/novel/novelP0Utils";
 import { beginLlmLiveSession } from "../../../platform/llm/live/llmLiveSession";
+import { claimModelRequest } from "../../../platform/llm/retries";
 import {
   buildPromptInvocationAttribution,
   getModelAttemptExecutionEvidence,
@@ -228,6 +229,14 @@ async function executeTextPromptInContext<I>(input: {
       promptMeta: prepared.invocation,
     });
     const resolved = getResolvedLLMClientOptionsFromInstance(llm);
+    // Reserve before the attempt record and the physical stream so a refused
+    // claim never leaves a phantom provider attempt behind, and budget scopes
+    // can validate the complete effective request.
+    await claimModelRequest({
+      configuration: resolved,
+      input: messages,
+      options: buildPromptCallOptions(input.options),
+    });
     attempt = await startModelTransportAttempt({
       provider: resolved?.provider ?? input.options?.provider ?? "unknown",
       model: resolved?.model ?? input.options?.model ?? "unknown",
@@ -379,6 +388,11 @@ async function executeTextPromptStreamInContext<I>(input: {
       promptMeta: prepared.invocation,
     });
     const resolved = getResolvedLLMClientOptionsFromInstance(llm);
+    await claimModelRequest({
+      configuration: resolved,
+      input: messages,
+      options: buildPromptCallOptions(input.options),
+    });
     attempt = await startModelTransportAttempt({
       provider: resolved?.provider ?? input.options?.provider ?? "unknown",
       model: resolved?.model ?? input.options?.model ?? "unknown",

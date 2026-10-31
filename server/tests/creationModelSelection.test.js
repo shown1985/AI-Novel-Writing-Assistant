@@ -79,7 +79,7 @@ async function runScenario(name) {
     }],
     novel: { id: "novel-1", title: direction.title, narrativeForm: "short_story", targetWordCount: 3000,
       writingPlatform: "zhihu_story", writingPlatformSnapshotJson: null, styleTone: null },
-    planRow: null, segments: [], confirmation: null, strategy: "local_patch",
+    planRow: null, segments: [], confirmation: null, strategy: "local_patch", revisionJob: null, candidates: [],
   };
   const activeIntent = () => state.intents.filter((row) => row.status === "active").at(-1);
   const latestIntent = () => state.intents.at(-1);
@@ -114,9 +114,12 @@ async function runScenario(name) {
         intentVersions: activeIntent() ? [activeIntent()] : [] }),
       findFirst: async () => clone(state.task),
       findMany: async () => [{ id: state.task.id }],
+      update: async ({ data }) => update(state.task, data),
       updateMany: async ({ where, data }) => {
         if (state.conflict || !match(state.task, where)) return { count: 0 };
-        update(state.task, data); return { count: 1 };
+        update(state.task, data);
+        if (data.status === "succeeded") state.finish?.();
+        return { count: 1 };
       },
     },
     novelIntentVersion: {
@@ -146,7 +149,7 @@ async function runScenario(name) {
     shortStoryPlan: {
       findUnique: async () => state.planRow ? clone({ ...state.planRow, segments: state.segments }) : null,
       create: async ({ data }) => {
-        state.planRow = { ...data, id: "plan-1" };
+        state.planRow = { ...data, id: "plan-1", updatedAt: new Date() };
         state.segments = data.segments.create.map((item) => ({ ...item, id: `segment-${item.order}`, planId: "plan-1",
           version: 1, content: "", status: "pending", userEditedAt: null, updatedAt: new Date() }));
         return clone({ ...state.planRow, segments: state.segments });
@@ -160,6 +163,38 @@ async function runScenario(name) {
         rows.forEach((row) => update(row, data)); return { count: rows.length };
       },
       update: async ({ where, data }) => update(state.segments.find((row) => row.id === where.id), data),
+    },
+    shortStoryRevisionCandidate: {
+      findUnique: async ({ where }) => state.candidates.find((row) => row.jobId === where.jobId_segmentId?.jobId && row.segmentId === where.jobId_segmentId?.segmentId) ?? null,
+      findMany: async () => clone(state.candidates),
+      create: async ({ data }) => {
+        const row = { ...data, id: `candidate-${data.segmentId}` };
+        state.candidates.push(row); return clone(row);
+      },
+      upsert: async ({ where, create }) => {
+        const existing = state.candidates.find((row) => row.jobId === where.jobId_segmentId.jobId && row.segmentId === where.jobId_segmentId.segmentId);
+        if (existing) return clone(existing);
+        const row = { ...create, id: `candidate-${create.segmentId}` };
+        state.candidates.push(row); return clone(row);
+      },
+    },
+    shortStoryRevisionJob: {
+      findUnique: async () => state.revisionJob ? clone(state.revisionJob) : null,
+      findUniqueOrThrow: async () => clone({
+        ...state.revisionJob, workflowTask: clone({ ...state.task }),
+        candidates: clone(state.candidates), intentVersion: clone(latestIntent()),
+      }),
+      create: async ({ data }) => { state.revisionJob = { ...data, status: "queued" }; return clone(state.revisionJob); },
+      update: async ({ where, data }) => {
+        if (!state.revisionJob || state.revisionJob.id !== where.id) return state.revisionJob;
+        Object.assign(state.revisionJob, data); return clone(state.revisionJob);
+      },
+      updateMany: async ({ where, data }) => {
+        if (!state.revisionJob) return { count: 0 };
+        if (where.leaseToken && state.revisionJob.leaseToken !== where.leaseToken) return { count: 0 };
+        Object.assign(state.revisionJob, data); return { count: 1 };
+      },
+      findFirst: async () => state.revisionJob ? clone(state.revisionJob) : null,
     },
     $transaction: async (input) => typeof input === "function" ? input(prisma) : Promise.all(input),
   };
@@ -188,6 +223,11 @@ async function runScenario(name) {
   const mocks = new Map();
   const stub = (file, exports) => mocks.set(path.join(dist, file), exports);
   stub("db/prisma.js", { prisma });
+  stub("platform/llm/diagnostics/StructuredDiagnosticStore.js", {
+    latestStructuredDiagnostic: async () => null,
+    canRetryStructuredTask: async () => true,
+    recordStructuredBusinessFailure: async () => {},
+  });
   stub("middleware/errorHandler.js", { AppError: class AppError extends Error {} });
   stub("services/novel/workflow/NovelWorkflowService.js", { NovelWorkflowService: Workflow });
   stub("services/novel/workflow/novelWorkflow.shared.js", {
@@ -234,7 +274,10 @@ async function runScenario(name) {
       case "novel.short_story.plan": output = plan; break;
       case "novel.short_story.segment.write": output = { content: `生成片段${input.promptInput.segment.order}`, continuitySummary: "连续性" }; break;
       case "novel.short_story.full.audit": output = { decision: "patchable", summary: "修补", issues: [] }; break;
-      case "novel.short_story.patch.repair": output = { patches: [], residualQualityDebt: [] }; break;
+      case "novel.short_story.patch.repair": output = {
+        patches: (input.promptInput.audit?.issues ?? []).map((issue) => ({ segmentOrder: issue.affectedSegmentOrders[0], content: `修改正文${issue.affectedSegmentOrders[0]}` })),
+        residualQualityDebt: [],
+      }; break;
       case "novel.short_story.revision.impact": output = { understoodGoal: "修改结尾", revisedDirection: direction,
         recommendedTargetWordCount: 3000, affectedSegmentOrders: [2], recommendedStrategy: state.strategy,
         changesEnding: true, changesScale: false, changesCoreIntent: false, summary: "修改第二段" }; break;
@@ -282,13 +325,12 @@ async function runScenario(name) {
     for (const row of state.segments) Object.assign(row, { status: "completed", content: `保留正文${row.order}` });
   }
   async function applyAndFlush() {
-    global.setImmediate = (callback) => { state.deferred.push(callback); };
     const finished = new Promise((resolve) => { state.finish = resolve; });
     await studio.applyRevision(state.novel.id, latestIntent().id);
     state.selection = { provider: "anthropic", model: "switched-after-apply" };
     state.task.seedPayloadJson = JSON.stringify({ llmSelection: route });
-    assert.equal(state.deferred.length, 1);
-    state.deferred[0]();
+    assert.equal(state.revisionJob?.status, "queued");
+    await production.run("task-1").catch((error) => { console.log("[run-error]", error.message); state.failure = error.message; });
     let timer;
     try {
       await Promise.race([finished, new Promise((_, reject) => {
@@ -351,8 +393,8 @@ async function runScenario(name) {
       state.onPrompt = () => { state.selection = nextSelected; state.task.seedPayloadJson = JSON.stringify({ llmSelection: nextSelected }); };
       await production.run("task-1"); assertCalls(); assert.equal(state.selectionReads, 0);
       assert.deepEqual(state.calls.map((call) => [call.id, call.options.temperature, call.options.maxTokens]), [
-        ["novel.short_story.plan", 0.55, undefined], ["novel.short_story.segment.write", 0.78, 3000],
-        ["novel.short_story.segment.write", 0.78, 3000], ["novel.short_story.full.audit", 0.25, 5000],
+        ["novel.short_story.plan", 0.55, undefined], ["novel.short_story.segment.write", 0.78, undefined],
+        ["novel.short_story.segment.write", 0.78, undefined], ["novel.short_story.full.audit", 0.25, 5000],
         ["novel.short_story.patch.repair", 0.45, 12000],
       ]); break;
     case "recovery keeps saved identity":
@@ -378,6 +420,7 @@ async function runScenario(name) {
       for (const raw of [JSON.stringify({ idea: "旧任务" }), "{", "null", "[]",
         JSON.stringify({ llmSelection: "qwen" }), JSON.stringify({ llmSelection: { provider: "ollama", model: " " } })]) {
         state.task.seedPayloadJson = raw; state.planRow = null; state.calls = []; state.segments = [];
+        state.task.status = "queued"; state.task.shortStoryOperationId = null;
         await production.run("task-1"); assertCalls(route);
       }
       assert.equal(state.selectionReads, 0); break;
@@ -396,7 +439,6 @@ async function runScenario(name) {
         () => creation.replaceDirection("task-1", { intentVersionId: "intent-1", directionId: direction.id }),
         () => creation.confirm("task-1", confirmInput("short_story")),
         () => studio.retryProduction("novel-1"), () => studio.previewRevision("novel-1", "修改结尾"),
-        () => studio.applyRevision("novel-1", "intent-1"),
       ];
       const before = clone({ task: state.task, segments: state.segments });
       for (const action of actions) await assert.rejects(action, /selection store unavailable/);
@@ -405,19 +447,19 @@ async function runScenario(name) {
       assert.deepEqual(state.foundations, []); assert.deepEqual(state.scheduled, []); break;
     }
     case "revision preview captures its own selection":
-      await installCompletedPlan(); state.selection = nextSelected;
+      await installCompletedPlan(); state.selection = nextSelected; state.task.status = "failed";
       await studio.previewRevision("novel-1", "修改结尾"); assertCalls(nextSelected);
       assert.equal(state.calls[0].options.temperature, 0.35); assert.equal(state.calls[0].options.maxTokens, undefined); break;
     case "revision patch freezes apply selection before asynchronous execution":
     case "revision full replan freezes selection across all writers": {
-      await installCompletedPlan();
+      await installCompletedPlan(); state.task.status = "failed";
       if (name.includes("full replan")) state.strategy = "full_replan";
-      await studio.previewRevision("novel-1", "修改结尾"); state.calls = []; state.selection = nextSelected;
+      state.selection = nextSelected;
+      await studio.previewRevision("novel-1", "修改结尾"); state.calls = [];
       state.onPrompt = () => { state.selection = selected; };
       await applyAndFlush(); assertCalls(nextSelected);
       assert.deepEqual(state.calls.map((call) => [call.id, call.options.temperature, call.options.maxTokens]), state.strategy === "full_replan" ? [
-        ["novel.short_story.plan", 0.55, undefined], ["novel.short_story.segment.write", 0.75, 3000],
-        ["novel.short_story.segment.write", 0.75, 3000],
+        ["novel.short_story.segment.write", 0.75, undefined], ["novel.short_story.segment.write", 0.75, undefined],
       ] : [["novel.short_story.patch.repair", 0.5, 12000]]); break;
     }
     case "concurrent production does not duplicate model calls": {

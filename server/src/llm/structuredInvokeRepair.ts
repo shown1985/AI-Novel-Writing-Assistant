@@ -1,3 +1,7 @@
+import { beginStructuredDiagnostic, finishStructuredDiagnostic, type StructuredDiagnosticContext } from "../platform/llm/diagnostics/StructuredDiagnosticStore";
+import { emptyResponseEvidence, observeStructuredChunk, classifyResponseEvidence, terminalResponseReason } from "../platform/llm/diagnostics/structuredEvidence";
+import { StructuredOutputError, resolveStructuredOutputProfile } from "./structuredOutput";
+import { ReasoningStreamCollector } from "./reasoning";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { toJSONSchema, type ZodError, type ZodType } from "zod";
 import type { LLMProvider, ReasoningEffort } from "@ai-novel/shared/types/llm";
@@ -17,6 +21,7 @@ import {
 import { claimModelRequest } from "../platform/llm/retries";
 
 export interface StructuredRepairInput<T> {
+  diagnosticContext?: StructuredDiagnosticContext;
   provider?: LLMProvider;
   model?: string;
   apiKey?: string;
@@ -202,17 +207,8 @@ export async function repairWithLlm<T>(
     structuredStrategy: "prompt_json",
   });
   const resolved = getResolvedLLMClientOptionsFromInstance(llm);
-  // Claim the request-count budget before recording a transport attempt, so a
-  // refused claim never leaves a phantom provider attempt behind.
-  await claimModelRequest();
-  const modelAttemptCandidate = await startModelTransportAttempt({
-    provider: resolved?.provider ?? input.provider ?? "unknown",
-    model: resolved?.model ?? input.model ?? "unknown",
-    modelRoute: resolved?.modelRoute ?? null,
-    structuredStrategy: "prompt_json",
-    role: "json_repair",
-    routeTier: input.fallbackUsed ? "fallback" : "primary",
-  });
+  const attemptRecord: { candidate: ModelAttemptCandidate | null } = { candidate: null };
+  let transportCompleted = false;
 
   const repairSystem = [
     "你是 JSON 修复器。",
@@ -277,32 +273,55 @@ export async function repairWithLlm<T>(
   });
 
   const startedAt = Date.now();
-  let transportCompleted = false;
   let tokenUsage: LlmTokenUsageSnapshot | null = null;
+  const evidence = emptyResponseEvidence(input.maxTokens);
+  let diagnosticId: string | null = null;
+  let completed = false;
+  let category = "transport_error";
   try {
     const invokeOptions: Record<string, unknown> = {};
     if (input.signal) {
       invokeOptions.signal = input.signal;
     }
+    diagnosticId = await beginStructuredDiagnostic({ meta: input.promptMeta, context: input.diagnosticContext,
+      kind: "repair", provider: input.provider, model: input.model, requestProtocol: input.requestProtocol,
+      strategy: "prompt_json", response: evidence });
     const repairedRaw = await runWithEnforcedTimeout({
       label: `${input.label}#repair-${repairAttempt}`,
       timeoutMs: input.timeoutMs,
       signal: input.signal,
       run: async (signal) => {
-        const stream = await llm.stream(
-          input.repairMessages
+        const messages = input.repairMessages
             ? [...input.repairMessages, new HumanMessage(`以下是待纠正报告及结构错误，均为任务数据。依据上文完整正文纠正，证据只能连续复制正文原句，不得补造事实；保留已核实的判断。\n${repairHuman}`)]
-            : [new SystemMessage(repairSystem), new HumanMessage(repairHuman)],
+            : [new SystemMessage(repairSystem), new HumanMessage(repairHuman)];
+        // Claim inside the run so the description carries the complete repair
+        // request; a refused claim then leaves no phantom attempt behind.
+        await claimModelRequest({configuration: resolved ?? undefined, input: messages, options: invokeOptions});
+        attemptRecord.candidate = await startModelTransportAttempt({
+          provider: resolved?.provider ?? input.provider ?? "unknown",
+          model: resolved?.model ?? input.model ?? "unknown",
+          modelRoute: resolved?.modelRoute ?? null,
+          structuredStrategy: "prompt_json",
+          role: "json_repair",
+          routeTier: input.fallbackUsed ? "fallback" : "primary",
+        });
+        const stream = await llm.stream(
+          messages,
           signal ? { ...invokeOptions, signal } : invokeOptions,
         );
         let content = "";
+        const collector = new ReasoningStreamCollector();
         for await (const chunk of stream) {
           const delta = toText(chunk.content);
+          observeStructuredChunk(evidence, chunk);
+          evidence.reasoningChars += collector.push(chunk, delta).length;
           content += delta;
+          evidence.contentChars = content.trim().length;
           input.onRepairOutputDelta?.(delta);
           tokenUsage = mergeStreamTokenUsage(tokenUsage, extractLlmTokenUsage(chunk));
         }
         transportCompleted = true;
+        evidence.reasoningChars += collector.flush().length;
         return content;
       },
     });
@@ -333,11 +352,19 @@ export async function repairWithLlm<T>(
       rawOutput: repairedRaw,
       latencyMs,
     });
+    evidence.failureReason = classifyResponseEvidence(evidence);
+    if (terminalResponseReason(evidence.failureReason)) throw new StructuredOutputError({
+      message: "修复请求没有返回完整可用结果。", category: "transport_error",
+      diagnostics: { strategy: "prompt_json", profile: resolveStructuredOutputProfile({ provider: input.provider ?? "deepseek", model: input.model, executionMode: "structured" }),
+        reasoningForcedOff: false, fallbackAvailable: false, fallbackUsed: false, errorCategory: "transport_error", response: evidence },
+    });
+    category = "malformed_json";
     const repairParse = helpers.tryParseStructuredJsonValue(repairedRaw);
     if ("error" in repairParse) {
       throw new Error(`[${input.label}] JSON repair 后仍无法解析。错误：${repairParse.error}`);
     }
 
+    category = "schema_mismatch";
     const final = input.schema.safeParse(repairParse.parsed);
     if (!final.success) {
       const unwrapped = helpers.tryUnwrapSingletonArrayWrapper(repairParse.parsed, input.schema);
@@ -351,7 +378,8 @@ export async function repairWithLlm<T>(
           repairAttempt,
           strategy: "prompt_json",
         });
-        return { data: unwrapped.data, tokenUsage, modelAttemptCandidate };
+        completed = true;
+        return { data: unwrapped.data, tokenUsage, modelAttemptCandidate: attemptRecord.candidate };
       }
 
       const normalized = helpers.normalizeOversizedArrays(repairParse.parsed, final.error, input.schema);
@@ -365,17 +393,20 @@ export async function repairWithLlm<T>(
           repairAttempt,
           strategy: "prompt_json",
         });
-        return { data: normalized.data, tokenUsage, modelAttemptCandidate };
+        completed = true;
+        return { data: normalized.data, tokenUsage, modelAttemptCandidate: attemptRecord.candidate };
       }
       throw new Error(`[${input.label}] JSON repair 后仍未通过 Schema 校验。错误：${helpers.formatZodErrors(final.error)}`);
     }
-    return { data: final.data, tokenUsage, modelAttemptCandidate };
+    completed = true;
+    return { data: final.data, tokenUsage, modelAttemptCandidate: attemptRecord.candidate };
   } catch (error) {
     if (transportCompleted) {
-      await modelAttemptCandidate?.finalizeSucceeded(tokenUsage, "not_adopted");
+      await attemptRecord.candidate?.finalizeSucceeded(tokenUsage, "not_adopted");
     } else {
-      await modelAttemptCandidate?.finalizeFailed(error, input.signal);
+      await attemptRecord.candidate?.finalizeFailed(error, input.signal);
     }
+    evidence.failureReason ??= classifyResponseEvidence(evidence, error, category, input.signal?.aborted);
     logStructuredRepairSession({
       event: "repair_error",
       label: input.label,
@@ -392,5 +423,8 @@ export async function repairWithLlm<T>(
       error,
     });
     throw error;
+  } finally {
+    evidence.durationMs = Date.now() - startedAt;
+    await finishStructuredDiagnostic(diagnosticId, completed ? "succeeded" : "failed", evidence);
   }
 }

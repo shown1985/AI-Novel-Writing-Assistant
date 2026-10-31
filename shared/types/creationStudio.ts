@@ -1,3 +1,5 @@
+import type { ShortStoryReferenceSelection, ShortStoryReferenceView } from "./shortStoryReference";
+import type { StructuredDiagnosticSummary } from "./structuredDiagnostics";
 import type { WritingPlatform, WritingPlatformPreference } from "./writingPlatform";
 import type { NovelCreateResourceRecommendation } from "./novelResourceRecommendation";
 
@@ -32,6 +34,7 @@ export interface CreationIntentInterpretation {
 }
 
 export interface CreationStudioInterpretRequest {
+  reference?: ShortStoryReferenceSelection;
   idea: string;
   preferredNarrativeForm?: NarrativeForm;
   targetWordCount?: number;
@@ -46,6 +49,7 @@ export interface CreationStudioReplaceDirectionRequest {
 }
 
 export interface CreationStudioRegenerateRequest {
+  reference?: ShortStoryReferenceSelection;
   narrativeForm: NarrativeForm;
   targetWordCount: number;
   feedback?: string;
@@ -63,6 +67,8 @@ export interface CreationStudioConfirmRequest {
 }
 
 export interface CreationStudioTaskProjection {
+  referenceSelection?: ShortStoryReferenceSelection;
+  reference?: ShortStoryReferenceView | null;
   taskId: string;
   intentVersionId: string | null;
   status: "queued" | "running" | "waiting_approval" | "succeeded" | "failed" | "cancelled";
@@ -75,6 +81,7 @@ export interface CreationStudioTaskProjection {
   productionTaskId: string | null;
   resumeRoute: string;
   error: string | null;
+  diagnostic?: StructuredDiagnosticSummary | null;
 }
 
 export type ShortStoryPlanStatus = "planning" | "ready" | "writing" | "reviewing" | "completed" | "failed";
@@ -139,6 +146,7 @@ export interface ShortStorySegmentProjection {
 }
 
 export interface ShortStoryProjection {
+  reference?: ShortStoryReferenceView | null;
   novel: {
     id: string;
     title: string;
@@ -170,6 +178,11 @@ export interface ShortStoryProjection {
     progress: number;
     currentAction: string | null;
     error: string | null;
+    diagnostic?: StructuredDiagnosticSummary | null;
+    checkpointType: string | null;
+    checkpointSummary: string | null;
+    recoveryAction: "preview_replan" | "preview_revision" | "retry_revision" | "retry_generation" | null;
+    revisionJob: { id: string; status: string; strategy: string } | null;
   };
 }
 
@@ -183,6 +196,11 @@ export interface ShortStoryRevisionPreviewRequest {
 }
 
 export interface ShortStoryRevisionImpact {
+  mode?: "revision" | "replan";
+  direction?: CreationDirection;
+  endingPromise?: string;
+  preservedFacts?: string[];
+  segmentPurposes?: Array<{ order: number; purpose: string }>;
   intentVersionId: string;
   understoodGoal: string;
   affectedSegmentIds: string[];

@@ -1,5 +1,5 @@
 import {attachLLMCacheRequestPolicy,resolveCacheCapability} from "../platform/llm/cache";
-import {attachExecutionSignal} from "../platform/llm/execution";
+import {attachExecutionSignal,assertLlmExecutionConfiguration,attachLlmExecutionPolicy,resolveScopedTaskOutputTokens} from "../platform/llm/execution";
 import type {
   LLMProvider,
   ModelSelectionProvenance,
@@ -276,19 +276,23 @@ export async function resolveLLMClientOptions(
     });
     if (shouldUseRouteProvider) {
       resolvedProvider = route.provider;
-      providerProvenance = route.selectionProvenance.provider;
+      providerProvenance = route.selectionProvenance?.provider ?? providerProvenance;
     }
     if (options.model == null && shouldUseRouteProvider) {
       resolvedModel = normalizeOptionalText(route.model);
-      modelProvenance = route.selectionProvenance.model;
+      modelProvenance = route.selectionProvenance?.model ?? modelProvenance;
     }
     if (options.temperature == null) {
       resolvedTemperature = route.temperature;
-      temperatureProvenance = route.selectionProvenance.temperature;
+      temperatureProvenance = route.selectionProvenance?.temperature ?? temperatureProvenance;
+    }
+    if (options.model == null && shouldUseRouteProvider) {
+      resolvedModel = normalizeOptionalText(route.model);
+      modelProvenance = route.selectionProvenance?.model ?? modelProvenance;
     }
     if (options.maxTokens == null) {
       resolvedMaxTokens = route.maxTokens;
-      maxTokensProvenance = route.selectionProvenance.maxTokens;
+      maxTokensProvenance = route.selectionProvenance?.maxTokens ?? maxTokensProvenance;
     }
     if (options.requestProtocol == null) {
       options.requestProtocol = route.requestProtocol;
@@ -388,7 +392,7 @@ export async function resolveLLMClientOptions(
       && structuredProfile.supportsReasoningToggle,
   );
   const reasoningEnabled = shouldForceDisableReasoning ? false : requestedReasoningEnabled;
-  let effectiveMaxTokens = resolvedMaxTokens;
+  let effectiveMaxTokens = resolveScopedTaskOutputTokens(resolvedProvider, model, resolvedModelRoute ?? options.taskType, resolvedMaxTokens);
   if (structuredProfile && usesNativeStructured && structuredProfile.omitMaxTokensForNativeStructured) {
     if (effectiveMaxTokens !== undefined) {
       maxTokensProvenance = appendModelSelectionAdjustment(maxTokensProvenance, {
@@ -503,6 +507,7 @@ export function buildOpenAICompatibleDefaultHeaders(
 }
 
 export function createLLMFromResolvedOptions(resolved: ResolvedLLMClientOptions): ChatOpenAI {
+  assertLlmExecutionConfiguration(resolved);
   const openCodeDefaultHeaders = resolved.openCodeSessionId ? {
     "user-agent": OPEN_CODE_USER_AGENT,
     "x-opencode-session": resolved.openCodeSessionId,
@@ -560,7 +565,7 @@ export function createLLMFromResolvedOptions(resolved: ResolvedLLMClientOptions)
     requestIntervalMs: resolved.requestIntervalMs,
   });
   (limited as ChatOpenAIWithResolvedOptions)[RESOLVED_LLM_OPTIONS] = resolved;
-  return attachExecutionSignal(limited);
+  return attachLlmExecutionPolicy(attachExecutionSignal(limited),resolved);
 }
 
 export async function getLLM(provider?: LLMProvider, options: LLMOptions = {}): Promise<ChatOpenAI> {

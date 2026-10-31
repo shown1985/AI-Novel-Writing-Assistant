@@ -28,7 +28,7 @@ test("BookAnalysisCommandService rebuildAnalysis keeps succeeded sections intact
   };
   let sectionWhere = null;
 
-  prisma.bookAnalysis.findUnique = async () => createAnalysisRow();
+  prisma.bookAnalysis.findUnique = async () => createAnalysisRow({ sections: [] });
   prisma.$transaction = async (callback) => callback({
     bookAnalysis: {
       update: async () => ({}),
@@ -48,7 +48,10 @@ test("BookAnalysisCommandService rebuildAnalysis keeps succeeded sections intact
     assert.deepEqual(sectionWhere, {
       analysisId: "analysis-1",
       frozen: false,
-      status: { not: "succeeded" },
+      OR: [
+        { status: { not: "succeeded" } },
+        { id: { in: [] } },
+      ],
     });
   } finally {
     prisma.bookAnalysis.findUnique = original.findUnique;
@@ -65,7 +68,7 @@ test("BookAnalysisCommandService rebuildAnalysis keeps frozen sections intact", 
   };
   let sectionWhere = null;
 
-  prisma.bookAnalysis.findUnique = async () => createAnalysisRow();
+  prisma.bookAnalysis.findUnique = async () => createAnalysisRow({ sections: [] });
   prisma.$transaction = async (callback) => callback({
     bookAnalysis: {
       update: async () => ({}),
@@ -198,7 +201,7 @@ test("BookAnalysisCommandService resumeWithBudget updates budget and preserves u
 
   prisma.bookAnalysis.findUnique = async () => {
     findUniqueCalls.push(true);
-    return createAnalysisRow({ status: "failed" });
+    return createAnalysisRow({ status: "failed", sections: [] });
   };
   prisma.$transaction = async (callback) => callback({
     bookAnalysis: {
@@ -248,7 +251,10 @@ test("BookAnalysisCommandService resumeWithBudget updates budget and preserves u
     assert.deepEqual(sectionWhere, {
       analysisId: "analysis-1",
       frozen: false,
-      status: { not: "succeeded" },
+      OR: [
+        { status: { not: "succeeded" } },
+        { id: { in: [] } },
+      ],
     });
     assert.deepEqual(enqueuedTask, { analysisId: "analysis-1", kind: "full" });
   } finally {

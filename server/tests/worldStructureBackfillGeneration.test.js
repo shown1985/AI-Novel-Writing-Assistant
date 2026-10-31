@@ -464,7 +464,6 @@ test("world structure backfill generation orchestration", async (t) => {
       const before = await worldFacts(clientA, worldId);
       const scenarios = [
         { operationId: "f-malformed", respond: async () => jsonStream("这不是 JSON"), kind: "failed_terminal", category: "malformed_json" },
-        { operationId: "f-empty", respond: async () => jsonStream("   "), kind: "failed_terminal", category: "empty_content" },
         {
           operationId: "f-schema",
           respond: async () => jsonStream(JSON.stringify({ profile: { summary: "缺字段" } })),
