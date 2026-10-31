@@ -73,6 +73,12 @@ services:
       CORS_ORIGIN: http://localhost:5173,http://127.0.0.1:5173
       DATABASE_URL: file:/data/dev.db
       QDRANT_URL: ${AI_NOVEL_DEV_QDRANT_URL:-http://qdrant:6333}
+    # 本机私有开发配置（magpie 网关等），值在 server/.env，不进仓库。
+    env_file:
+      - ../server/.env
+    extra_hosts:
+      # 让容器内可访问宿主机回环上的 magpie 网关。
+      - "host.docker.internal:host-gateway"
     volumes:
       - ..:/app
       - node-modules-root:/app/node_modules
